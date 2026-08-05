@@ -50,6 +50,7 @@ class AdminRolesPermissionsSeeder extends Seeder
             'reservations',
             'payments',
             'promo_codes',
+            'service_fees',
 
             // ── Fund transfers (new) ──────────────────────────────────────────
             'transfer_policies',

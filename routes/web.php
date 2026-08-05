@@ -148,6 +148,18 @@ Route::prefix('admin/ads')->middleware(['auth:admin', 'admin.guard', 'permission
 
 // Payment result pages — accessible by anyone (Geidea redirects here)
 Route::get('/payment-complete', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'success'])->name('payment.success');
+
+// Service fee settings — a fixed set of payment categories (reservation,
+// ad_package, property_package), each with an editable amount + toggle.
+// See App\Models\ServiceFee::feeFor() for where these are actually applied.
+Route::prefix('admin/service-fees')->middleware(['auth:admin', 'admin.guard'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\ServiceFee\ServiceFeeController::class, 'index'])
+        ->middleware('permission:service_fees.view')
+        ->name('admin.service-fees.index');
+    Route::put('/{key}', [\App\Http\Controllers\Admin\ServiceFee\ServiceFeeController::class, 'update'])
+        ->middleware('permission:service_fees.update')
+        ->name('admin.service-fees.update');
+});
 Route::get('/payment-failed', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'failed'])->name('payment.failed');
 Route::get('/payment-cancelled', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'cancelled'])->name('payment.cancelled');
 

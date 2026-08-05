@@ -24,12 +24,14 @@ class Payment extends Model
         'promo_code_id',
         'discount_amount',
         'original_amount',
+        'service_fee_amount',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'original_amount' => 'decimal:2',
+        'service_fee_amount' => 'decimal:2',
     ];
 
     protected static function booted(): void

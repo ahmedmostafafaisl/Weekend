@@ -1361,5 +1361,13 @@ return [
     'rejection_note_required' => 'يرجى توضيح سبب رفض هذا الإعلان — تُعرض الملاحظة للمستخدم.',
     'approve_confirm' => 'الموافقة على هذا الإعلان؟ سيصبح مرئيًا للمستخدمين فورًا.',
     'pending_ads' => 'إعلانات بانتظار المراجعة',
-    'sidebar_pending_ads' => 'إعلانات بانتظار المراجعة',
+
+    'service_fee' => 'رسوم الخدمة',
+    'service_fees' => 'رسوم الخدمة',
+    'service_fees_subtitle' => 'حدد رسمًا ثابتًا يُطبَّق عند الدفع لكل فئة من فئات الدفع أدناه.',
+    'service_fee_category' => 'الفئة',
+    'service_fee_amount' => 'قيمة الرسوم (ريال)',
+    'service_fee_updated' => 'تم تحديث رسوم الخدمة بنجاح.',
+    'enabled' => 'مفعّل',
+    'disabled' => 'غير مفعّل',
 ];

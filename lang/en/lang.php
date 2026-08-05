@@ -1367,5 +1367,13 @@ return [
     'rejection_note_required' => 'Please explain why this ad is being rejected — the note is shown to the user.',
     'approve_confirm' => 'Approve this ad? It will become visible to users immediately.',
     'pending_ads' => 'Pending Ads',
-    'sidebar_pending_ads' => 'Pending Ads',
+
+    'service_fee' => 'Service Fee',
+    'service_fees' => 'Service Fees',
+    'service_fees_subtitle' => 'Configure a fixed fee applied at checkout for each payment category below.',
+    'service_fee_category' => 'Category',
+    'service_fee_amount' => 'Fee Amount (SAR)',
+    'service_fee_updated' => 'Service fee updated successfully.',
+    'enabled' => 'Enabled',
+    'disabled' => 'Disabled',
 ];

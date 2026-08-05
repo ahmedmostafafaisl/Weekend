@@ -324,6 +324,11 @@ Route::middleware('auth:sanctum')->group(function () {
 // unite city field's validation and the dashboard city dropdown)
 Route::get('/saudi-cities', [\App\Http\Controllers\Api\SaudiCityController::class, 'index']);
 
+// Service fees — public reference data, so a client can show a price
+// breakdown before checkout instead of only discovering the fee after
+// paying. See App\Models\ServiceFee::feeFor() for where it's actually applied.
+Route::get('/service-fees', [\App\Http\Controllers\Api\ServiceFeeController::class, 'index']);
+
 // Stadium Type Routes
 Route::prefix('stadium-types')->group(function () {
     Route::get('/', [StadiumTypeController::class, 'index']);

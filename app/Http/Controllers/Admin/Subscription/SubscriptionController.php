@@ -100,6 +100,14 @@ class SubscriptionController extends Controller
 
                 $subscription = Subscription::create($subData);
 
+                // Service fee — keyed by subscription type ('ad' -> ad_package,
+                // 'property' -> property_package). Kept separate from
+                // Subscription.amount (the pure package price) and tracked
+                // only at the Payment level, matching the reservation flow's
+                // same principle.
+                $serviceFee = \App\Models\ServiceFee::feeFor($data['type'] === 'ad' ? 'ad_package' : 'property_package');
+                $chargeAmount = $subscription->amount + $serviceFee;
+
                 // 2. Resolve gateway first so payment_type is correct from creation
                 $paymentMethod = $data['payment_method'] ?? 'geidea';
                 try {
@@ -113,9 +121,10 @@ class SubscriptionController extends Controller
                     'user_id' => $userId,
                     'subscription_id' => $subscription->id,
                     'payment_type' => $paymentMethod,
-                    'amount' => $subscription->amount,
+                    'amount' => $chargeAmount,
                     'status' => 'pending',
                     'phone' => $user->phone,
+                    'service_fee_amount' => $serviceFee > 0 ? $serviceFee : null,
                 ]);
 
                 $payment->items()->create([
@@ -125,11 +134,20 @@ class SubscriptionController extends Controller
                     'quantity' => 1,
                     'total_amount' => $subscription->amount,
                 ]);
+                if ($serviceFee > 0) {
+                    $payment->items()->create([
+                        'name' => __('lang.service_fee'),
+                        'item_number' => (string) $subscription->id.'-fee',
+                        'price' => $serviceFee,
+                        'quantity' => 1,
+                        'total_amount' => $serviceFee,
+                    ]);
+                }
 
                 // Call the selected gateway
                 $gatewayResult = $gateway->sendPayment([
-                    'amount' => $subscription->amount,
-                    'price' => $subscription->amount,
+                    'amount' => $chargeAmount,
+                    'price' => $chargeAmount,
                     'quantity' => 1,
                     'description' => $package->name.' — '.ucfirst($data['type']).' subscription',
                     'currency' => config('services.'.$paymentMethod.'.currency', 'SAR'),

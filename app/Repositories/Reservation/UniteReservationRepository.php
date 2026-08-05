@@ -89,6 +89,13 @@ class UniteReservationRepository implements UniteReservationInterface
             $chargeAmount = $promoResult['final_amount'];
         }
 
+        // Service fee is a flat charge, applied AFTER any promo-code
+        // discount — it's not part of the discountable price. feeFor()
+        // returns 0.0 for categories with no fee configured or explicitly
+        // disabled, so this is always safe to add unconditionally.
+        $serviceFee = \App\Models\ServiceFee::feeFor('reservation');
+        $chargeAmount += $serviceFee;
+
         $this->ensureNoConflict($unite->id, $data['reservation_date'], $fromTime, $toTime);
 
         // ── Provider approval mode ────────────────────────────────────────────────
@@ -96,7 +103,7 @@ class UniteReservationRepository implements UniteReservationInterface
         // status and notify the provider — no Geidea call yet.
         if ($unite->requires_approval) {
             return $this->createPendingApproval(
-                $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult
+                $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $serviceFee
             );
         }
 
@@ -107,7 +114,7 @@ class UniteReservationRepository implements UniteReservationInterface
         // Wrap reservation + payment creation in a single transaction.
         // If Geidea returns an error we roll back both rows so the slot stays free.
         $result = DB::transaction(function () use (
-            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $gateway, $paymentMethod
+            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $gateway, $paymentMethod, $serviceFee
         ) {
             // 1. Create the reservation (status: pending — confirmed only after payment)
             $reservation = UniteReservation::create([
@@ -136,16 +143,32 @@ class UniteReservationRepository implements UniteReservationInterface
                 'promo_code_id' => $promoResult ? $promoResult['promo_code']->id : null,
                 'discount_amount' => $promoResult ? $promoResult['discount_amount'] : null,
                 'original_amount' => $promoResult ? $promoResult['original_amount'] : null,
+                'service_fee_amount' => $serviceFee > 0 ? $serviceFee : null,
             ]);
 
-            // Build the PaymentItem that Geidea's eInvoice needs
+            // Build the PaymentItem(s) that Geidea's eInvoice needs — split
+            // into a base line + a separate Service Fee line when a fee
+            // applies, so the customer sees an itemized breakdown rather
+            // than a mysteriously inflated lump sum. The base line is
+            // computed as chargeAmount minus the fee (not independently
+            // recalculated) so the two lines always sum exactly to
+            // chargeAmount with no floating-point rounding drift.
             $payment->items()->create([
                 'name' => $unite->name.' — '.ucfirst(str_replace('_', ' ', $data['period_type'])),
                 'item_number' => (string) $reservation->id,
-                'price' => $chargeAmount,
+                'price' => $chargeAmount - $serviceFee,
                 'quantity' => 1,
-                'total_amount' => $chargeAmount,
+                'total_amount' => $chargeAmount - $serviceFee,
             ]);
+            if ($serviceFee > 0) {
+                $payment->items()->create([
+                    'name' => __('lang.service_fee'),
+                    'item_number' => (string) $reservation->id.'-fee',
+                    'price' => $serviceFee,
+                    'quantity' => 1,
+                    'total_amount' => $serviceFee,
+                ]);
+            }
 
             // 4. Call Geidea — if this throws or returns failure we roll back
             $gatewayResult = $gateway->sendPayment([
@@ -384,10 +407,11 @@ class UniteReservationRepository implements UniteReservationInterface
         string $toTime,
         float $fullPrice,
         float $chargeAmount,
-        ?array $promoResult
+        ?array $promoResult,
+        float $serviceFee = 0.0
     ): array {
         $reservation = DB::transaction(function () use (
-            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult
+            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $serviceFee
         ) {
             $reservation = UniteReservation::create([
                 'unite_id' => $unite->id,
@@ -415,6 +439,7 @@ class UniteReservationRepository implements UniteReservationInterface
                 'promo_code_id' => $promoResult ? $promoResult['promo_code']->id : null,
                 'discount_amount' => $promoResult ? $promoResult['discount_amount'] : null,
                 'original_amount' => $promoResult ? $promoResult['original_amount'] : null,
+                'service_fee_amount' => $serviceFee > 0 ? $serviceFee : null,
             ]);
 
             return $reservation;
@@ -450,13 +475,23 @@ class UniteReservationRepository implements UniteReservationInterface
         }
 
         if ($payment->items()->doesntExist()) {
+            $serviceFee = (float) ($payment->service_fee_amount ?? 0);
             $payment->items()->create([
                 'name' => $reservation->unite->name.' — '.ucfirst(str_replace('_', ' ', $reservation->period_type)),
                 'item_number' => (string) $reservation->id,
-                'price' => $payment->amount,
+                'price' => $payment->amount - $serviceFee,
                 'quantity' => 1,
-                'total_amount' => $payment->amount,
+                'total_amount' => $payment->amount - $serviceFee,
             ]);
+            if ($serviceFee > 0) {
+                $payment->items()->create([
+                    'name' => __('lang.service_fee'),
+                    'item_number' => (string) $reservation->id.'-fee',
+                    'price' => $serviceFee,
+                    'quantity' => 1,
+                    'total_amount' => $serviceFee,
+                ]);
+            }
         }
 
         $user = $reservation->user;

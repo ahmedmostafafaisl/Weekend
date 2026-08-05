@@ -17,6 +17,7 @@
     $showReservations     = $me && $me->can('reservations.view');
     $showReviewers        = $me && $me->hasRole(['super_admin','admin']);
     $showPromoCodes       = true;
+    $showServiceFees      = $me && $me->can('service_fees.view');
 
     $initials = collect(explode(' ', $me?->name ?? 'A'))->map(fn($w) => strtoupper($w[0]))->take(2)->implode('');
 @endphp
@@ -130,6 +131,12 @@
         <a class="nav-link-dark {{ str_starts_with($r,'admin.payments') ? 'active' : '' }}"
            href="{{ route('admin.payments.index') }}">
             <i class="ti ti-credit-card"></i> {{ __('lang.sidebar_payments') }}
+        </a>
+        @endif
+        @if($showServiceFees && Route::has('admin.service-fees.index'))
+        <a class="nav-link-dark {{ str_starts_with($r,'admin.service-fees') ? 'active' : '' }}"
+           href="{{ route('admin.service-fees.index') }}">
+            <i class="ti ti-receipt"></i> {{ __('lang.sidebar_service_fees') }}
         </a>
         @endif
         @if($showPropertyPackages)
