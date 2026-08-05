@@ -1,0 +1,84 @@
+:root{
+  --accent:#6f00ff;
+  --bg:#f6f5fb;
+  --text:#1f2937;
+  --muted:#6b7280;
+}
+
+body{
+  background: var(--bg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--text);
+}
+
+.auth-wrap{
+  min-height: 100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 24px;
+  position: relative;
+  overflow:hidden;
+}
+
+.auth-card{
+  width: 420px;
+  border-radius: 14px;
+  background:#fff;
+}
+
+.logo-box{
+  width: 100%;
+  height: 140px;
+  border: 2px solid rgba(111,0,255,.35);
+  border-radius: 10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.logo-box img{
+  max-width: 70%;
+  max-height: 70%;
+}
+
+.brand{ color: var(--accent); }
+
+.btn-accent{
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 11px 14px;
+  border-radius: 10px;
+}
+.btn-accent:hover{ opacity:.92; color:#fff; }
+
+.link-accent{ color: var(--accent); }
+.link-accent:hover{ opacity:.85; }
+
+.toggle-pass{
+  border-radius: 0 10px 10px 0 !important;
+}
+
+.form-control{
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.dots{
+  position:absolute;
+  width: 160px;
+  height: 160px;
+  background-image: radial-gradient(rgba(111,0,255,.35) 2px, transparent 2px);
+  background-size: 16px 16px;
+  border-radius: 14px;
+  opacity: .6;
+}
+.dots-top{
+  top: 70px;
+  right: 120px;
+}
+.dots-bottom{
+  bottom: 90px;
+  left: 120px;
+}

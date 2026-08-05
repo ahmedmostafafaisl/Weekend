@@ -1,0 +1,774 @@
+<?php
+
+namespace App\Repositories\Reservation;
+
+use App\Models\Payment;
+use App\Models\Unite;
+use App\Models\UniteReservation;
+use App\Notifications\ReservationCancelled;
+use App\Notifications\ReservationPendingApproval;
+use App\Repositories\Interfaces\PaymentGatewayInterface;
+use App\Repositories\Interfaces\UniteReservationInterface;
+use App\Services\PromoCode\PromoCodeService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class UniteReservationRepository implements UniteReservationInterface
+{
+    public function __construct(
+        protected PaymentGatewayInterface $paymentGateway,
+        protected PromoCodeService $promoCodeService,
+    ) {}
+
+    // -------------------------------------------------------------------------
+    // Queries
+    // -------------------------------------------------------------------------
+
+    public function all()
+    {
+        return UniteReservation::with(['user', 'unite', 'payment'])->latest()->get();
+    }
+
+    public function allForUser($userId)
+    {
+        return UniteReservation::with(['user', 'unite', 'payment'])
+            ->where('user_id', $userId)
+            ->latest()
+            ->get();
+    }
+
+    public function find($id)
+    {
+        return UniteReservation::with(['user', 'unite', 'payment'])->findOrFail($id);
+    }
+
+    // -------------------------------------------------------------------------
+    // Create — single atomic flow: validate → reserve → pay
+    // -------------------------------------------------------------------------
+
+    /**
+     * Creates a reservation and a pending Payment record in a single transaction,
+     * then requests a Geidea hosted-payment URL.
+     *
+     * Returns an array with:
+     *   - reservation  UniteReservation  the newly created booking
+     *   - payment      Payment           the pending payment record
+     *   - payment_url  string            the Geidea hosted-checkout link
+     *
+     * Throws on conflict, missing slot config, or gateway failure.
+     */
+    public function create(array $data, $userId = null): array
+    {
+        $unite = Unite::with(['prices', 'offers', 'slots'])->findOrFail($data['unite_id']);
+
+        [$fromTime, $toTime] = $this->resolveTimes($unite, $data);
+        // Hourly bookings: calculate price from from_time/to_time + hourly rates
+        if ($data['period_type'] === 'hourly') {
+            $fullPrice = $this->resolveHourlyPrice($unite, $fromTime, $toTime, $data['reservation_date']);
+        } else {
+            $fullPrice = $this->resolvePrice($unite, $data['period_type'], $data['reservation_date']);
+        }
+        $chargeAmount = $this->resolveChargeAmount($unite, $fullPrice);
+
+        if ($chargeAmount <= 0) {
+            abort(422, __('lang.venue_no_price_configured'));
+        }
+
+        // Resolve promo code if provided (validate outside transaction — read-only)
+        $promoResult = null;
+        if (! empty($data['promo_code'])) {
+            $promoResult = $this->promoCodeService->validate(
+                $data['promo_code'],
+                $chargeAmount,
+                $userId
+            );
+            if (! $promoResult['valid']) {
+                abort(422, $promoResult['message']);
+            }
+            $chargeAmount = $promoResult['final_amount'];
+        }
+
+        $this->ensureNoConflict($unite->id, $data['reservation_date'], $fromTime, $toTime);
+
+        // ── Provider approval mode ────────────────────────────────────────────────
+        // If the venue requires approval, create the reservation in pending_approval
+        // status and notify the provider — no Geidea call yet.
+        if ($unite->requires_approval) {
+            return $this->createPendingApproval(
+                $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult
+            );
+        }
+
+        // Select payment gateway based on requested method (default: geidea)
+        $paymentMethod = $data['payment_method'] ?? 'geidea';
+        $gateway = \App\Services\Payment\PaymentMethodFactory::make($paymentMethod);
+
+        // Wrap reservation + payment creation in a single transaction.
+        // If Geidea returns an error we roll back both rows so the slot stays free.
+        $result = DB::transaction(function () use (
+            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $gateway, $paymentMethod
+        ) {
+            // 1. Create the reservation (status: pending — confirmed only after payment)
+            $reservation = UniteReservation::create([
+                'unite_id' => $unite->id,
+                'user_id' => $userId,
+                'reservation_date' => $data['reservation_date'],
+                'period_type' => $data['period_type'],
+                'from_time' => $fromTime,
+                'to_time' => $toTime,
+                'price' => $fullPrice,
+                'status' => 'pending',
+            ]);
+
+            // 2. Resolve the user's phone — required by Geidea
+            $user = $reservation->user ?? auth()->user();
+            $phone = $user?->phone ?? $data['phone'] ?? null;
+
+            // 3. Create the pending Payment row (reference_id auto-generated in model boot)
+            $payment = Payment::create([
+                'user_id' => $userId,
+                'reservation_id' => $reservation->id,
+                'payment_type' => $paymentMethod,
+                'amount' => $chargeAmount,
+                'status' => 'pending',
+                'phone' => $phone,
+                'promo_code_id' => $promoResult ? $promoResult['promo_code']->id : null,
+                'discount_amount' => $promoResult ? $promoResult['discount_amount'] : null,
+                'original_amount' => $promoResult ? $promoResult['original_amount'] : null,
+            ]);
+
+            // Build the PaymentItem that Geidea's eInvoice needs
+            $payment->items()->create([
+                'name' => $unite->name.' — '.ucfirst(str_replace('_', ' ', $data['period_type'])),
+                'item_number' => (string) $reservation->id,
+                'price' => $chargeAmount,
+                'quantity' => 1,
+                'total_amount' => $chargeAmount,
+            ]);
+
+            // 4. Call Geidea — if this throws or returns failure we roll back
+            $gatewayResult = $gateway->sendPayment([
+                'amount' => $chargeAmount,
+                'price' => $chargeAmount,
+                'quantity' => 1,
+                'description' => $unite->name.' — '.$data['reservation_date'],
+                'currency' => env('GEIDEA_CURRENCY'),
+
+                // merchantReferenceId ties the callback back to our Payment row
+                'merchantReferenceId' => $payment->reference_id,
+
+                'customer' => [
+                    'name' => $user?->name ?? 'Customer',
+                    'email' => $user?->email,
+                    'phoneNumber' => $phone,
+                ],
+
+                // callbackUrl: Geidea POSTs to this after payment
+                // Must be a publicly reachable URL — set GEIDEA_CALLBACK_URL in .env for local dev (use ngrok)
+                'callbackUrl' => config('services.geidea.callback_url', route('payment.callback')),
+
+                // returnUrl: browser redirect after user completes payment on Geidea's page
+                'returnUrl' => config('services.geidea.return_url', url('/payment-complete')),
+            ]);
+
+            if (! ($gatewayResult['success'] ?? false)) {
+                // Force a rollback — throw an exception so DB::transaction catches it
+                throw new \RuntimeException(
+                    $gatewayResult['message'] ?? 'Payment gateway returned an error.'
+                );
+            }
+
+            // 5. Store Geidea's paymentIntentId on the Payment row for later lookups
+            $payment->update(['payment_id' => $gatewayResult['item_id']]);
+
+            // 6. Record promo code usage (inside transaction — rolls back if Geidea fails)
+            if ($promoResult) {
+                $this->promoCodeService->recordUsage(
+                    $promoResult['promo_code'],
+                    $payment->id,
+                    $promoResult['original_amount'],
+                    $promoResult['discount_amount'],
+                    $promoResult['final_amount'],
+                    $userId
+                );
+            }
+            // dd($gatewayResult['payment_url']);
+
+            return [
+                'reservation' => $reservation->load(['user', 'unite', 'payment']),
+                'payment' => $payment->fresh()->load('items'),
+                'payment_url' => $gatewayResult['payment_url'],
+            ];
+        });
+
+        return $result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Update
+    // -------------------------------------------------------------------------
+
+    public function update($id, array $data)
+    {
+        $reservation = UniteReservation::with(['unite.prices', 'unite.offers', 'unite.slots'])->findOrFail($id);
+
+        if ($reservation->status === 'cancelled') {
+            abort(422, __('lang.cancelled_reservation_cannot_update'));
+        }
+
+        $payload = array_merge([
+            'reservation_date' => $reservation->reservation_date?->format('Y-m-d'),
+            'period_type' => $reservation->period_type,
+            'from_time' => $reservation->from_time,
+            'to_time' => $reservation->to_time,
+            'unite_id' => $reservation->unite_id,
+        ], $data);
+
+        [$fromTime, $toTime] = $this->resolveTimes($reservation->unite, $payload);
+        $price = $this->resolvePrice($reservation->unite, $payload['period_type'], $payload['reservation_date']);
+
+        $this->ensureNoConflict(
+            $reservation->unite_id,
+            $payload['reservation_date'],
+            $fromTime,
+            $toTime,
+            $reservation->id
+        );
+
+        $reservation->update([
+            'reservation_date' => $payload['reservation_date'],
+            'period_type' => $payload['period_type'],
+            'from_time' => $fromTime,
+            'to_time' => $toTime,
+            'price' => $price,
+            'status' => $data['status'] ?? $reservation->status,
+        ]);
+
+        return $reservation->fresh(['user', 'unite', 'payment']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Delete
+    // -------------------------------------------------------------------------
+
+    public function delete($id)
+    {
+        return UniteReservation::findOrFail($id)->delete();
+    }
+
+    // -------------------------------------------------------------------------
+    // Cancel
+    // -------------------------------------------------------------------------
+
+    public function cancel($id, $userId = null): UniteReservation
+    {
+        $reservation = UniteReservation::with(['payment', 'unite'])->findOrFail($id);
+
+        if ($userId && $reservation->user_id !== $userId) {
+            abort(403, __('lang.unauthorized_action'));
+        }
+
+        $startDateTime = Carbon::parse(
+            $reservation->reservation_date->format('Y-m-d').' '.$reservation->from_time
+        );
+
+        if (now()->greaterThanOrEqualTo($startDateTime)) {
+            abort(422, __('lang.reservation_cannot_cancel_started'));
+        }
+
+        return DB::transaction(function () use ($reservation) {
+            // Mark reservation cancelled
+            $reservation->update(['status' => 'cancelled']);
+
+            $payment = $reservation->payment;
+
+            // Nothing to refund if there is no paid payment
+            if (! $payment || $payment->status !== 'paid') {
+                Log::info('Reservation cancelled with no paid payment to refund', [
+                    'reservation_id' => $reservation->id,
+                    'payment_status' => $payment?->status,
+                ]);
+
+                $fresh = $reservation->fresh(['payment', 'unite.department.user', 'user']);
+                $fresh->user?->notify(new ReservationCancelled($fresh, 0));
+                $fresh->unite?->department?->user?->notify(new ReservationCancelled($fresh, 0, true));
+
+                return $fresh;
+            }
+
+            // Determine refund amount from the venue's refund_policy
+            $refundAmount = $this->resolveRefundAmount($reservation);
+
+            if ($refundAmount <= 0) {
+                Log::info('Reservation cancelled — refund_policy: no refund due', [
+                    'reservation_id' => $reservation->id,
+                    'policy' => $reservation->unite?->refund_policy,
+                ]);
+                // Mark payment as refunded with zero — keeps audit trail clean
+                $payment->update(['status' => 'refunded']);
+
+                $fresh = $reservation->fresh(['payment', 'unite.department.user', 'user']);
+                $fresh->user?->notify(new ReservationCancelled($fresh, 0));
+                $fresh->unite?->department?->user?->notify(new ReservationCancelled($fresh, 0, true));
+
+                return $fresh;
+            }
+
+            // No Geidea order ID → cannot call the API
+            if (empty($payment->payment_id)) {
+                Log::warning('Reservation cancelled — paid payment has no gateway order ID; cannot auto-refund', [
+                    'reservation_id' => $reservation->id,
+                    'payment_id' => $payment->id,
+                ]);
+                $payment->update(['status' => 'refund_failed']);
+
+                return $reservation->fresh('payment');
+            }
+
+            Log::info('Initiating Geidea refund', [
+                'reservation_id' => $reservation->id,
+                'payment_id' => $payment->id,
+                'geidea_order_id' => $payment->payment_id,
+                'refund_amount' => $refundAmount,
+                'policy' => $reservation->unite?->refund_policy,
+            ]);
+
+            $result = $this->paymentGateway->refund(
+                $payment->payment_id,
+                $refundAmount,
+                'Customer cancellation – reservation #'.$reservation->id
+            );
+
+            if ($result['success'] ?? false) {
+                $payment->update(['status' => 'refunded']);
+                Log::info('Geidea refund succeeded', ['reservation_id' => $reservation->id]);
+
+                $fresh = $reservation->fresh(['payment', 'unite.department.user', 'user']);
+                $fresh->user?->notify(new ReservationCancelled($fresh, $refundAmount));
+                $fresh->unite?->department?->user?->notify(new ReservationCancelled($fresh, $refundAmount, true));
+            } else {
+                $payment->update(['status' => 'refund_failed']);
+                Log::error('Geidea refund failed', [
+                    'reservation_id' => $reservation->id,
+                    'message' => $result['message'] ?? 'unknown',
+                ]);
+                // Do NOT re-throw — the reservation is already cancelled.
+                // The refund failure is logged; admin can retry via the recovery endpoint.
+
+                $fresh = $reservation->fresh(['payment', 'unite.department.user', 'user']);
+                $fresh->user?->notify(new ReservationCancelled($fresh, 0)); // refund pending admin action
+            }
+
+            return $reservation->fresh('payment');
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Resolve how much to refund based on the venue's refund_policy
+    //
+    // free       → 100 % refund (full paid amount)
+    // flexible   → 100 % if cancelled > 24 h before start, 0 % otherwise
+    // moderate   → 50 % if cancelled > 48 h before start, 0 % otherwise
+    // strict     → 0 % (no refund ever)
+    // null/other → 100 % (default to generous policy)
+    // -------------------------------------------------------------------------
+
+    // ── Provider approval mode ───────────────────────────────────────────────
+
+    protected function createPendingApproval(
+        Unite $unite,
+        array $data,
+        mixed $userId,
+        string $fromTime,
+        string $toTime,
+        float $fullPrice,
+        float $chargeAmount,
+        ?array $promoResult
+    ): array {
+        $reservation = DB::transaction(function () use (
+            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult
+        ) {
+            $reservation = UniteReservation::create([
+                'unite_id' => $unite->id,
+                'user_id' => $userId,
+                'reservation_date' => $data['reservation_date'],
+                'period_type' => $data['period_type'],
+                'from_time' => $fromTime,
+                'to_time' => $toTime,
+                'price' => $fullPrice,
+                'status' => 'pending_approval',
+                'guest_count' => $data['guest_count'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $user = $reservation->user ?? auth()->user();
+            $phone = $user?->phone ?? $data['phone'] ?? null;
+
+            Payment::create([
+                'user_id' => $userId,
+                'reservation_id' => $reservation->id,
+                'payment_type' => 'geidea',
+                'amount' => $chargeAmount,
+                'status' => 'pending',
+                'phone' => $phone,
+                'promo_code_id' => $promoResult ? $promoResult['promo_code']->id : null,
+                'discount_amount' => $promoResult ? $promoResult['discount_amount'] : null,
+                'original_amount' => $promoResult ? $promoResult['original_amount'] : null,
+            ]);
+
+            return $reservation;
+        });
+
+        $fresh = $reservation->fresh(['unite.department.user', 'user', 'payment']);
+        $fresh->unite?->department?->user?->notify(new ReservationPendingApproval($fresh));
+
+        return [
+            'reservation' => $fresh,
+            'payment' => $fresh->payment,
+            'payment_url' => null,
+            'status' => 'pending_approval',
+            'message' => __('lang.booking_request_sent_awaiting_payment'),
+        ];
+    }
+
+    public function approve(int $reservationId, int $providerId): array
+    {
+        $reservation = UniteReservation::with(['unite.department', 'payment', 'user'])->findOrFail($reservationId);
+
+        if ($reservation->unite?->department?->user_id !== $providerId) {
+            abort(403, __('lang.only_provider_can_approve'));
+        }
+
+        if ($reservation->status !== 'pending_approval') {
+            abort(422, str_replace(':status', $reservation->status, __('lang.reservation_not_awaiting_approval')));
+        }
+
+        $payment = $reservation->payment;
+        if (! $payment) {
+            abort(422, __('lang.no_payment_record_found'));
+        }
+
+        if ($payment->items()->doesntExist()) {
+            $payment->items()->create([
+                'name' => $reservation->unite->name.' — '.ucfirst(str_replace('_', ' ', $reservation->period_type)),
+                'item_number' => (string) $reservation->id,
+                'price' => $payment->amount,
+                'quantity' => 1,
+                'total_amount' => $payment->amount,
+            ]);
+        }
+
+        $user = $reservation->user;
+        $phone = $user?->phone ?? $payment->phone;
+
+        $gatewayResult = $this->paymentGateway->sendPayment([
+            'amount' => $payment->amount,
+            'price' => $payment->amount,
+            'quantity' => 1,
+            'description' => $reservation->unite->name.' — '.$reservation->reservation_date->format('Y-m-d'),
+            'currency' => env('GEIDEA_CURRENCY'),
+            'payment_id' => $payment->id,
+            'reference' => $payment->reference_id,
+            'email' => $user?->email,
+            'phone' => $phone,
+            'name' => $user?->name ?? 'Customer',
+        ]);
+
+        if (! isset($gatewayResult['payment_url'])) {
+            abort(502, str_replace(':reason', $gatewayResult['message'] ?? __('lang.no_payment_url_returned'), __('lang.payment_gateway_error')));
+        }
+
+        $payment->update(['payment_id' => $gatewayResult['item_id'] ?? null]);
+        $reservation->update(['status' => 'pending']);
+
+        return [
+            'reservation' => $reservation->fresh(),
+            'payment_url' => $gatewayResult['payment_url'],
+            'message' => __('lang.reservation_approved_awaiting_payment'),
+        ];
+    }
+
+    public function reject(int $reservationId, int $providerId, ?string $reason = null): UniteReservation
+    {
+        $reservation = UniteReservation::with(['unite.department', 'payment', 'user'])->findOrFail($reservationId);
+
+        if ($reservation->unite?->department?->user_id !== $providerId) {
+            abort(403, __('lang.only_provider_can_reject'));
+        }
+
+        if ($reservation->status !== 'pending_approval') {
+            abort(422, str_replace(':status', $reservation->status, __('lang.reservation_not_awaiting_approval')));
+        }
+
+        DB::transaction(function () use ($reservation) {
+            $reservation->update(['status' => 'cancelled']);
+            $reservation->payment?->update(['status' => 'failed']);
+        });
+
+        $fresh = $reservation->fresh(['unite', 'payment', 'user']);
+        $fresh->user?->notify(new ReservationCancelled($fresh, 0));
+
+        return $fresh;
+    }
+
+    protected function resolveRefundAmount(UniteReservation $reservation): float
+    {
+        $paid = (float) ($reservation->payment?->amount ?? 0);
+        $policy = $reservation->unite?->refund_policy;
+
+        $startDateTime = Carbon::parse(
+            $reservation->reservation_date->format('Y-m-d').' '.$reservation->from_time
+        );
+        $hoursUntilStart = now()->diffInHours($startDateTime, false); // negative if past
+
+        return match ($policy) {
+            'free' => $paid,
+            'flexible' => $hoursUntilStart >= 24 ? $paid : 0.0,
+            'moderate' => $hoursUntilStart >= 48 ? round($paid * 0.5, 2) : 0.0,
+            'strict' => 0.0,
+            default => $paid, // no policy set → full refund
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Private: charge amount (deposit vs full price)
+    // -------------------------------------------------------------------------
+
+    /**
+     * If the venue requires a deposit, the customer is charged only the deposit
+     * now; the remainder is settled at the venue.
+     *
+     * deposit_type = 'amount'     → charge exactly reservation_deposit_amount
+     * deposit_type = 'percentage' → charge (reservation_deposit_amount / 100) * fullPrice
+     * no deposit                  → charge fullPrice
+     */
+    private function resolveChargeAmount(Unite $unite, float $fullPrice): float
+    {
+        if (! $unite->reservation_deposit) {
+            return $fullPrice;
+        }
+
+        $depositAmount = (float) ($unite->reservation_deposit_amount ?? 0);
+
+        if ($unite->reservation_deposit_type === 'percentage') {
+            return round(($depositAmount / 100) * $fullPrice, 2);
+        }
+
+        // 'amount' type — fixed deposit, capped at the full price
+        return min($depositAmount, $fullPrice);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private: slot resolution
+    // -------------------------------------------------------------------------
+
+    protected function resolveTimes(Unite $unite, array $data): array
+    {
+        // BUG FIX: stadiums only support hourly bookings — the null-check
+        // fallback further down (which correctly rejects morning/evening
+        // for halls once their slot data has no times configured) would
+        // NOT have caught this case, since stadium slots genuinely have
+        // non-null full_start/full_end representing the stadium's
+        // OPERATING WINDOW, not a bookable whole-day reservation type.
+        // Without this explicit check, a full_day (or morning/evening)
+        // booking for a stadium would have silently succeeded at the flat
+        // 'price' rate instead of being rejected in favor of hourly booking.
+        if ($unite->type === 'stadium' && $data['period_type'] !== 'hourly') {
+            abort(422, str_replace(':type', __('lang.'.$unite->type), __('lang.venue_hourly_only')));
+        }
+
+        $dayOfWeek = strtolower(Carbon::parse($data['reservation_date'])->englishDayOfWeek);
+
+        // Use already-loaded collection first to avoid an extra query
+        $slot = $unite->relationLoaded('slots')
+            ? $unite->slots->firstWhere('day_of_week', $dayOfWeek)
+            : $unite->slots()->where('day_of_week', $dayOfWeek)->first();
+
+        // Try 'weekday' slot as fallback if exact day is missing
+        if (! $slot && $unite->relationLoaded('slots')) {
+            $slot = $unite->slots->firstWhere('day_of_week', 'weekday')
+                ?? $unite->slots->first();
+        }
+
+        if (! $slot) {
+            abort(422, str_replace(':day', $dayOfWeek, __('lang.no_slot_config_for_day')));
+        }
+
+        [$from, $to] = match ($data['period_type']) {
+            'morning' => [$slot->morning_start, $slot->morning_end],
+            'evening' => [$slot->evening_start, $slot->evening_end],
+            'full_day' => [$slot->full_start,    $slot->full_end],
+            'custom',
+            'hourly' => [$data['from_time'] ?? null, $data['to_time'] ?? null],
+            default => abort(422, str_replace(':type', $data['period_type'], __('lang.invalid_period_type'))),
+        };
+
+        if (is_null($from) || is_null($to)) {
+            // Distinguish the two causes of null so the error is actionable:
+            // - custom/hourly: the caller didn't send from_time / to_time
+            // - morning/evening/full_day: the venue slot has no times configured
+            //   for that period (e.g. stadiums only support full_day)
+            if (in_array($data['period_type'], ['custom', 'hourly'])) {
+                abort(422, str_replace(':period', $data['period_type'], __('lang.from_to_time_required_for_period')));
+            }
+
+            abort(422, str_replace(':period', $data['period_type'], __('lang.venue_does_not_offer_period')));
+        }
+
+        // Hourly: enforce minimum booking duration
+        if ($data['period_type'] === 'hourly') {
+            $priceRow = $unite->relationLoaded('prices')
+                ? $unite->prices->first()
+                : $unite->prices()->first();
+
+            if ($priceRow && $priceRow->hourly_enabled) {
+                $minMinutes = $priceRow->min_booking_minutes ?? 60;
+                $duration = Carbon::parse($from)->diffInMinutes(Carbon::parse($to));
+                if ($duration < $minMinutes) {
+                    abort(422, str_replace([':min', ':requested'], [$minMinutes, $duration], __('lang.min_booking_duration')));
+                }
+            }
+        }
+
+        return [$from, $to];
+    }
+
+    // -------------------------------------------------------------------------
+    // Private: price resolution (offers → base price)
+    // -------------------------------------------------------------------------
+
+    protected function resolvePrice(Unite $unite, string $periodType, string $date): float
+    {
+        $reservationDate = Carbon::parse($date);
+
+        $activeOffer = $unite->offers()
+            ->where('status', 'active')
+            ->whereDate('start', '<=', $reservationDate)
+            ->whereDate('end', '>=', $reservationDate)
+            ->latest('id')
+            ->first();
+
+        if ($activeOffer) {
+            if ($unite->type === 'stadium') {
+                return (float) ($activeOffer->full_day_price ?? 0);
+            }
+
+            // Hourly price is calculated separately; resolvePrice returns 0 for it
+            if ($periodType === 'hourly') {
+                return 0.0;
+            }
+
+            return (float) match ($periodType) {
+                'morning' => $activeOffer->morning_price ?? 0,
+                'evening' => $activeOffer->evening_price ?? 0,
+                'full_day', 'custom', 'hourly' => $activeOffer->full_day_price ?? 0,
+                default => 0,
+            };
+        }
+
+        $mappedDay = match (strtolower($reservationDate->englishDayOfWeek)) {
+            'thursday' => 'thursday',
+            'friday' => 'friday',
+            'saturday' => 'saturday',
+            default => 'week_day',
+        };
+
+        $price = $unite->prices()->where('day', $mappedDay)->first();
+
+        if (! $price) {
+            return 0;
+        }
+
+        if ($unite->type === 'stadium') {
+            return (float) $price->price;
+        }
+
+        // Hourly price is calculated separately; resolvePrice returns 0 for it
+        if ($periodType === 'hourly') {
+            return 0.0;
+        }
+
+        return (float) match ($periodType) {
+            'morning' => $price->morning_price,
+            'evening' => $price->evening_price,
+            'full_day', 'custom' => $price->full_price,
+            default => 0,
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Private: conflict guard
+    // -------------------------------------------------------------------------
+
+    protected function ensureNoConflict(
+        int $uniteId,
+        string $date,
+        string $fromTime,
+        string $toTime,
+        ?int $ignoreId = null
+    ): void {
+        $query = UniteReservation::where('unite_id', $uniteId)
+            ->where('reservation_date', $date)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where(function ($q) use ($fromTime, $toTime) {
+                $q->where('from_time', '<', $toTime)
+                    ->where('to_time', '>', $fromTime);
+            });
+
+        if ($ignoreId) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        if ($query->exists()) {
+            abort(422, __('lang.time_slot_conflict'));
+        }
+    }
+
+    /**
+     * Calculate the total price for an hourly booking.
+     *
+     * Looks up the correct price row for the day, then uses
+     * UnitePrice::calculateHourlyPrice() to split the time range
+     * at the day/night boundary.
+     */
+    protected function resolveHourlyPrice(
+        Unite $unite,
+        string $fromTime,
+        string $toTime,
+        string $date
+    ): float {
+        $reservationDate = Carbon::parse($date);
+
+        $mappedDay = match (strtolower($reservationDate->englishDayOfWeek)) {
+            'thursday' => 'thursday',
+            'friday' => 'friday',
+            'saturday' => 'saturday',
+            default => 'week_day',
+        };
+
+        $prices = $unite->relationLoaded('prices')
+            ? $unite->prices
+            : $unite->prices()->get();
+
+        $priceRow = $prices->firstWhere('day', $mappedDay)
+            ?? $prices->firstWhere('day', 'week_day')
+            ?? $prices->first();
+
+        if (! $priceRow) {
+            abort(422, __('lang.no_pricing_configured_for_day'));
+        }
+
+        if (! $priceRow->hourly_enabled || ! $priceRow->day_hour_price) {
+            abort(422, __('lang.hourly_booking_unavailable_for_day'));
+        }
+
+        $total = $priceRow->calculateHourlyPrice($fromTime, $toTime);
+
+        if ($total <= 0) {
+            abort(422, __('lang.hourly_price_calc_failed'));
+        }
+
+        return $total;
+    }
+}
