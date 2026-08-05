@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Ad;
+use App\Models\Admin;
 use App\Models\Unite;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -13,6 +14,7 @@ class AdsTableSeeder extends Seeder
     {
         $users = User::pluck('id')->values();
         $unites = Unite::pluck('id')->values();
+        $reviewerAdminId = Admin::pluck('id')->first();
 
         if ($users->isEmpty()) {
             return;
@@ -52,6 +54,18 @@ class AdsTableSeeder extends Seeder
                 'target_audience' => $targeting['target_audience'],
                 'target_user_type' => $targeting['target_user_type'],
                 'city' => $targeting['city'],
+                // Realistic approval-status mix — mostly approved (matches
+                // established demo data), a genuine pending subset and one
+                // rejected example, so the new review workflow has real
+                // data to work against immediately after seeding.
+                'approval_status' => match (true) {
+                    $i % 10 === 0 => 'pending',
+                    $i % 10 === 1 => 'rejected',
+                    default => 'approved',
+                },
+                'reviewed_by_admin_id' => $i % 10 === 0 ? null : $reviewerAdminId,
+                'reviewed_at' => $i % 10 === 0 ? null : now()->subHours(rand(1, 48)),
+                'rejection_note' => $i % 10 === 1 ? 'المحتوى لا يتوافق مع سياسات الإعلانات — يرجى مراجعة النص والصورة.' : null,
             ];
         }
 
@@ -69,6 +83,9 @@ class AdsTableSeeder extends Seeder
                     'is_active' => true,
                     'activated_at' => now()->subHours(rand(1, 10)),
                     'expires_at' => now()->addHours(rand(2, 24)),
+                    'approval_status' => 'approved',
+                    'reviewed_by_admin_id' => $reviewerAdminId,
+                    'reviewed_at' => now()->subHours(rand(1, 48)),
                 ];
             }
         }

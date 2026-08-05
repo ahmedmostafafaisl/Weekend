@@ -1348,4 +1348,16 @@ return [
     'showing_departments_of_type' => 'يتم عرض الأقسام المطابقة للنوع المحدد.',
     'type_locked_after_creation' => 'لا يمكن تغيير النوع بعد إنشاء الوحدة.',
     'department_locked_after_creation' => 'لا يمكن تغيير القسم بعد إنشاء الوحدة.',
+
+    'ad_approved_successfully' => 'تمت الموافقة على الإعلان بنجاح.',
+    'ad_rejected_successfully' => 'تم رفض الإعلان.',
+    'ads_pending_review' => 'إعلانات بانتظار المراجعة',
+    'no_ads_pending_review' => 'لا توجد إعلانات بانتظار المراجعة حاليًا.',
+    'review_ad' => 'مراجعة الإعلان',
+    'submitted_by' => 'مُقدَّم من',
+    'approve' => 'موافقة',
+    'reject' => 'رفض',
+    'rejection_note' => 'ملاحظة الرفض',
+    'rejection_note_required' => 'يرجى توضيح سبب رفض هذا الإعلان — تُعرض الملاحظة للمستخدم.',
+    'approve_confirm' => 'الموافقة على هذا الإعلان؟ سيصبح مرئيًا للمستخدمين فورًا.',
 ];

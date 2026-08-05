@@ -1354,4 +1354,16 @@ return [
     'showing_departments_of_type' => 'Showing departments matching the selected type.',
     'type_locked_after_creation' => 'Type cannot be changed after the venue has been created.',
     'department_locked_after_creation' => 'Department cannot be changed after the venue has been created.',
+
+    'ad_approved_successfully' => 'Ad approved successfully.',
+    'ad_rejected_successfully' => 'Ad rejected.',
+    'ads_pending_review' => 'Ads Pending Review',
+    'no_ads_pending_review' => 'No ads are currently awaiting review.',
+    'review_ad' => 'Review Ad',
+    'submitted_by' => 'Submitted by',
+    'approve' => 'Approve',
+    'reject' => 'Reject',
+    'rejection_note' => 'Rejection Note',
+    'rejection_note_required' => 'Please explain why this ad is being rejected — the note is shown to the user.',
+    'approve_confirm' => 'Approve this ad? It will become visible to users immediately.',
 ];

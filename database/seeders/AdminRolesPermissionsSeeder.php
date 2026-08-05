@@ -78,6 +78,15 @@ class AdminRolesPermissionsSeeder extends Seeder
             }
         }
 
+        // 'review' isn't one of the standard CRUD actions above — added
+        // explicitly. admin's syncPermissions() below already includes it
+        // automatically (its pattern is "not like %.delete", which this
+        // matches), so only super_admin needs the explicit addition here.
+        $allPermissions[] = Permission::firstOrCreate([
+            'name' => 'ads.review',
+            'guard_name' => $guard,
+        ]);
+
         // ── Roles ─────────────────────────────────────────────────────────────
         $superAdmin = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => $guard]);
         $admin = Role::firstOrCreate(['name' => 'admin',       'guard_name' => $guard]);

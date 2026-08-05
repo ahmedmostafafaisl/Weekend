@@ -135,6 +135,17 @@ Route::post('/ads/{id}/activate', [AdController::class, 'activate'])
     ->middleware('auth')
     ->name('ads.activate');
 
+// Ad approval review workflow — an admin with the ads.review permission
+// clicks the "new ad needs review" notification, lands here, and can
+// approve or reject (with a note) — see App\Notifications\AdPendingApproval
+// and App\Notifications\AdReviewed for the notification side of this.
+Route::prefix('admin/ads')->middleware(['auth:admin', 'admin.guard', 'permission:ads.review'])->group(function () {
+    Route::get('/pending', [\App\Http\Controllers\Admin\Ads\AdReviewController::class, 'index'])->name('admin.ads.pending');
+    Route::get('/{id}/review', [\App\Http\Controllers\Admin\Ads\AdReviewController::class, 'show'])->name('admin.ads.review');
+    Route::post('/{id}/approve', [\App\Http\Controllers\Admin\Ads\AdReviewController::class, 'approve'])->name('admin.ads.approve');
+    Route::post('/{id}/reject', [\App\Http\Controllers\Admin\Ads\AdReviewController::class, 'reject'])->name('admin.ads.reject');
+});
+
 // Payment result pages — accessible by anyone (Geidea redirects here)
 Route::get('/payment-complete', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'success'])->name('payment.success');
 Route::get('/payment-failed', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'failed'])->name('payment.failed');

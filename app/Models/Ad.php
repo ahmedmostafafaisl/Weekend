@@ -21,12 +21,17 @@ class Ad extends Model
         'city',
         'target_audience',
         'target_user_type',
+        'approval_status',
+        'reviewed_by_admin_id',
+        'reviewed_at',
+        'rejection_note',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'activated_at' => 'datetime',
         'expires_at' => 'datetime',
+        'reviewed_at' => 'datetime',
         'target_audience' => 'string',
         'target_user_type' => 'string',
     ];
@@ -103,6 +108,10 @@ class Ad extends Model
                 if ($userType && $userType !== 'all') {
                     $targeting->where(fn ($q) => $q->where('target_user_type', 'all')->orWhere('target_user_type', $userType));
                 }
+                // New ads require admin approval before anyone besides
+                // their own owner can see them — the "own ads always show"
+                // branch above already bypasses this for the owner.
+                $targeting->where('approval_status', 'approved');
             });
         });
     }
@@ -112,5 +121,26 @@ class Ad extends Model
         return $query->where('is_active', true)
             ->whereNotNull('expires_at')
             ->where('expires_at', '>', now());
+    }
+
+    /**
+     * The admin who reviewed this ad (approved or rejected it) — null while
+     * still pending.
+     */
+    public function reviewer()
+    {
+        return $this->belongsTo(Admin::class, 'reviewed_by_admin_id');
+    }
+
+    /**
+     * Approval is a separate gate from activeNow()/is_active — an ad can be
+     * approved but not yet activated (activated_at/expires_at still null),
+     * or activated but pending approval (shouldn't normally happen since
+     * activate() is customer-facing, but this scope makes the intent explicit
+     * regardless of how the two states combine).
+     */
+    public function scopeApproved(Builder $query)
+    {
+        return $query->where('approval_status', 'approved');
     }
 }

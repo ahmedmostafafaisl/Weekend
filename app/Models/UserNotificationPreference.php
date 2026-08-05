@@ -30,6 +30,7 @@ class UserNotificationPreference extends Model
         'subscription_activated' => 'Subscription Activated',
         'promotion' => 'Promotions & Offers',
         'leave_review' => 'Leave a Review',
+        'ad_reviewed' => 'Ad Review Outcome',
     ];
 
     /**

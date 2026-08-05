@@ -65,6 +65,15 @@ class AdRepository implements AdInterface
             $data['expires_at'] = now()->addDay();
         }
 
+        // BUG FIX / SECURITY: force pending regardless of anything a client
+        // might submit — approval_status must never be settable directly
+        // through the create request, or a malicious request could just
+        // submit approval_status=approved and skip review entirely.
+        $data['approval_status'] = 'pending';
+        $data['reviewed_by_admin_id'] = null;
+        $data['reviewed_at'] = null;
+        $data['rejection_note'] = null;
+
         $targetUsers = $data['target_users'] ?? null;
         unset($data['target_users']);
 
@@ -73,6 +82,13 @@ class AdRepository implements AdInterface
         if (is_array($targetUsers) && count($targetUsers)) {
             $ad->targetUsers()->sync(array_map('intval', $targetUsers));
         }
+
+        // Notify every admin who can review ads — Spatie's permission()
+        // scope correctly includes admins with the permission granted
+        // directly AND those who have it via a role, matching how
+        // permission checks work everywhere else in this codebase.
+        $reviewers = \App\Models\Admin::permission('ads.review')->get();
+        \Illuminate\Support\Facades\Notification::send($reviewers, new \App\Notifications\AdPendingApproval($ad));
 
         return $ad;
     }
@@ -129,6 +145,7 @@ class AdRepository implements AdInterface
             },
         ])
             ->activeNow()
+            ->approved()
             ->where('user_id', '!=', $userId)
             ->latest()
             ->get()
@@ -222,6 +239,7 @@ class AdRepository implements AdInterface
             'comments',
         ])
             ->activeNow()
+            ->where(fn ($q) => $q->where('approval_status', 'approved')->orWhere('user_id', $userId))
             ->latest()
             ->get()
             ->map(function ($ad) {
