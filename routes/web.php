@@ -156,7 +156,7 @@ Route::prefix('admin/service-fees')->middleware(['auth:admin', 'admin.guard'])->
     Route::get('/', [\App\Http\Controllers\Admin\ServiceFee\ServiceFeeController::class, 'index'])
         ->middleware('permission:service_fees.view')
         ->name('admin.service-fees.index');
-    Route::put('/{key}', [\App\Http\Controllers\Admin\ServiceFee\ServiceFeeController::class, 'update'])
+    Route::put('/', [\App\Http\Controllers\Admin\ServiceFee\ServiceFeeController::class, 'update'])
         ->middleware('permission:service_fees.update')
         ->name('admin.service-fees.update');
 });

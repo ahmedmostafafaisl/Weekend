@@ -1370,4 +1370,6 @@ return [
     'service_fee_updated' => 'تم تحديث رسوم الخدمة بنجاح.',
     'enabled' => 'مفعّل',
     'disabled' => 'غير مفعّل',
+    'sidebar_service_fees' => 'رسوم الخدمة',
+    'sidebar_pending_ads' => 'الإعلانات المعلقة',
 ];

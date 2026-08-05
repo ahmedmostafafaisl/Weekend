@@ -1376,4 +1376,6 @@ return [
     'service_fee_updated' => 'Service fee updated successfully.',
     'enabled' => 'Enabled',
     'disabled' => 'Disabled',
+    'sidebar_service_fees' => 'Service Fees',
+    'sidebar_pending_ads' => 'Pending Ads',
 ];
