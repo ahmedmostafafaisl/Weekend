@@ -76,16 +76,30 @@ class SingleUniteResource extends JsonResource
                 ];
             })->values(),
             'offers' => $this->offers->map(function ($offer) {
-                return [
+                $base = [
                     'id' => $offer->id,
                     'name' => $offer->name,
                     'start' => $offer->start,
                     'end' => $offer->end,
-                    'morning_price' => $offer->morning_price,
-                    'evening_price' => $offer->evening_price,
-                    'full_day_price' => $offer->full_day_price,
-                    'status' => $offer->status,
                 ];
+
+                // Stadiums are hourly-only — morning_price/evening_price/
+                // full_day_price are always null for this type, since
+                // offers here use day_hour_price/night_hour_price instead,
+                // matching the admin dashboard's offers form and the
+                // standalone offers pages (fixed a few sessions ago).
+                if ($this->type === 'stadium') {
+                    $base['day_hour_price'] = $offer->day_hour_price;
+                    $base['night_hour_price'] = $offer->night_hour_price;
+                } else {
+                    $base['morning_price'] = $offer->morning_price;
+                    $base['evening_price'] = $offer->evening_price;
+                    $base['full_day_price'] = $offer->full_day_price;
+                }
+
+                $base['status'] = $offer->status;
+
+                return $base;
             })->values(),
 
             'slots' => $this->formatSlotsByType(),

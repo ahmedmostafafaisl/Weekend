@@ -1372,4 +1372,7 @@ return [
     'disabled' => 'غير مفعّل',
     'sidebar_service_fees' => 'رسوم الخدمة',
     'sidebar_pending_ads' => 'الإعلانات المعلقة',
+
+    'venue_closed_on_this_day' => 'هذه الوحدة مغلقة يوم :day.',
+    'booking_outside_operating_hours' => 'ساعات عمل هذه الوحدة في هذا اليوم من :from إلى :to فقط.',
 ];

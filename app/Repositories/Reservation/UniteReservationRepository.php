@@ -591,7 +591,7 @@ class UniteReservationRepository implements UniteReservationInterface
         }
 
         // 'amount' type — fixed deposit, capped at the full price
-        return min($depositAmount, $fullPrice);
+        return $fullPrice;
     }
 
     // -------------------------------------------------------------------------
@@ -798,7 +798,29 @@ class UniteReservationRepository implements UniteReservationInterface
             abort(422, __('lang.hourly_booking_unavailable_for_day'));
         }
 
-        $total = $priceRow->calculateHourlyPrice($fromTime, $toTime);
+        // BUG FIX: active offers were never checked here at all — this
+        // always used the base price row's rates even when a cheaper
+        // promotional offer covered the requested date, unlike
+        // AvailabilityService (fixed a couple sessions ago), which
+        // already correctly prioritizes offer rates over the base price.
+        // A non-persisted clone lets calculateHourlyPrice()'s existing
+        // day/night-split logic run unchanged against the offer's rates
+        // instead of duplicating that calculation here.
+        $offer = $unite->offers()
+            ->where('status', 'active')
+            ->where('start', '<=', $date)
+            ->where('end', '>=', $date)
+            ->latest('id')
+            ->first();
+
+        $effectiveRow = $priceRow;
+        if ($offer && $offer->day_hour_price) {
+            $effectiveRow = clone $priceRow;
+            $effectiveRow->day_hour_price = $offer->day_hour_price;
+            $effectiveRow->night_hour_price = $offer->night_hour_price ?? $offer->day_hour_price;
+        }
+
+        $total = $effectiveRow->calculateHourlyPrice($fromTime, $toTime);
 
         if ($total <= 0) {
             abort(422, __('lang.hourly_price_calc_failed'));

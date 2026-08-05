@@ -1378,4 +1378,7 @@ return [
     'disabled' => 'Disabled',
     'sidebar_service_fees' => 'Service Fees',
     'sidebar_pending_ads' => 'Pending Ads',
+
+    'venue_closed_on_this_day' => 'This venue is closed on :day.',
+    'booking_outside_operating_hours' => 'This venue is only open from :from to :to on this day.',
 ];

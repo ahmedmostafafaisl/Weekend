@@ -136,7 +136,7 @@ class AvailabilityService
         Carbon $date
     ): array {
         if ($unite->type === 'stadium') {
-            return [$this->buildStadiumPeriod($slot, $price, $offer, $dayReservations, $date)];
+            return $this->buildStadiumPeriods($slot, $price, $offer, $dayReservations, $date);
         }
 
         $periods = [];
@@ -164,23 +164,100 @@ class AvailabilityService
         return $periods;
     }
 
-    private function buildStadiumPeriod($slot, $price, $offer, Collection $dayReservations, Carbon $date): array
+    /**
+     * BUG FIX: stadiums are hourly-only — the operating window
+     * (full_start-full_end) is not itself one bookable "period" the way
+     * morning/evening/full_day are for other venue types. This used to
+     * mark the WHOLE day 'booked' the instant any reservation existed,
+     * even a 1-hour one out of a 17-hour window. Now computes the actual
+     * free gaps around existing reservations via interval subtraction, so
+     * a stadium booked 14:00-16:00 out of a 06:00-23:00 window correctly
+     * returns two separate available slots (06:00-14:00 and 16:00-23:00)
+     * instead of the entire day reading as unavailable.
+     *
+     * Each slot also carries day_hour_price/night_hour_price directly (not
+     * a single flat 'price' the way the old single-period version did),
+     * since that's the actual pricing mechanism for this venue type —
+     * UnitePrice::calculateHourlyPrice() splits any given booking within a
+     * slot proportionally between the two based on the day/night boundary.
+     *
+     * @return array<int, array>
+     */
+    private function buildStadiumPeriods($slot, $price, $offer, Collection $dayReservations, Carbon $date): array
     {
-        $start = $slot->full_start;
-        $end = $slot->full_end;
-        $priceVal = $offer
-            ? (float) ($offer->full_day_price ?? 0)
-            : (float) ($price?->price ?? 0);
+        $windowStart = $slot->full_start;
+        $windowEnd = $slot->full_end;
 
-        // For stadiums, check for any overlapping reservations across the full window
-        $booked = $dayReservations->isNotEmpty();
+        if (! $windowStart || ! $windowEnd) {
+            return [];
+        }
 
+        $dayHourPrice = $offer?->day_hour_price ?? $price?->day_hour_price ?? 0;
+        $nightHourPrice = $offer?->night_hour_price ?? $price?->night_hour_price ?? 0;
+        $isPastDate = $date->isPast() && ! $date->isToday();
+
+        // Merge overlapping/adjacent booked ranges first (ensureNoConflict
+        // should prevent genuine overlaps from ever being created, but
+        // merging defensively means this still produces a clean gap list
+        // even against unexpected data).
+        $booked = $dayReservations
+            ->map(fn ($r) => ['from' => $r->from_time, 'to' => $r->to_time])
+            ->sortBy('from')
+            ->values();
+
+        $merged = [];
+        foreach ($booked as $range) {
+            if ($merged && $range['from'] <= end($merged)['to']) {
+                $merged[array_key_last($merged)]['to'] = max(end($merged)['to'], $range['to']);
+            } else {
+                $merged[] = $range;
+            }
+        }
+
+        // Walk the operating window, emitting a free slot for every gap
+        // before/between/after the merged booked ranges.
+        $slots = [];
+        $cursor = $windowStart;
+
+        foreach ($merged as $range) {
+            if ($range['from'] > $cursor) {
+                $slots[] = $this->makeStadiumSlot($cursor, $range['from'], $dayHourPrice, $nightHourPrice, $isPastDate);
+            }
+            $cursor = max($cursor, $range['to']);
+        }
+
+        if ($cursor < $windowEnd) {
+            $slots[] = $this->makeStadiumSlot($cursor, $windowEnd, $dayHourPrice, $nightHourPrice, $isPastDate);
+        }
+
+        // The whole window was booked solid, no gaps at all — return it as
+        // a single, explicitly booked entry so the day still reads as
+        // fully_booked rather than silently showing zero periods (which
+        // summariseAvailability would otherwise read as 'unavailable',
+        // the wrong status for "booked solid" vs "closed/no slot config").
+        if (empty($slots) && ! empty($merged)) {
+            return [[
+                'period_type' => 'hourly',
+                'from_time' => $windowStart,
+                'to_time' => $windowEnd,
+                'day_hour_price' => (float) $dayHourPrice,
+                'night_hour_price' => (float) $nightHourPrice,
+                'availability' => 'booked',
+            ]];
+        }
+
+        return $slots;
+    }
+
+    private function makeStadiumSlot(string $from, string $to, $dayHourPrice, $nightHourPrice, bool $isPastDate): array
+    {
         return [
-            'period_type' => 'full_day',
-            'from_time' => $start,
-            'to_time' => $end,
-            'price' => $priceVal,
-            'availability' => $booked ? 'booked' : ($date->isPast() && ! $date->isToday() ? 'past' : 'available'),
+            'period_type' => 'hourly',
+            'from_time' => $from,
+            'to_time' => $to,
+            'day_hour_price' => (float) $dayHourPrice,
+            'night_hour_price' => (float) $nightHourPrice,
+            'availability' => $isPastDate ? 'past' : 'available',
         ];
     }
 
