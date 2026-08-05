@@ -45,11 +45,23 @@
         </a>
         @endif
         @if(Route::has('admin.ads.index'))
-        <a class="nav-link-dark {{ str_starts_with($r,'admin.ads') ? 'active' : '' }}"
+        <a class="nav-link-dark {{ str_starts_with($r,'admin.ads') && $r !== 'admin.ads.pending' ? 'active' : '' }}"
            href="{{ route('admin.ads.index') }}">
             <i class="ti ti-speakerphone"></i> {{ __('lang.sidebar_ads') }}
         </a>
         @endif
+        @can('ads.review')
+            @if(Route::has('admin.ads.pending'))
+            <a class="nav-link-dark {{ $r === 'admin.ads.pending' ? 'active' : '' }}"
+               href="{{ route('admin.ads.pending') }}">
+                <i class="ti ti-clipboard-check"></i> {{ __('lang.sidebar_pending_ads') }}
+                @php($pendingCount = \App\Models\Ad::where('approval_status', 'pending')->count())
+                @if($pendingCount)
+                    <span class="badge bg-warning text-dark ms-1">{{ $pendingCount }}</span>
+                @endif
+            </a>
+            @endif
+        @endcan
         @if(Route::has('admin.transfers.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.transfers') ? 'active' : '' }}"
            href="{{ route('admin.transfers.index') }}">
