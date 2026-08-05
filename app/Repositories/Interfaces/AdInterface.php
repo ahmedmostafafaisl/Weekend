@@ -4,7 +4,7 @@ namespace App\Repositories\Interfaces;
 
 interface AdInterface
 {
-    public function all();
+    public function all(array $filters = []);
 
     public function allActive();
 

@@ -11,7 +11,18 @@
         <h4 class="fw-bold mb-1">{{ __('lang.ads') }}</h4>
         <div class="text-muted small">{{ __('lang.ads_subtitle') }}</div>
     </div>
-    <a href="{{ route('admin.ads.create') }}" class="btn btn-accent">{{ __('lang.new_ad') }}</a>
+    <div class="d-flex gap-2">
+        @can('ads.review')
+            <a href="{{ route('admin.ads.pending') }}" class="btn btn-outline-warning">
+                {{ __('lang.pending_ads') }}
+                @php($pendingCount = \App\Models\Ad::where('approval_status', 'pending')->count())
+                @if($pendingCount)
+                    <span class="badge bg-warning text-dark ms-1">{{ $pendingCount }}</span>
+                @endif
+            </a>
+        @endcan
+        <a href="{{ route('admin.ads.create') }}" class="btn btn-accent">{{ __('lang.new_ad') }}</a>
+    </div>
 </div>
 
 {{-- Filters --}}

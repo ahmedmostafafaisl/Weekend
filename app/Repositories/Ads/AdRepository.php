@@ -9,11 +9,15 @@ use App\Repositories\Interfaces\AdInterface;
 
 class AdRepository implements AdInterface
 {
-    public function all()
+    public function all(array $filters = [])
     {
-        return Ad::with(['user', 'property'])
-            ->latest()
-            ->get();
+        $query = Ad::with(['user', 'property']);
+
+        if (! empty($filters['approval_status'])) {
+            $query->where('approval_status', $filters['approval_status']);
+        }
+
+        return $query->latest()->get();
     }
 
     public function allActive(array $filters = [])

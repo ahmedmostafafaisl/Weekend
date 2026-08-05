@@ -1366,4 +1366,5 @@ return [
     'rejection_note' => 'Rejection Note',
     'rejection_note_required' => 'Please explain why this ad is being rejected — the note is shown to the user.',
     'approve_confirm' => 'Approve this ad? It will become visible to users immediately.',
+    'pending_ads' => 'Pending Ads',
 ];

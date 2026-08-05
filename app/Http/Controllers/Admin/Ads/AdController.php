@@ -15,13 +15,15 @@ class AdController extends Controller
 
     public function index(Request $request)
     {
+        $status = $request->query('status');
+
         $ads = $request->expectsJson()
             ? $this->adRepo->allActive()
-            : $this->adRepo->all();
+            : $this->adRepo->all($status ? ['approval_status' => $status] : []);
 
         return $request->expectsJson()
             ? AdResource::collection($ads)
-            : view('dashboard.web.ads.index', compact('ads'));
+            : view('dashboard.web.ads.index', compact('ads', 'status'));
     }
 
     public function create()
