@@ -133,6 +133,26 @@ class SingleUniteResource extends JsonResource
                 ];
             })->values(),
 
+            // Genuinely universal across all 4 venue types, unlike the
+            // capacity-tier 'packages' above it — package booking is an
+            // optional add-on available equally to stadium/hall/lounge/camp.
+            'package_booking_enabled' => (bool) $this->package_booking_enabled,
+            'booking_packages' => $this->bookingPackages->map(function ($pkg) {
+                return [
+                    'id' => $pkg->id,
+                    'name' => $pkg->name,
+                    'day' => $pkg->day,
+                    'start_time' => $pkg->start_time,
+                    'end_time' => $pkg->end_time,
+                    'price' => $pkg->price,
+                    'status' => $pkg->status,
+                    'services' => $pkg->services->map(fn ($s) => [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                    ])->values(),
+                ];
+            })->values(),
+
             'is_favorite' => $isFavorite,
 
             'location_data' => [

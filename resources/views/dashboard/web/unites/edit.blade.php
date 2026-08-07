@@ -258,6 +258,12 @@
         ])
     @endunless
 
+    {{-- ── Booking Packages ── (universal — available to every venue type) --}}
+    @include('dashboard.web.unites.partials._booking_packages_section', [
+        'unite'     => $unite,
+        'services'  => $services,
+    ])
+
     {{-- ── Reservations ── --}}
     <div class="card card-soft shadow-sm mb-4">
         <div class="card-body">

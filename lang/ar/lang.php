@@ -1375,4 +1375,11 @@ return [
 
     'venue_closed_on_this_day' => 'هذه الوحدة مغلقة يوم :day.',
     'booking_outside_operating_hours' => 'ساعات عمل هذه الوحدة في هذا اليوم من :from إلى :to فقط.',
+
+    'booking_packages' => 'باقات الحجز',
+    'booking_packages_subtitle' => 'باقات اختيارية يمكن للعميل حجزها مباشرة — لكل منها يومها/أيامها، والفترة الزمنية، والسعر الثابت، والخدمات المشمولة.',
+    'package_booking_enabled' => 'تفعيل الحجز بالباقات لهذه الوحدة',
+    'booking_package_days' => 'اليوم',
+    'any_day' => 'أي يوم',
+    'included_services' => 'الخدمات المشمولة',
 ];

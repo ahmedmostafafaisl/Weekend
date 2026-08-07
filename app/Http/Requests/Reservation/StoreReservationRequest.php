@@ -18,9 +18,10 @@ class StoreReservationRequest extends FormRequest
         return [
             'unite_id' => ['required', 'exists:unites,id'],
             'reservation_date' => ['required', 'date', 'after_or_equal:today'],
-            'period_type' => ['required', 'in:morning,evening,full_day,custom,hourly'],
+            'period_type' => ['required', 'in:morning,evening,full_day,custom,hourly,package'],
             'from_time' => ['nullable', 'required_if:period_type,custom', 'required_if:period_type,hourly', 'date_format:H:i'],
             'to_time' => ['nullable', 'required_if:period_type,custom', 'required_if:period_type,hourly', 'date_format:H:i', 'after:from_time'],
+            'booking_package_id' => ['nullable', 'required_if:period_type,package', 'integer', 'exists:unite_booking_packages,id'],
             'phone' => ['nullable', 'string', 'max:20'],
             'promo_code' => ['nullable', 'string', 'max:50'],
             'guest_count' => ['nullable', 'integer', 'min:1', 'max:10000'],

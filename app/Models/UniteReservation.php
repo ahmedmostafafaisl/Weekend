@@ -22,12 +22,18 @@ class UniteReservation extends Model
         'status',
         'guest_count',
         'notes',
+        'unite_booking_package_id',
     ];
 
     protected $casts = [
         'reservation_date' => 'date',
         'price' => 'float',
     ];
+
+    public function bookingPackage()
+    {
+        return $this->belongsTo(UniteBookingPackage::class);
+    }
 
     public function unite()
     {

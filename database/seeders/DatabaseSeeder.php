@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
             PropertyPackagesTableSeeder::class,
             AdPackagesTableSeeder::class,
             ServiceSeeder::class,
+            UniteBookingPackagesTableSeeder::class, // NEW — package booking demo data (depends on Unites + Service, both seeded by this point)
 
             // ── 4. Transactional data ─────────────────────────────────────────
             SubscriptionsTableSeeder::class,

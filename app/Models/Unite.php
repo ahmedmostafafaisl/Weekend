@@ -27,6 +27,7 @@ class Unite extends Model
         'additional_terms',
         'status',
         'families_and_singles',
+        'package_booking_enabled',
         'insurance_policy_id',
         'requires_approval',
 
@@ -109,6 +110,15 @@ class Unite extends Model
         return $this->hasMany(UnitePackage::class, 'unite_id');
     }
 
+    // booking packages — a genuinely different concept from packages()
+    // above: day/time-window/price bundles a customer reserves directly,
+    // not a men/women capacity tier. Available to every venue type as an
+    // optional add-on (see package_booking_enabled).
+    public function bookingPackages()
+    {
+        return $this->hasMany(UniteBookingPackage::class, 'unite_id');
+    }
+
     // new features
     /**
      * The newer, simpler highlights list (JSON description, no status,
@@ -149,5 +159,35 @@ class Unite extends Model
     public function insurancePolicy()
     {
         return $this->belongsTo(InsurancePolicy::class);
+    }
+
+    /**
+     * The single source of truth for which period_types this venue can
+     * accept at all, matching the reservation-level enforcement matrix:
+     *   stadium -> hourly + package (never morning/evening/full_day)
+     *   hall    -> full_day + package (never hourly/morning/evening)
+     *   lounge  -> morning/evening/full_day + package, + hourly if enabled
+     *   camp    -> same as lounge
+     *
+     * 'hourly' being present here for lounge/camp is necessary but not
+     * sufficient — it only means the TYPE can support hourly at all; the
+     * specific day's price row still needs hourly_enabled=true, which is
+     * checked separately (and already correctly enforced) in
+     * UniteReservationRepository::resolveHourlyPrice().
+     * 'package' is only ever included when package_booking_enabled is on.
+     */
+    public function allowedPeriodTypes(): array
+    {
+        $types = match ($this->type) {
+            'stadium' => ['hourly'],
+            'hall' => ['full_day'],
+            default => ['morning', 'evening', 'full_day', 'hourly'], // lounge, camp
+        };
+
+        if ($this->package_booking_enabled) {
+            $types[] = 'package';
+        }
+
+        return $types;
     }
 }

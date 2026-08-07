@@ -676,7 +676,18 @@
 <script>
 (function () {
     const UNITE_ID = {{ $unite->id }};
-    const API_BASE = '{{ rtrim(config("app.url"), "/") }}/api';
+    // BUG FIX: this used to be built from config('app.url') — a
+    // server-rendered value that silently drifts out of sync with
+    // reality if APP_URL in .env doesn't exactly match the scheme the
+    // site is actually served over. If APP_URL was set to
+    // "http://weekend.com" while the page was actually loaded via
+    // "https://weekend.com", every fetch() call below would try to reach
+    // an http:// endpoint from an https:// page — which browsers block
+    // outright as mixed content (visible in devtools as "Mixed Block"),
+    // never even reaching the server. window.location.origin always
+    // matches whatever scheme+host the page was ACTUALLY loaded with, so
+    // this is immune to that class of misconfiguration entirely.
+    const API_BASE = window.location.origin + '/api';
     const cache    = {};   // "year-month" → dates array
 
     const monthTitleEl = document.getElementById('cal-month-title');

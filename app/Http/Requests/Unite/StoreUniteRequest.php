@@ -173,6 +173,21 @@ class StoreUniteRequest extends FormRequest
                 break;
         }
 
+        // Package booking — available to every venue type as an optional
+        // add-on (see Unite::package_booking_enabled), unlike everything
+        // above this which still branches by type. 'days' accepts either
+        // ["any"] or specific days like ["thursday","friday","saturday"].
+        $rules['package_booking_enabled'] = ['nullable', 'boolean'];
+        $rules['booking_packages'] = ['nullable', 'array'];
+        $rules['booking_packages.*.name'] = ['nullable', 'string', 'max:255'];
+        $rules['booking_packages.*.day'] = ['required_with:booking_packages', 'in:week_day,thursday,friday,saturday'];
+        $rules['booking_packages.*.start_time'] = ['required_with:booking_packages', 'date_format:H:i'];
+        $rules['booking_packages.*.end_time'] = ['required_with:booking_packages', 'date_format:H:i', 'after:booking_packages.*.start_time'];
+        $rules['booking_packages.*.price'] = ['required_with:booking_packages', 'numeric', 'min:0'];
+        $rules['booking_packages.*.status'] = ['nullable', 'in:active,inactive'];
+        $rules['booking_packages.*.service_ids'] = ['nullable', 'array'];
+        $rules['booking_packages.*.service_ids.*'] = ['integer', 'exists:services,id'];
+
         return $rules;
     }
 

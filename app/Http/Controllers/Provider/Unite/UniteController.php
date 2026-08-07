@@ -188,8 +188,9 @@ class UniteController extends Controller
 
         $departments = Department::all();
         $insurancePolicies = \App\Models\InsurancePolicy::orderBy('name')->get();
+        $services = \App\Models\Service::where('status', 'active')->orderBy('name')->get();
 
-        return view('dashboard.web.unites.create', compact('departments', 'insurancePolicies'));
+        return view('dashboard.web.unites.create', compact('departments', 'insurancePolicies', 'services'));
     }
 
     public function store(StoreUniteRequest $request)
@@ -235,9 +236,9 @@ class UniteController extends Controller
 
         $departments = Department::all();
         $insurancePolicies = \App\Models\InsurancePolicy::orderBy('name')->get();
-        // dd($unite->offers);
+        $services = \App\Models\Service::where('status', 'active')->orderBy('name')->get();
 
-        return view('dashboard.web.unites.edit', compact('unite', 'departments', 'insurancePolicies'));
+        return view('dashboard.web.unites.edit', compact('unite', 'departments', 'insurancePolicies', 'services'));
     }
 
     public function update(StoreUniteRequest $request, Unite $unite)

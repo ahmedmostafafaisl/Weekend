@@ -33,6 +33,7 @@ return new class extends Migration
             $table->enum('refund_policy', ['free', 'flexible', 'moderate', 'strict'])->default('free');
             $table->text('additional_terms')->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->boolean('package_booking_enabled')->default(false);
             $table->timestamps();
         });
     }

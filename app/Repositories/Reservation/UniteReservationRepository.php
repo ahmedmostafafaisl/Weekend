@@ -4,6 +4,7 @@ namespace App\Repositories\Reservation;
 
 use App\Models\Payment;
 use App\Models\Unite;
+use App\Models\UniteBookingPackage;
 use App\Models\UniteReservation;
 use App\Notifications\ReservationCancelled;
 use App\Notifications\ReservationPendingApproval;
@@ -66,6 +67,12 @@ class UniteReservationRepository implements UniteReservationInterface
         // Hourly bookings: calculate price from from_time/to_time + hourly rates
         if ($data['period_type'] === 'hourly') {
             $fullPrice = $this->resolveHourlyPrice($unite, $fromTime, $toTime, $data['reservation_date']);
+        } elseif ($data['period_type'] === 'package') {
+            // Package reservations use the package's own fixed price
+            // rather than hourly or period pricing — service fee and any
+            // eligible discount/promo still apply on top of it further
+            // down, exactly like every other period_type.
+            $fullPrice = $this->resolvePackagePrice($unite, $data);
         } else {
             $fullPrice = $this->resolvePrice($unite, $data['period_type'], $data['reservation_date']);
         }
@@ -126,6 +133,7 @@ class UniteReservationRepository implements UniteReservationInterface
                 'to_time' => $toTime,
                 'price' => $fullPrice,
                 'status' => 'pending',
+                'unite_booking_package_id' => $data['period_type'] === 'package' ? $data['booking_package_id'] : null,
             ]);
 
             // 2. Resolve the user's phone — required by Geidea
@@ -249,7 +257,19 @@ class UniteReservationRepository implements UniteReservationInterface
         ], $data);
 
         [$fromTime, $toTime] = $this->resolveTimes($reservation->unite, $payload);
-        $price = $this->resolvePrice($reservation->unite, $payload['period_type'], $payload['reservation_date']);
+        // BUG FIX: this never branched for period_type at all — hourly
+        // reservations would have gone through resolvePrice(), which
+        // explicitly returns 0 for hourly (see its own comment further
+        // down), and package reservations would have tried to resolve a
+        // price with no package context. Matches the same 3-way branch
+        // already used in create().
+        if ($payload['period_type'] === 'hourly') {
+            $price = $this->resolveHourlyPrice($reservation->unite, $fromTime, $toTime, $payload['reservation_date']);
+        } elseif ($payload['period_type'] === 'package') {
+            $price = $this->resolvePackagePrice($reservation->unite, $payload);
+        } else {
+            $price = $this->resolvePrice($reservation->unite, $payload['period_type'], $payload['reservation_date']);
+        }
 
         $this->ensureNoConflict(
             $reservation->unite_id,
@@ -424,6 +444,7 @@ class UniteReservationRepository implements UniteReservationInterface
                 'status' => 'pending_approval',
                 'guest_count' => $data['guest_count'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                'unite_booking_package_id' => $data['period_type'] === 'package' ? $data['booking_package_id'] : null,
             ]);
 
             $user = $reservation->user ?? auth()->user();
@@ -600,17 +621,20 @@ class UniteReservationRepository implements UniteReservationInterface
 
     protected function resolveTimes(Unite $unite, array $data): array
     {
-        // BUG FIX: stadiums only support hourly bookings — the null-check
-        // fallback further down (which correctly rejects morning/evening
-        // for halls once their slot data has no times configured) would
-        // NOT have caught this case, since stadium slots genuinely have
-        // non-null full_start/full_end representing the stadium's
-        // OPERATING WINDOW, not a bookable whole-day reservation type.
-        // Without this explicit check, a full_day (or morning/evening)
-        // booking for a stadium would have silently succeeded at the flat
-        // 'price' rate instead of being rejected in favor of hourly booking.
-        if ($unite->type === 'stadium' && $data['period_type'] !== 'hourly') {
-            abort(422, str_replace(':type', __('lang.'.$unite->type), __('lang.venue_hourly_only')));
+        // Centralized reservation-level enforcement — replaces the old
+        // stadium-only check with the general matrix from
+        // Unite::allowedPeriodTypes(), which also covers hall (full_day +
+        // package only) and gates 'package' behind package_booking_enabled
+        // for every type.
+        if (! in_array($data['period_type'], $unite->allowedPeriodTypes())) {
+            abort(422, str_replace(':type', __('lang.'.$unite->type), __('lang.period_type_not_allowed_for_venue')));
+        }
+
+        // Packages have their own start_time/end_time, entirely independent
+        // of the venue's unite_slots table — they skip the slot-based
+        // resolution below altogether rather than trying to fit into it.
+        if ($data['period_type'] === 'package') {
+            return $this->resolvePackageTimes($unite, $data);
         }
 
         $dayOfWeek = strtolower(Carbon::parse($data['reservation_date'])->englishDayOfWeek);
@@ -669,9 +693,71 @@ class UniteReservationRepository implements UniteReservationInterface
         return [$from, $to];
     }
 
+    /**
+     * Packages have their own start_time/end_time, entirely independent of
+     * the venue's unite_slots table — validates the requested package
+     * exists, belongs to this unite, is active, and actually applies to
+     * the requested day, then returns its own time window. The caller's
+     * existing ensureNoConflict() call (using whatever [$from, $to] this
+     * returns) then handles overlap detection exactly like every other
+     * period_type, with no extra code needed for that.
+     */
+    protected function resolvePackageTimes(Unite $unite, array $data): array
+    {
+        $package = $this->findValidPackage($unite, $data);
+
+        return [(string) $package->start_time, (string) $package->end_time];
+    }
+
+    /**
+     * Shared lookup+validation used by both resolvePackageTimes() and
+     * resolvePackagePrice() — kept in one place so the two can't drift
+     * out of sync on what counts as a "valid" package for this booking.
+     */
+    protected function findValidPackage(Unite $unite, array $data): UniteBookingPackage
+    {
+        if (empty($data['booking_package_id'])) {
+            abort(422, __('lang.booking_package_id_required'));
+        }
+
+        $package = UniteBookingPackage::where('id', $data['booking_package_id'])
+            ->where('unite_id', $unite->id)
+            ->first();
+
+        if (! $package) {
+            abort(422, __('lang.booking_package_not_found'));
+        }
+
+        if ($package->status !== 'active') {
+            abort(422, __('lang.booking_package_not_available'));
+        }
+
+        $dayOfWeek = strtolower(Carbon::parse($data['reservation_date'])->englishDayOfWeek);
+
+        if (! $package->appliesToDay($dayOfWeek)) {
+            abort(422, str_replace(':day', $dayOfWeek, __('lang.booking_package_not_available_this_day')));
+        }
+
+        return $package;
+    }
+
     // -------------------------------------------------------------------------
     // Private: price resolution (offers → base price)
     // -------------------------------------------------------------------------
+
+    /**
+     * Package reservations use the package's own fixed price, not hourly
+     * or period pricing — deliberately does NOT check for an active offer
+     * the way resolvePrice()/resolveHourlyPrice() do, since a package's
+     * price is already a specific, deliberately-set bundle price, not a
+     * base rate offers are meant to discount.
+     */
+    protected function resolvePackagePrice(Unite $unite, array $data): float
+    {
+        $package = $this->findValidPackage($unite, $data);
+
+        return (float) $package->price;
+    }
 
     protected function resolvePrice(Unite $unite, string $periodType, string $date): float
     {

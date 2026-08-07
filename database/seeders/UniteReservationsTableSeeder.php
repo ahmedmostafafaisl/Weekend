@@ -90,6 +90,107 @@ class UniteReservationsTableSeeder extends Seeder
                 }
             }
         }
+
+        $this->seedPackageReservations($customers);
+    }
+
+    /**
+     * A small, separate loop for package-based reservations — deliberately
+     * NOT woven into the main loop above, to avoid any risk of regressing
+     * its existing, carefully-tuned 25-reservations-per-venue logic.
+     * Creates 2 package reservations (1 confirmed+paid, 1 pending) for
+     * each venue that actually has package_booking_enabled and at least
+     * one active package, using the venue's own real seeded package.
+     */
+    private function seedPackageReservations($customers): void
+    {
+        $unites = Unite::where('package_booking_enabled', true)
+            ->with('bookingPackages')
+            ->get();
+
+        foreach ($unites as $uIdx => $unite) {
+            $package = $unite->bookingPackages->firstWhere('status', 'active');
+
+            if (! $package) {
+                continue;
+            }
+
+            // 'day' is a category (week_day/thursday/friday/saturday), not
+            // a specific day-of-week — thursday/friday/saturday map
+            // directly to that exact day, but 'week_day' means "any day
+            // that ISN'T thu/fri/sat", so nudging for it means finding the
+            // next day that satisfies that, not a single fixed target.
+            $targetDayName = in_array($package->day, ['thursday', 'friday', 'saturday']) ? $package->day : null;
+            $isWeekDayCategory = $package->day === 'week_day';
+
+            foreach ([['days_offset' => 7, 'status' => 'confirmed', 'pay_status' => 'paid'],
+                ['days_offset' => 14, 'status' => 'pending', 'pay_status' => 'pending']] as $sIdx => $scenario) {
+                $date = Carbon::today()->addDays($scenario['days_offset']);
+
+                // Nudge the date forward to a day the package's day-type
+                // actually covers — a reservation dated for a day the
+                // package doesn't apply to wouldn't be creatable through
+                // the real booking flow at all, so seeding one would
+                // misrepresent what's actually possible.
+                if ($targetDayName) {
+                    for ($guard = 0; $guard < 7; $guard++) {
+                        if (strtolower($date->englishDayOfWeek) === $targetDayName) {
+                            break;
+                        }
+                        $date->addDay();
+                    }
+                } elseif ($isWeekDayCategory) {
+                    for ($guard = 0; $guard < 7; $guard++) {
+                        if (! in_array(strtolower($date->englishDayOfWeek), ['thursday', 'friday', 'saturday'])) {
+                            break;
+                        }
+                        $date->addDay();
+                    }
+                }
+
+                $customerId = $customers[($uIdx + $sIdx) % $customers->count()];
+
+                $res = UniteReservation::updateOrCreate(
+                    [
+                        'unite_id' => $unite->id,
+                        'user_id' => $customerId,
+                        'reservation_date' => $date->format('Y-m-d'),
+                        'period_type' => 'package',
+                        'unite_booking_package_id' => $package->id,
+                    ],
+                    [
+                        'from_time' => $package->start_time,
+                        'to_time' => $package->end_time,
+                        'price' => $package->price,
+                        'status' => $scenario['status'],
+                    ]
+                );
+
+                $existing = Payment::where('reservation_id', $res->id)->first();
+                if (! $existing) {
+                    $ref = 'PAY-'.now()->format('Ymd').'-'.strtoupper(Str::random(8));
+                    $payment = Payment::create([
+                        'user_id' => $customerId,
+                        'reservation_id' => $res->id,
+                        'payment_type' => 'geidea',
+                        'amount' => $package->price,
+                        'reference_id' => $ref,
+                        'payment_id' => 'GD-'.strtoupper(Str::random(12)),
+                        'status' => $scenario['pay_status'],
+                        'phone' => '96650000000'.$sIdx,
+                    ]);
+
+                    PaymentItem::create([
+                        'payment_id' => $payment->id,
+                        'name' => $unite->name.' — '.$package->name,
+                        'item_number' => (string) $res->id,
+                        'price' => $package->price,
+                        'quantity' => 1,
+                        'total_amount' => $package->price,
+                    ]);
+                }
+            }
+        }
     }
 
     private function pickPeriod(Unite $unite, int $idx): array

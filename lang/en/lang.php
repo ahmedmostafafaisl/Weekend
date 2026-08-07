@@ -1381,4 +1381,11 @@ return [
 
     'venue_closed_on_this_day' => 'This venue is closed on :day.',
     'booking_outside_operating_hours' => 'This venue is only open from :from to :to on this day.',
+
+    'booking_packages' => 'Booking Packages',
+    'booking_packages_subtitle' => 'Optional bundles a customer can book directly — each with its own day(s), time window, fixed price, and included services.',
+    'package_booking_enabled' => 'Enable package booking for this venue',
+    'booking_package_days' => 'Day',
+    'any_day' => 'Any day',
+    'included_services' => 'Included Services',
 ];

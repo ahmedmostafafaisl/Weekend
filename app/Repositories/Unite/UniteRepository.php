@@ -28,6 +28,7 @@ class UniteRepository implements UniteRepositoryInterface
             'slots',
             'prices',
             'packages',
+            'bookingPackages',
             'newFeatures',
             'services',
             'department',
@@ -462,6 +463,7 @@ class UniteRepository implements UniteRepositoryInterface
             'slots',
             'prices',
             'packages',
+            'bookingPackages.services',
             'newFeatures',
             'favorites',
             'department.user.receivedVendorRatings',
@@ -493,6 +495,7 @@ class UniteRepository implements UniteRepositoryInterface
             $this->storeSlots($unite, $data['slots'] ?? [], $data['type'] ?? 'stadium');
             $this->storePrices($unite, $data['prices'] ?? [], $data['type'] ?? 'stadium');
             $this->storePackages($unite, $data['packages'] ?? []);
+            $this->storeBookingPackages($unite, $data['booking_packages'] ?? []);
             $this->storeNewFeatures($unite, $data['new_features'] ?? []);
             $this->syncServices($unite, $data['service_ids'] ?? []);
             $unite = $unite->fresh([
@@ -505,6 +508,7 @@ class UniteRepository implements UniteRepositoryInterface
                 'prices',
                 'services',
                 'packages',
+                'bookingPackages',
                 'newFeatures',
             ]);
             // all_men_count / all_women_count are now computed accessors on
@@ -532,6 +536,7 @@ class UniteRepository implements UniteRepositoryInterface
             $unite->slots()->delete();
             $unite->prices()->delete();
             $unite->packages()->delete();
+            $unite->bookingPackages()->delete();
             $unite->newFeatures()->delete();
 
             $this->storeFeatures($unite, $data['features'] ?? []);
@@ -540,6 +545,7 @@ class UniteRepository implements UniteRepositoryInterface
             $this->storeSlots($unite, $data['slots'] ?? [], $data['type'] ?? 'stadium');
             $this->storePrices($unite, $data['prices'] ?? [], $data['type'] ?? 'stadium');
             $this->storePackages($unite, $data['packages'] ?? []);
+            $this->storeBookingPackages($unite, $data['booking_packages'] ?? []);
             $this->storeNewFeatures($unite, $data['new_features'] ?? []);
             $this->syncServices($unite, $data['service_ids'] ?? []);
 
@@ -573,6 +579,7 @@ class UniteRepository implements UniteRepositoryInterface
                 'prices',
                 'services',
                 'packages',
+                'bookingPackages',
                 'newFeatures',
             ]);
             // all_men_count / all_women_count are now computed accessors on
@@ -755,6 +762,32 @@ class UniteRepository implements UniteRepositoryInterface
                 'women_capacity' => $package['women_capacity'] ?? 0,
                 'price' => $package['price'] ?? 0,
             ]);
+        }
+    }
+
+    /**
+     * Package booking — a genuinely different concept from storePackages()
+     * above (capacity tiers). Available to every venue type; days is
+     * stored as a JSON array (["any"] or specific days) rather than a
+     * single day_of_week column, since a package can apply to several
+     * specific days at once.
+     */
+    protected function storeBookingPackages(Unite $unite, array $bookingPackages): void
+    {
+        foreach ($bookingPackages as $pkg) {
+            $bookingPackage = \App\Models\UniteBookingPackage::create([
+                'unite_id' => $unite->id,
+                'name' => $pkg['name'] ?? null,
+                'day' => $pkg['day'] ?? 'week_day',
+                'start_time' => $pkg['start_time'] ?? null,
+                'end_time' => $pkg['end_time'] ?? null,
+                'price' => $pkg['price'] ?? 0,
+                'status' => $pkg['status'] ?? 'active',
+            ]);
+
+            if (! empty($pkg['service_ids'])) {
+                $bookingPackage->services()->sync(array_map('intval', $pkg['service_ids']));
+            }
         }
     }
 
