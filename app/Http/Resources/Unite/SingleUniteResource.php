@@ -136,20 +136,31 @@ class SingleUniteResource extends JsonResource
             // Genuinely universal across all 4 venue types, unlike the
             // capacity-tier 'packages' above it — package booking is an
             // optional add-on available equally to stadium/hall/lounge/camp.
+            // Which booking systems this specific venue actually supports —
+            // reuses the same centralized matrix the reservation-creation
+            // flow itself validates against (Unite::allowedPeriodTypes()),
+            // so this can never drift out of sync with what a booking
+            // attempt would actually be allowed to use.
+            'available_booking_systems' => $this->allowedPeriodTypes(),
+
             'package_booking_enabled' => (bool) $this->package_booking_enabled,
             'booking_packages' => $this->bookingPackages->map(function ($pkg) {
                 return [
                     'id' => $pkg->id,
                     'name' => $pkg->name,
+                    'booking_type' => $pkg->booking_type,
+                    // Only the fields relevant to this package's own mode
+                    // are meaningful — the other mode's fields are null.
                     'day' => $pkg->day,
                     'start_time' => $pkg->start_time,
                     'end_time' => $pkg->end_time,
+                    'day_from' => $pkg->day_from,
+                    'day_to' => $pkg->day_to,
+                    'duration_days' => $pkg->duration_days,
                     'price' => $pkg->price,
                     'status' => $pkg->status,
-                    'services' => $pkg->services->map(fn ($s) => [
-                        'id' => $s->id,
-                        'name' => $s->name,
-                    ])->values(),
+                    // Free text the provider typed in, not a relation.
+                    'services' => $pkg->services ?? [],
                 ];
             })->values(),
 

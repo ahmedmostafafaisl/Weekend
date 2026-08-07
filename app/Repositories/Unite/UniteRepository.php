@@ -463,7 +463,7 @@ class UniteRepository implements UniteRepositoryInterface
             'slots',
             'prices',
             'packages',
-            'bookingPackages.services',
+            'bookingPackages',
             'newFeatures',
             'favorites',
             'department.user.receivedVendorRatings',
@@ -775,19 +775,31 @@ class UniteRepository implements UniteRepositoryInterface
     protected function storeBookingPackages(Unite $unite, array $bookingPackages): void
     {
         foreach ($bookingPackages as $pkg) {
-            $bookingPackage = \App\Models\UniteBookingPackage::create([
+            $bookingType = $pkg['booking_type'] ?? 'hours';
+
+            $duration = null;
+            if ($bookingType === 'days' && ! empty($pkg['day_from']) && ! empty($pkg['day_to'])) {
+                $duration = \App\Models\UniteBookingPackage::computeDurationDays($pkg['day_from'], $pkg['day_to']);
+            }
+
+            \App\Models\UniteBookingPackage::create([
                 'unite_id' => $unite->id,
                 'name' => $pkg['name'] ?? null,
-                'day' => $pkg['day'] ?? 'week_day',
-                'start_time' => $pkg['start_time'] ?? null,
-                'end_time' => $pkg['end_time'] ?? null,
+                'booking_type' => $bookingType,
+                // 'hours' mode fields — null for 'days'-type packages
+                'day' => $bookingType === 'hours' ? ($pkg['day'] ?? 'week_day') : null,
+                'start_time' => $bookingType === 'hours' ? ($pkg['start_time'] ?? null) : null,
+                'end_time' => $bookingType === 'hours' ? ($pkg['end_time'] ?? null) : null,
+                // 'days' mode fields — null for 'hours'-type packages
+                'day_from' => $bookingType === 'days' ? ($pkg['day_from'] ?? null) : null,
+                'day_to' => $bookingType === 'days' ? ($pkg['day_to'] ?? null) : null,
+                'duration_days' => $duration,
                 'price' => $pkg['price'] ?? 0,
+                // Free text the provider typed in — not a relation, so no
+                // sync() call needed, just stored directly as a JSON array.
+                'services' => array_values(array_filter($pkg['services'] ?? [])),
                 'status' => $pkg['status'] ?? 'active',
             ]);
-
-            if (! empty($pkg['service_ids'])) {
-                $bookingPackage->services()->sync(array_map('intval', $pkg['service_ids']));
-            }
         }
     }
 

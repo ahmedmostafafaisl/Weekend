@@ -175,18 +175,32 @@ class StoreUniteRequest extends FormRequest
 
         // Package booking — available to every venue type as an optional
         // add-on (see Unite::package_booking_enabled), unlike everything
-        // above this which still branches by type. 'days' accepts either
-        // ["any"] or specific days like ["thursday","friday","saturday"].
+        // above this which still branches by type. Two genuinely different
+        // modes per package: 'hours' (a time window within one day-type)
+        // or 'days' (a span of one or more consecutive calendar days,
+        // starting on day_from's weekday). services is free text the
+        // provider types in, not a relation to the services table.
         $rules['package_booking_enabled'] = ['nullable', 'boolean'];
         $rules['booking_packages'] = ['nullable', 'array'];
         $rules['booking_packages.*.name'] = ['nullable', 'string', 'max:255'];
-        $rules['booking_packages.*.day'] = ['required_with:booking_packages', 'in:week_day,thursday,friday,saturday'];
-        $rules['booking_packages.*.start_time'] = ['required_with:booking_packages', 'date_format:H:i'];
-        $rules['booking_packages.*.end_time'] = ['required_with:booking_packages', 'date_format:H:i', 'after:booking_packages.*.start_time'];
+        $rules['booking_packages.*.booking_type'] = ['required_with:booking_packages', 'in:hours,days'];
+
+        // 'hours' mode fields — required only when this specific row's
+        // booking_type is 'hours'.
+        $rules['booking_packages.*.day'] = ['required_if:booking_packages.*.booking_type,hours', 'in:week_day,thursday,friday,saturday'];
+        $rules['booking_packages.*.start_time'] = ['required_if:booking_packages.*.booking_type,hours', 'date_format:H:i'];
+        $rules['booking_packages.*.end_time'] = ['required_if:booking_packages.*.booking_type,hours', 'date_format:H:i', 'after:booking_packages.*.start_time'];
+
+        // 'days' mode fields — required only when this specific row's
+        // booking_type is 'days'. day_to may equal day_from for a
+        // single-day package (e.g. "Saturday" alone).
+        $rules['booking_packages.*.day_from'] = ['required_if:booking_packages.*.booking_type,days', 'in:sunday,monday,tuesday,wednesday,thursday,friday,saturday'];
+        $rules['booking_packages.*.day_to'] = ['required_if:booking_packages.*.booking_type,days', 'in:sunday,monday,tuesday,wednesday,thursday,friday,saturday'];
+
         $rules['booking_packages.*.price'] = ['required_with:booking_packages', 'numeric', 'min:0'];
         $rules['booking_packages.*.status'] = ['nullable', 'in:active,inactive'];
-        $rules['booking_packages.*.service_ids'] = ['nullable', 'array'];
-        $rules['booking_packages.*.service_ids.*'] = ['integer', 'exists:services,id'];
+        $rules['booking_packages.*.services'] = ['nullable', 'array'];
+        $rules['booking_packages.*.services.*'] = ['string', 'max:255'];
 
         return $rules;
     }

@@ -345,7 +345,7 @@ function addRow(bodyId, tplId) {
 }
 
 let offerRowCounter = {{ $unite->offers->count() }};
-const uniteTypeForOffers = {{ json_encode($unite->type) }};
+const uniteTypeForOffers = {!! json_encode($unite->type) !!};
 
 function addOfferRow() {
     const i = offerRowCounter++;

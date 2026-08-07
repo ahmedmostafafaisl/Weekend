@@ -63,7 +63,7 @@ class UniteReservationRepository implements UniteReservationInterface
     {
         $unite = Unite::with(['prices', 'offers', 'slots'])->findOrFail($data['unite_id']);
 
-        [$fromTime, $toTime] = $this->resolveTimes($unite, $data);
+        [$fromTime, $toTime, $endDate] = $this->resolveTimes($unite, $data);
         // Hourly bookings: calculate price from from_time/to_time + hourly rates
         if ($data['period_type'] === 'hourly') {
             $fullPrice = $this->resolveHourlyPrice($unite, $fromTime, $toTime, $data['reservation_date']);
@@ -103,14 +103,14 @@ class UniteReservationRepository implements UniteReservationInterface
         $serviceFee = \App\Models\ServiceFee::feeFor('reservation');
         $chargeAmount += $serviceFee;
 
-        $this->ensureNoConflict($unite->id, $data['reservation_date'], $fromTime, $toTime);
+        $this->ensureNoConflict($unite->id, $data['reservation_date'], $fromTime, $toTime, null, $endDate);
 
         // ── Provider approval mode ────────────────────────────────────────────────
         // If the venue requires approval, create the reservation in pending_approval
         // status and notify the provider — no Geidea call yet.
         if ($unite->requires_approval) {
             return $this->createPendingApproval(
-                $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $serviceFee
+                $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $serviceFee, $endDate
             );
         }
 
@@ -121,13 +121,14 @@ class UniteReservationRepository implements UniteReservationInterface
         // Wrap reservation + payment creation in a single transaction.
         // If Geidea returns an error we roll back both rows so the slot stays free.
         $result = DB::transaction(function () use (
-            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $gateway, $paymentMethod, $serviceFee
+            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $gateway, $paymentMethod, $serviceFee, $endDate
         ) {
             // 1. Create the reservation (status: pending — confirmed only after payment)
             $reservation = UniteReservation::create([
                 'unite_id' => $unite->id,
                 'user_id' => $userId,
                 'reservation_date' => $data['reservation_date'],
+                'end_date' => $endDate,
                 'period_type' => $data['period_type'],
                 'from_time' => $fromTime,
                 'to_time' => $toTime,
@@ -256,7 +257,7 @@ class UniteReservationRepository implements UniteReservationInterface
             'unite_id' => $reservation->unite_id,
         ], $data);
 
-        [$fromTime, $toTime] = $this->resolveTimes($reservation->unite, $payload);
+        [$fromTime, $toTime, $endDate] = $this->resolveTimes($reservation->unite, $payload);
         // BUG FIX: this never branched for period_type at all — hourly
         // reservations would have gone through resolvePrice(), which
         // explicitly returns 0 for hourly (see its own comment further
@@ -276,11 +277,13 @@ class UniteReservationRepository implements UniteReservationInterface
             $payload['reservation_date'],
             $fromTime,
             $toTime,
-            $reservation->id
+            $reservation->id,
+            $endDate
         );
 
         $reservation->update([
             'reservation_date' => $payload['reservation_date'],
+            'end_date' => $endDate,
             'period_type' => $payload['period_type'],
             'from_time' => $fromTime,
             'to_time' => $toTime,
@@ -423,20 +426,22 @@ class UniteReservationRepository implements UniteReservationInterface
         Unite $unite,
         array $data,
         mixed $userId,
-        string $fromTime,
-        string $toTime,
+        ?string $fromTime,
+        ?string $toTime,
         float $fullPrice,
         float $chargeAmount,
         ?array $promoResult,
-        float $serviceFee = 0.0
+        float $serviceFee = 0.0,
+        ?string $endDate = null
     ): array {
         $reservation = DB::transaction(function () use (
-            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $serviceFee
+            $unite, $data, $userId, $fromTime, $toTime, $fullPrice, $chargeAmount, $promoResult, $serviceFee, $endDate
         ) {
             $reservation = UniteReservation::create([
                 'unite_id' => $unite->id,
                 'user_id' => $userId,
                 'reservation_date' => $data['reservation_date'],
+                'end_date' => $endDate,
                 'period_type' => $data['period_type'],
                 'from_time' => $fromTime,
                 'to_time' => $toTime,
@@ -690,23 +695,40 @@ class UniteReservationRepository implements UniteReservationInterface
             }
         }
 
-        return [$from, $to];
+        return [$from, $to, null];
     }
 
     /**
      * Packages have their own start_time/end_time, entirely independent of
      * the venue's unite_slots table — validates the requested package
      * exists, belongs to this unite, is active, and actually applies to
-     * the requested day, then returns its own time window. The caller's
-     * existing ensureNoConflict() call (using whatever [$from, $to] this
-     * returns) then handles overlap detection exactly like every other
-     * period_type, with no extra code needed for that.
+     * the requested day, then returns its own time window (or, for
+     * 'days'-type packages, an end_date instead — see below). The caller
+     * threads whatever this returns straight into ensureNoConflict(),
+     * which already knows how to handle both a plain time-window request
+     * and a multi-day date-range request.
      */
     protected function resolvePackageTimes(Unite $unite, array $data): array
     {
         $package = $this->findValidPackage($unite, $data);
 
-        return [(string) $package->start_time, (string) $package->end_time];
+        if ($package->booking_type === 'days') {
+            // A 'days' package occupies whole calendar days, not a
+            // specific time window — from_time/to_time stay null (both
+            // columns are nullable), and end_date is computed from the
+            // package's own duration_days rather than taken from the
+            // request, since the customer only picks a start date and the
+            // package itself dictates how many nights it spans.
+            $endDate = Carbon::parse($data['reservation_date'])
+                ->addDays(max(1, $package->duration_days ?? 1) - 1)
+                ->format('Y-m-d');
+
+            return [null, null, $endDate];
+        }
+
+        // 'hours' mode — unchanged from before: a single day, specific
+        // time window, no end_date.
+        return [(string) $package->start_time, (string) $package->end_time, null];
     }
 
     /**
@@ -822,20 +844,74 @@ class UniteReservationRepository implements UniteReservationInterface
     // Private: conflict guard
     // -------------------------------------------------------------------------
 
+    /**
+     * Checks for a booking conflict on this unite across a date RANGE, not
+     * just a single date — needed because 'days'-type packages can span
+     * multiple calendar days and must be checked against everything else
+     * that unite has booked during that whole span, not just exact-date
+     * matches.
+     *
+     * $startDate/$endDate: the range being checked. For a normal
+     * single-day booking (hourly/morning/evening/full_day/'hours'-type
+     * package), pass the same date for both and provide $fromTime/$toTime
+     * to also check time-overlap against other single-day bookings on
+     * that exact date. For a 'days'-type package, pass the real
+     * check-in/check-out range and omit the times — a multi-day booking
+     * occupies whole days regardless of what specific hours a conflicting
+     * reservation happens to use.
+     *
+     * Conflict rules, matching the confirmed design exactly:
+     *   - Always scoped to this one unite_id — a conflict on one unit has
+     *     zero effect on any other unit, even with identical dates/times.
+     *   - A new single-day booking conflicts with any EXISTING multi-day
+     *     reservation whose range covers that date, full stop — a 5-day
+     *     package occupies the whole day, not just specific hours.
+     *   - A new multi-day booking conflicts with ANY existing reservation
+     *     (single or multi-day) whose date falls anywhere in the range,
+     *     for the same reason — an hourly booking on day 3 of a 5-day
+     *     range blocks that package from being sold.
+     *   - Time-overlap (from_time/to_time) is only actually checked when
+     *     BOTH the new booking and the existing one are genuinely
+     *     single-day on the exact same date — that's the one case where
+     *     two bookings can coexist on the same day without conflicting.
+     */
     protected function ensureNoConflict(
         int $uniteId,
-        string $date,
-        string $fromTime,
-        string $toTime,
-        ?int $ignoreId = null
+        string $startDate,
+        ?string $fromTime = null,
+        ?string $toTime = null,
+        ?int $ignoreId = null,
+        ?string $endDate = null
     ): void {
+        $endDate = $endDate ?? $startDate;
+        $isMultiDayRequest = $endDate !== $startDate;
+
         $query = UniteReservation::where('unite_id', $uniteId)
-            ->where('reservation_date', $date)
             ->whereIn('status', ['pending', 'confirmed'])
-            ->where(function ($q) use ($fromTime, $toTime) {
-                $q->where('from_time', '<', $toTime)
-                    ->where('to_time', '>', $fromTime);
+            ->where(function ($q) use ($startDate, $endDate) {
+                // Date-range overlap, treating a single-day reservation's
+                // implicit range as [reservation_date, reservation_date]
+                // via COALESCE — one formula covers both single-day and
+                // multi-day existing reservations correctly.
+                $q->where('reservation_date', '<=', $endDate)
+                    ->where(function ($q2) use ($startDate) {
+                        $q2->whereRaw('COALESCE(end_date, reservation_date) >= ?', [$startDate]);
+                    });
             });
+
+        // Time-overlap only matters when this is genuinely a single-day
+        // vs single-day comparison — a multi-day request or a multi-day
+        // existing reservation both occupy whole days regardless of hours.
+        if (! $isMultiDayRequest && $fromTime && $toTime) {
+            $query->where(function ($q) use ($fromTime, $toTime) {
+                $q->whereNotNull('end_date') // existing reservation is multi-day -> whole-day conflict, time irrelevant
+                    ->orWhere(function ($q2) use ($fromTime, $toTime) {
+                        $q2->whereNull('end_date') // existing reservation is single-day -> check actual time overlap
+                            ->where('from_time', '<', $toTime)
+                            ->where('to_time', '>', $fromTime);
+                    });
+            });
+        }
 
         if ($ignoreId) {
             $query->where('id', '!=', $ignoreId);

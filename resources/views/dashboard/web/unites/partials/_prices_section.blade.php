@@ -177,7 +177,7 @@
 
 <script>
 let priceRowCounter = {{ $unite ? $unite->prices->count() : 0 }};
-const uniteTypeForPricing = {{ json_encode($uniteType ?? ($unite->type ?? '')) }};
+const uniteTypeForPricing = {!! json_encode($uniteType ?? ($unite->type ?? '')) !!};
 
 function addPriceRow() {
     const i = priceRowCounter++;

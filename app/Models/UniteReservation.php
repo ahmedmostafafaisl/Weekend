@@ -15,6 +15,7 @@ class UniteReservation extends Model
         'unite_id',
         'user_id',
         'reservation_date',
+        'end_date',
         'period_type',
         'from_time',
         'to_time',
@@ -27,6 +28,7 @@ class UniteReservation extends Model
 
     protected $casts = [
         'reservation_date' => 'date',
+        'end_date' => 'date',
         'price' => 'float',
     ];
 
