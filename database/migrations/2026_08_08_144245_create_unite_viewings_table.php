@@ -37,7 +37,9 @@ return new class extends Migration
             $table->boolean('deposit_required')->default(false);
             $table->decimal('deposit_amount', 10, 2)->nullable();
             $table->boolean('deposit_refundable')->nullable();
+
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

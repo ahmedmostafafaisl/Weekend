@@ -67,6 +67,23 @@ class UniteViewingsTableSeeder extends Seeder
                 ]
             );
 
+            // BUG FIX: this seeder was written before the multi-attendee
+            // feature existed and was never updated once it landed — the
+            // booker themselves was never even attached to the new
+            // unite_viewing_user pivot, so every seeded appointment
+            // showed 0 people despite genuinely having a booker. The
+            // booker is always attached; every 3rd viewing additionally
+            // gets 2 more attendees, matching the user's own example
+            // ("Number of People: 3") — booker + 2 others — so the demo
+            // data actually shows a realistic mix of appointment sizes
+            // rather than every single one being just one person.
+            $attendeeIds = [$customerId];
+            if ($i % 3 === 0 && $customers->count() >= 3) {
+                $others = $customers->reject(fn ($id) => $id === $customerId)->shuffle()->take(2);
+                $attendeeIds = array_merge($attendeeIds, $others->all());
+            }
+            $viewing->attendees()->syncWithoutDetaching($attendeeIds);
+
             if ($depositRequired && ! Payment::where('unite_viewing_id', $viewing->id)->exists()) {
                 $payment = Payment::create([
                     'user_id' => $customerId,
