@@ -302,6 +302,25 @@
 
 
         {{-- ── Booking Packages ── --}}
+        @php
+            // Constant mapping, defined once here rather than inline
+            // inside the loop below. An inline php-tag-with-parentheses
+            // form doesn't need its own closing tag by design, but Blade's
+            // compiler extracts every open/close php-block pair via one
+            // global, whole-file regex that doesn't distinguish that
+            // parenthesized form from a genuine bare open/close block.
+            // Having the mapping defined inline inside the loop caused
+            // that regex to match from there all the way to an unrelated
+            // closing tag much further down the file, silently swallowing
+            // everything in between — including the entire Time Slots
+            // section's real conditional/loop directives — into one
+            // giant, unparseable literal PHP block. That was the actual
+            // cause of the "unexpected end of file" error. Moving this
+            // here, as a properly self-paired block, fixes it at the
+            // root, and is also a genuine performance win since this
+            // array never changes per-iteration anyway.
+            $hoursDayLabels = ['week_day'=>__('lang.weekday'),'thursday'=>__('lang.thursday'),'friday'=>__('lang.friday'),'saturday'=>__('lang.saturday')];
+        @endphp
         <div class="card card-soft shadow-sm mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -336,7 +355,6 @@
                                         {{ __('lang.'.$pkg->day_from) }} → {{ __('lang.'.$pkg->day_to) }}
                                         <span class="text-muted">({{ $pkg->duration_days }} {{ __('lang.days_unit') }})</span>
                                     @else
-                                        @php($hoursDayLabels = ['week_day'=>__('lang.weekday'),'thursday'=>__('lang.thursday'),'friday'=>__('lang.friday'),'saturday'=>__('lang.saturday')])
                                         {{ $hoursDayLabels[$pkg->day] ?? $pkg->day }} · {{ $pkg->start_time }} → {{ $pkg->end_time }}
                                     @endif
                                 </td>
