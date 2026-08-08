@@ -360,60 +360,127 @@
         </div>
 
 
-        {{-- ── Time Slots ── --}}
-        <div class="card card-soft shadow-sm mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold mb-0">📅 {{ __('lang.time_slots') }}</h6>
-                    <span class="badge bg-light text-dark border">{{ $unite->slots->count() }}</span>
-                </div>
-                @if($unite->slots->count())
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>{{ __('lang.day_type') }}</th>
-                                    @if(in_array($unite->type, ['stadium', 'hall']))
-                                        <th>{{ __('lang.th_full_price') }}</th>
-                                    @else
-                                        <th>{{ __('lang.th_morning') }}</th><th>{{ __('lang.th_evening') }}</th><th>{{ __('lang.th_full_day') }}</th>
-                                    @endif
-                                    <th>{{ __('lang.status') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($unite->slots as $sl)
-                                <tr>
-                                    <td class="small fw-semibold">{{ ucfirst($sl->day_of_week ?? '—') }}</td>
-                                    @if(in_array($unite->type, ['stadium', 'hall']))
-                                        <td class="small text-muted">{{ $sl->full_start }} – {{ $sl->full_end }}</td>
-                                    @else
-                                        <td class="small text-muted">
-                                            @if($sl->morning_start){{ substr($sl->morning_start,0,5) }} – {{ substr($sl->morning_end,0,5) }}@else —@endif
-                                        </td>
-                                        <td class="small text-muted">
-                                            @if($sl->evening_start){{ substr($sl->evening_start,0,5) }} – {{ substr($sl->evening_end,0,5) }}@else —@endif
-                                        </td>
-                                        <td class="small text-muted">
-                                            @if($sl->full_start){{ substr($sl->full_start,0,5) }} – {{ substr($sl->full_end,0,5) }}@else —@endif
-                                        </td>
-                                    @endif
-                                    <td>
-                                        @php $sc = ['available'=>'success','booked'=>'warning','unavailable'=>'secondary'] @endphp
-                                        <span class="badge bg-{{ $sc[$sl->status] ?? 'secondary' }} bg-opacity-75" style="font-size:10px">
-                                            {{ __('lang.'.($sl->status ?? 'available')) }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="text-muted small">{{ __('lang.no_slots') }}</div>
-                @endif
-            </div>
+      {{-- ── Time Slots ── --}}
+<div class="card card-soft shadow-sm mb-4">
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0">
+                📅 {{ __('lang.time_slots') }}
+            </h6>
+
+            <span class="badge bg-light text-dark border">
+                {{ $unite->slots->count() }}
+            </span>
         </div>
+
+        @if($unite->slots->count() > 0)
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th>{{ __('lang.day_type') }}</th>
+
+                            @if(in_array($unite->type, ['stadium', 'hall']))
+                                <th>{{ __('lang.th_full_price') }}</th>
+                            @else
+                                <th>{{ __('lang.th_morning') }}</th>
+                                <th>{{ __('lang.th_evening') }}</th>
+                                <th>{{ __('lang.th_full_day') }}</th>
+                            @endif
+
+                            <th>{{ __('lang.status') }}</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach($unite->slots as $sl)
+
+                            <tr>
+
+                                <td class="small fw-semibold">
+                                    {{ ucfirst($sl->day_of_week ?? '—') }}
+                                </td>
+
+                                @if(in_array($unite->type, ['stadium', 'hall']))
+
+                                    <td class="small text-muted">
+                                        {{ $sl->full_start ? substr($sl->full_start, 0, 5) : '—' }}
+                                        –
+                                        {{ $sl->full_end ? substr($sl->full_end, 0, 5) : '—' }}
+                                    </td>
+
+                                @else
+
+                                    <td class="small text-muted">
+                                        @if($sl->morning_start)
+                                            {{ substr($sl->morning_start, 0, 5) }}
+                                            –
+                                            {{ $sl->morning_end ? substr($sl->morning_end, 0, 5) : '—' }}
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+
+                                    <td class="small text-muted">
+                                        @if($sl->evening_start)
+                                            {{ substr($sl->evening_start, 0, 5) }}
+                                            –
+                                            {{ $sl->evening_end ? substr($sl->evening_end, 0, 5) : '—' }}
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+
+                                    <td class="small text-muted">
+                                        @if($sl->full_start)
+                                            {{ substr($sl->full_start, 0, 5) }}
+                                            –
+                                            {{ $sl->full_end ? substr($sl->full_end, 0, 5) : '—' }}
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+
+                                @endif
+
+                                <td>
+                                    <span
+                                        class="badge bg-{{
+                                            [
+                                                'available' => 'success',
+                                                'booked' => 'warning',
+                                                'unavailable' => 'secondary',
+                                            ][$sl->status ?? 'available'] ?? 'secondary'
+                                        }} bg-opacity-75"
+                                        style="font-size:10px"
+                                    >
+                                        {{ __('lang.' . ($sl->status ?? 'available')) }}
+                                    </span>
+                                </td>
+
+                            </tr>
+
+                        @endforeach
+
+                    </tbody>
+
+                </table>
+            </div>
+
+        @else
+
+            <div class="text-muted small">
+                {{ __('lang.no_slots') }}
+            </div>
+
+        @endif
+
+    </div>
+</div>
 
         {{-- ── Pricing ── --}}
         @php $hasHourly = $unite->prices->where('hourly_enabled', true)->count() > 0; @endphp
