@@ -95,14 +95,19 @@ class UnitesTableSeeder extends Seeder
         // "unspecified" across the 24 venues.
         $familiesAndSinglesCycle = ['families', 'singles', 'both', null];
 
-        // Package booking is an optional add-on, off by default — enabled
-        // here only for a specific, named subset of venues (one per type,
         // Package booking is enabled for every unite here — the seeded
         // booking-packages data (see UniteBookingPackagesTableSeeder) now
         // covers all venues with both booking_type modes, not just a
         // demonstrative subset.
+        //
+        // Viewing-appointment deposit stays a genuine mix rather than
+        // universal, since it's explicitly an optional feature: every
+        // 3rd venue gets a refundable deposit, every 3rd+1 gets a
+        // non-refundable one, everything else has no deposit at all.
 
         foreach ($unites as $i => $data) {
+            $depositCycle = $i % 3;
+
             Unite::updateOrCreate(
                 ['name' => $data['name']],
                 array_merge($data, [
@@ -112,6 +117,9 @@ class UnitesTableSeeder extends Seeder
                     'additional_terms' => 'يتم تأكيد الحجز فقط بعد دفع العربون. لا يُسمح بتقديم ضيافة خارجية.',
                     'status' => 'active',
                     'package_booking_enabled' => true,
+                    'viewing_deposit_enabled' => $depositCycle !== 2,
+                    'viewing_deposit_refundable' => $depositCycle === 0,
+                    'viewing_deposit_amount' => $depositCycle !== 2 ? 50 + ($i * 5) : null,
                 ])
             );
         }

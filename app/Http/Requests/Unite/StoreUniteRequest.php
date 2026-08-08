@@ -201,6 +201,22 @@ class StoreUniteRequest extends FormRequest
         $rules['booking_packages.*.status'] = ['nullable', 'in:active,inactive'];
         $rules['booking_packages.*.services_text'] = ['nullable', 'string', 'max:1000'];
 
+        // Viewing appointments — an optional feature available to every
+        // venue type, letting a customer schedule a visit to inspect the
+        // venue before booking it. Deliberately separate from
+        // reservation_deposit_* (a different concept — a partial payment
+        // toward an actual reservation, not a viewing appointment).
+        // Multiple rows per day are explicitly allowed — e.g. Saturday
+        // 09:00-11:30 AND Saturday 15:00-17:00 as two separate rows.
+        $rules['viewing_deposit_enabled'] = ['nullable', 'boolean'];
+        $rules['viewing_deposit_refundable'] = ['nullable', 'boolean'];
+        $rules['viewing_deposit_amount'] = ['required_if:viewing_deposit_enabled,1', 'nullable', 'numeric', 'min:0'];
+        $rules['viewing_times'] = ['nullable', 'array'];
+        $rules['viewing_times.*.day_of_week'] = ['required_with:viewing_times', 'in:sunday,monday,tuesday,wednesday,thursday,friday,saturday'];
+        $rules['viewing_times.*.start_time'] = ['required_with:viewing_times', 'date_format:H:i'];
+        $rules['viewing_times.*.end_time'] = ['required_with:viewing_times', 'date_format:H:i', 'after:viewing_times.*.start_time'];
+        $rules['viewing_times.*.status'] = ['nullable', 'in:active,inactive'];
+
         return $rules;
     }
 

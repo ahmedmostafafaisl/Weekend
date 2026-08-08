@@ -28,6 +28,9 @@ class Unite extends Model
         'status',
         'families_and_singles',
         'package_booking_enabled',
+        'viewing_deposit_enabled',
+        'viewing_deposit_refundable',
+        'viewing_deposit_amount',
         'insurance_policy_id',
         'requires_approval',
 
@@ -117,6 +120,20 @@ class Unite extends Model
     public function bookingPackages()
     {
         return $this->hasMany(UniteBookingPackage::class, 'unite_id');
+    }
+
+    // viewing appointments — a genuinely separate booking mechanism from
+    // reservations/packages: a customer visits the physical venue to
+    // inspect it before committing to an actual booking, not to use it
+    // for an event.
+    public function viewingTimes()
+    {
+        return $this->hasMany(UniteViewingTime::class, 'unite_id');
+    }
+
+    public function viewings()
+    {
+        return $this->hasMany(UniteViewing::class, 'unite_id');
     }
 
     // new features

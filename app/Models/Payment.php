@@ -16,6 +16,7 @@ class Payment extends Model
         'user_id',
         'reservation_id',
         'subscription_id',
+        'unite_viewing_id',
         'payment_type',
         'amount',
         'payment_id',
@@ -57,6 +58,11 @@ class Payment extends Model
     public function reservation()
     {
         return $this->belongsTo(UniteReservation::class, 'reservation_id');
+    }
+
+    public function uniteViewing()
+    {
+        return $this->belongsTo(UniteViewing::class, 'unite_viewing_id');
     }
 
     public function subscription()

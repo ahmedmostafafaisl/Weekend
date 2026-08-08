@@ -26,7 +26,9 @@ return new class extends Migration
             $table->boolean('reservation_deposit')->default(false);
             $table->enum('reservation_deposit_type', ['amount', 'percentage'])->default('amount')->nullable();
             $table->decimal('reservation_deposit_amount', 15, 2)->nullable();
-
+            $table->boolean('viewing_deposit_enabled')->default(false);
+            $table->boolean('viewing_deposit_refundable')->nullable();
+            $table->decimal('viewing_deposit_amount', 10, 2)->nullable();
             $table->boolean('insurance')->default(false);
             $table->decimal('insurance_amount', 15, 2)->nullable();
 

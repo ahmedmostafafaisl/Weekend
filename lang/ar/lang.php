@@ -1395,4 +1395,21 @@ return [
     'package_booking_disabled_for_venue' => 'الحجز بالباقات غير مفعّل لهذه الوحدة.',
     'no_booking_packages' => 'لم تتم إضافة أي باقات حجز بعد.',
     'days_unit' => 'أيام',
+
+    'viewing_time_not_found' => 'لم يتم العثور على وقت المعاينة المحدد لهذه الوحدة.',
+    'viewing_time_not_available' => 'وقت المعاينة هذا غير متاح حاليًا.',
+    'viewing_date_day_mismatch' => 'وقت المعاينة هذا متاح فقط يوم :expected — التاريخ الذي اخترته يوافق يوم :requested.',
+    'viewing_slot_already_booked' => 'وقت المعاينة هذا محجوز مسبقًا لهذا التاريخ.',
+    'viewing_deposit_amount_not_configured' => 'تتطلب هذه الوحدة عربونًا لحجز معاينة، ولكن لم يتم تحديد قيمة العربون بعد.',
+    'viewing_deposit' => 'عربون المعاينة',
+    'viewing_created_pay_deposit' => 'تم إنشاء موعد المعاينة. يرجى إتمام الدفع لتأكيد الحجز.',
+    'viewing_confirmed_no_deposit' => 'تم تأكيد موعد المعاينة — لا يتطلب عربونًا لهذه الوحدة.',
+
+    'viewing_times' => 'أوقات المعاينة',
+    'viewing_times_subtitle' => 'فترات زمنية أسبوعية محددة مسبقًا يمكن للعميل الاختيار منها لجدولة زيارة ومعاينة الوحدة قبل الحجز.',
+    'add_viewing_time' => 'إضافة وقت',
+    'viewing_deposit_enabled' => 'طلب عربون لحجز معاينة',
+    'viewing_deposit_amount' => 'قيمة العربون',
+    'viewing_deposit_refundable' => 'العربون قابل للاسترداد',
+    'viewing_times_hint' => 'يمكن إضافة أكثر من فترة زمنية في اليوم — أضف صفًا منفصلًا لكل فترة.',
 ];

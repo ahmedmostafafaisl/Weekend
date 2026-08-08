@@ -29,6 +29,7 @@ class UniteRepository implements UniteRepositoryInterface
             'prices',
             'packages',
             'bookingPackages',
+            'viewingTimes',
             'newFeatures',
             'services',
             'department',
@@ -464,6 +465,7 @@ class UniteRepository implements UniteRepositoryInterface
             'prices',
             'packages',
             'bookingPackages',
+            'viewingTimes',
             'newFeatures',
             'favorites',
             'department.user.receivedVendorRatings',
@@ -496,6 +498,7 @@ class UniteRepository implements UniteRepositoryInterface
             $this->storePrices($unite, $data['prices'] ?? [], $data['type'] ?? 'stadium');
             $this->storePackages($unite, $data['packages'] ?? []);
             $this->storeBookingPackages($unite, $data['booking_packages'] ?? []);
+            $this->storeViewingTimes($unite, $data['viewing_times'] ?? []);
             $this->storeNewFeatures($unite, $data['new_features'] ?? []);
             $this->syncServices($unite, $data['service_ids'] ?? []);
             $unite = $unite->fresh([
@@ -509,6 +512,7 @@ class UniteRepository implements UniteRepositoryInterface
                 'services',
                 'packages',
                 'bookingPackages',
+                'viewingTimes',
                 'newFeatures',
             ]);
             // all_men_count / all_women_count are now computed accessors on
@@ -537,6 +541,7 @@ class UniteRepository implements UniteRepositoryInterface
             $unite->prices()->delete();
             $unite->packages()->delete();
             $unite->bookingPackages()->delete();
+            $unite->viewingTimes()->delete();
             $unite->newFeatures()->delete();
 
             $this->storeFeatures($unite, $data['features'] ?? []);
@@ -546,6 +551,7 @@ class UniteRepository implements UniteRepositoryInterface
             $this->storePrices($unite, $data['prices'] ?? [], $data['type'] ?? 'stadium');
             $this->storePackages($unite, $data['packages'] ?? []);
             $this->storeBookingPackages($unite, $data['booking_packages'] ?? []);
+            $this->storeViewingTimes($unite, $data['viewing_times'] ?? []);
             $this->storeNewFeatures($unite, $data['new_features'] ?? []);
             $this->syncServices($unite, $data['service_ids'] ?? []);
 
@@ -580,6 +586,7 @@ class UniteRepository implements UniteRepositoryInterface
                 'services',
                 'packages',
                 'bookingPackages',
+                'viewingTimes',
                 'newFeatures',
             ]);
             // all_men_count / all_women_count are now computed accessors on
@@ -802,6 +809,27 @@ class UniteRepository implements UniteRepositoryInterface
                     explode(',', $pkg['services_text'] ?? '')
                 ))),
                 'status' => $pkg['status'] ?? 'active',
+            ]);
+        }
+    }
+
+    /**
+     * Viewing appointments — an optional feature letting a customer
+     * schedule a visit to inspect the venue before booking it.
+     * Deliberately separate from the reservation-deposit fields, which
+     * govern a different concept entirely. Multiple rows per day are
+     * expected and fully supported here — each row in $viewingTimes just
+     * becomes its own row, with no deduplication or merging by day.
+     */
+    protected function storeViewingTimes(Unite $unite, array $viewingTimes): void
+    {
+        foreach ($viewingTimes as $vt) {
+            \App\Models\UniteViewingTime::create([
+                'unite_id' => $unite->id,
+                'day_of_week' => $vt['day_of_week'],
+                'start_time' => $vt['start_time'],
+                'end_time' => $vt['end_time'],
+                'status' => $vt['status'] ?? 'active',
             ]);
         }
     }

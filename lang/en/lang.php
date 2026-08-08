@@ -1401,4 +1401,21 @@ return [
     'package_booking_disabled_for_venue' => 'Package booking is not enabled for this venue.',
     'no_booking_packages' => 'No booking packages have been added yet.',
     'days_unit' => 'days',
+
+    'viewing_time_not_found' => 'The selected viewing time could not be found for this venue.',
+    'viewing_time_not_available' => 'This viewing time is not currently available.',
+    'viewing_date_day_mismatch' => 'This viewing time is only available on :expected — the date you selected falls on :requested.',
+    'viewing_slot_already_booked' => 'This viewing time is already booked for that date.',
+    'viewing_deposit_amount_not_configured' => 'This venue requires a deposit to book a viewing, but no deposit amount has been configured yet.',
+    'viewing_deposit' => 'Viewing Deposit',
+    'viewing_created_pay_deposit' => 'Viewing appointment created. Complete payment to confirm your booking.',
+    'viewing_confirmed_no_deposit' => 'Viewing appointment confirmed — no deposit required for this venue.',
+
+    'viewing_times' => 'Viewing Times',
+    'viewing_times_subtitle' => 'Predefined weekly time slots a customer can pick from to schedule a visit and inspect the venue before booking it.',
+    'add_viewing_time' => 'Add Time',
+    'viewing_deposit_enabled' => 'Require a deposit to book a viewing',
+    'viewing_deposit_amount' => 'Deposit Amount',
+    'viewing_deposit_refundable' => 'Deposit is refundable',
+    'viewing_times_hint' => 'Multiple time windows per day are allowed — add a separate row for each.',
 ];

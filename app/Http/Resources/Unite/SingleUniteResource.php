@@ -164,6 +164,28 @@ class SingleUniteResource extends JsonResource
                 ];
             })->values(),
 
+            // Viewing appointments — a customer schedules a visit to
+            // inspect the venue before booking it, picking one of these
+            // predefined weekly slots. Only active slots are exposed here
+            // (an inactive one the provider disabled shouldn't appear as
+            // bookable), matching how offers/packages/etc. already filter
+            // by status before reaching this response.
+            'viewing_deposit_enabled' => (bool) $this->viewing_deposit_enabled,
+            'viewing_deposit_refundable' => $this->viewing_deposit_enabled ? (bool) $this->viewing_deposit_refundable : null,
+            'viewing_deposit_amount' => $this->viewing_deposit_enabled && $this->viewing_deposit_amount
+                ? (float) $this->viewing_deposit_amount
+                : null,
+            'viewing_times' => $this->viewingTimes
+                ->where('status', 'active')
+                ->map(function ($vt) {
+                    return [
+                        'id' => $vt->id,
+                        'day_of_week' => $vt->day_of_week,
+                        'start_time' => $vt->start_time,
+                        'end_time' => $vt->end_time,
+                    ];
+                })->values(),
+
             'is_favorite' => $isFavorite,
 
             'location_data' => [

@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             UniteFeatureSeeder::class,            // NEW — 3-5 amenities per venue, type-specific, active/inactive mix
             UniteNewFeatureSeeder::class,         // NEW — "what's new" highlights on ~60% of venues
             UnitePackageSeeder::class,            // NEW — Bronze/Silver/Gold capacity packages per venue
+            UniteViewingTimesTableSeeder::class,  // NEW — predefined weekly viewing slots per venue (depends only on Unites, seeded above)
             AdminReviewerScopeSeeder::class,      // NEW — 3 reviewer accounts covering all 3 scope modes
 
             // ── 3. Supporting data ────────────────────────────────────────────
@@ -41,6 +42,7 @@ class DatabaseSeeder extends Seeder
             AdViewsTableSeeder::class,
             AdCommentSeeder::class,               // NEW — 2–4 comments per ad (1 hidden to demo toggle)
             UniteReservationsTableSeeder::class,  // 25 reservations + payments per venue
+            UniteViewingsTableSeeder::class,      // NEW — customer viewing-appointment bookings, both deposit and no-deposit outcomes
             ProviderStatisticsSeeder::class,       // 12-month historical data for provider stats API
             FavoriteUnitesTableSeeder::class,
             UniteRatingsTableSeeder::class,

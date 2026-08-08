@@ -264,6 +264,11 @@
         'services'  => $services,
     ])
 
+    {{-- ── Viewing Times & Deposit ── (universal — available to every venue type) --}}
+    @include('dashboard.web.unites.partials._viewing_times_section', [
+        'unite'     => $unite,
+    ])
+
     {{-- ── Reservations ── --}}
     <div class="card card-soft shadow-sm mb-4">
         <div class="card-body">

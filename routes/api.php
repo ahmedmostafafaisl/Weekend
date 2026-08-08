@@ -223,6 +223,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-reservations', [UniteReservationController::class, 'myReservations'])
         ->name('reservations.my');
 
+    // Viewing appointments — a customer schedules a visit to inspect the
+    // venue before booking it, picking one of the venue's predefined
+    // weekly time slots. Deposit (if the venue requires one) is handled
+    // inside UniteViewingRepository, matching the reservation flow's
+    // exact gateway-integration pattern.
+    Route::post('/unite-viewings', [\App\Http\Controllers\Viewing\UniteViewingController::class, 'store']);
+
     // Store/update FCM device token for push notifications
     // POST /api/fcm/token  { "fcm_token": "..." }
     Route::post('/fcm/token', [\App\Http\Controllers\Provider\AuthController::class, 'updateFcmToken'])
