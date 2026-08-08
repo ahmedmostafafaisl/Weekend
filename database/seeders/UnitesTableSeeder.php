@@ -97,15 +97,10 @@ class UnitesTableSeeder extends Seeder
 
         // Package booking is an optional add-on, off by default — enabled
         // here only for a specific, named subset of venues (one per type,
-        // matching the infographic's exact examples), not universally,
-        // so the seeded data actually demonstrates "some venues have it,
-        // most don't" rather than making it look like the default.
-        $packageBookingVenues = [
-            'ملعب الدمام ب',        // stadium
-            'قاعة النور للأعراس',   // hall
-            'صالة اللؤلؤة',          // lounge
-            'مخيم الصفا الصحراوي',  // camp
-        ];
+        // Package booking is enabled for every unite here — the seeded
+        // booking-packages data (see UniteBookingPackagesTableSeeder) now
+        // covers all venues with both booking_type modes, not just a
+        // demonstrative subset.
 
         foreach ($unites as $i => $data) {
             Unite::updateOrCreate(
@@ -116,7 +111,7 @@ class UnitesTableSeeder extends Seeder
                     'description' => 'وحدة '.($typeLabelsAr[$data['type']] ?? $data['type']).' مميزة — '.$data['location_name'].'. مجهزة بالكامل بأحدث المرافق.',
                     'additional_terms' => 'يتم تأكيد الحجز فقط بعد دفع العربون. لا يُسمح بتقديم ضيافة خارجية.',
                     'status' => 'active',
-                    'package_booking_enabled' => in_array($data['name'], $packageBookingVenues),
+                    'package_booking_enabled' => true,
                 ])
             );
         }

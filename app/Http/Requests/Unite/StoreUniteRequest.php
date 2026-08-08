@@ -199,8 +199,7 @@ class StoreUniteRequest extends FormRequest
 
         $rules['booking_packages.*.price'] = ['required_with:booking_packages', 'numeric', 'min:0'];
         $rules['booking_packages.*.status'] = ['nullable', 'in:active,inactive'];
-        $rules['booking_packages.*.services'] = ['nullable', 'array'];
-        $rules['booking_packages.*.services.*'] = ['string', 'max:255'];
+        $rules['booking_packages.*.services_text'] = ['nullable', 'string', 'max:1000'];
 
         return $rules;
     }

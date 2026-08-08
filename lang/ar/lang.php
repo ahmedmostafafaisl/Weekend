@@ -1382,4 +1382,17 @@ return [
     'booking_package_days' => 'اليوم',
     'any_day' => 'أي يوم',
     'included_services' => 'الخدمات المشمولة',
+
+    'booking_type' => 'النوع',
+    'booking_package_when' => 'التوقيت',
+    'booking_type_hours' => 'ساعات',
+    'booking_type_days' => 'أيام',
+    'booking_package_from' => 'من',
+    'booking_package_to' => 'إلى',
+    'included_services_placeholder' => 'مثال: تنظيف يومي، إفطار مجاني، موقف سيارات',
+    'included_services_hint' => 'أدخل الخدمات مفصولة بفواصل — نص عادي، وليست مختارة من قائمة.',
+
+    'package_booking_disabled_for_venue' => 'الحجز بالباقات غير مفعّل لهذه الوحدة.',
+    'no_booking_packages' => 'لم تتم إضافة أي باقات حجز بعد.',
+    'days_unit' => 'أيام',
 ];

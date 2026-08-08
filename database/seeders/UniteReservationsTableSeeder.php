@@ -115,13 +115,20 @@ class UniteReservationsTableSeeder extends Seeder
                 continue;
             }
 
-            // 'day' is a category (week_day/thursday/friday/saturday), not
-            // a specific day-of-week — thursday/friday/saturday map
-            // directly to that exact day, but 'week_day' means "any day
-            // that ISN'T thu/fri/sat", so nudging for it means finding the
-            // next day that satisfies that, not a single fixed target.
-            $targetDayName = in_array($package->day, ['thursday', 'friday', 'saturday']) ? $package->day : null;
-            $isWeekDayCategory = $package->day === 'week_day';
+            $isDaysType = $package->booking_type === 'days';
+
+            // 'hours' mode: 'day' is a category (week_day/thursday/friday/
+            // saturday), not a specific day-of-week — thursday/friday/
+            // saturday map directly to that exact day, but 'week_day'
+            // means "any day that ISN'T thu/fri/sat", so nudging for it
+            // means finding the next day that satisfies that.
+            // 'days' mode: the booking must START on day_from's exact
+            // weekday — day_to only affects duration_days, not which
+            // start days are valid.
+            $targetDayName = $isDaysType
+                ? $package->day_from
+                : (in_array($package->day, ['thursday', 'friday', 'saturday']) ? $package->day : null);
+            $isWeekDayCategory = ! $isDaysType && $package->day === 'week_day';
 
             foreach ([['days_offset' => 7, 'status' => 'confirmed', 'pay_status' => 'paid'],
                 ['days_offset' => 14, 'status' => 'pending', 'pay_status' => 'pending']] as $sIdx => $scenario) {
@@ -150,6 +157,15 @@ class UniteReservationsTableSeeder extends Seeder
 
                 $customerId = $customers[($uIdx + $sIdx) % $customers->count()];
 
+                // 'days' mode occupies whole calendar days with no
+                // specific hours — end_date computed from duration_days,
+                // from_time/to_time stay null, matching exactly how
+                // UniteReservationRepository::resolvePackageTimes()
+                // handles this same mode for a real booking.
+                $endDate = $isDaysType
+                    ? $date->copy()->addDays(max(1, $package->duration_days ?? 1) - 1)->format('Y-m-d')
+                    : null;
+
                 $res = UniteReservation::updateOrCreate(
                     [
                         'unite_id' => $unite->id,
@@ -159,8 +175,9 @@ class UniteReservationsTableSeeder extends Seeder
                         'unite_booking_package_id' => $package->id,
                     ],
                     [
-                        'from_time' => $package->start_time,
-                        'to_time' => $package->end_time,
+                        'end_date' => $endDate,
+                        'from_time' => $isDaysType ? null : $package->start_time,
+                        'to_time' => $isDaysType ? null : $package->end_time,
                         'price' => $package->price,
                         'status' => $scenario['status'],
                     ]

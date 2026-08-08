@@ -2,117 +2,100 @@
 
 namespace Database\Seeders;
 
-use App\Models\Service;
 use App\Models\Unite;
 use App\Models\UniteBookingPackage;
 use Illuminate\Database\Seeder;
 
 /**
- * Creates actual booking packages for the specific venues enabled in
- * UnitesTableSeeder — matching the infographic's own examples where
- * possible (stadium: Friday 8-11pm; hall: Saturday full-day) so the
- * seeded data genuinely demonstrates the feature rather than just
- * flipping the enabled flag with nothing behind it.
- *
- * 'day' matches the exact same 4-value enum already used for
- * unite_prices.day (week_day/thursday/friday/saturday) — a single row can
- * only ever apply to one of these, not several specific days at once, so
- * the lounge "weekend package" example below is genuinely 3 separate rows
- * (thursday, friday, saturday), each otherwise identical — not one row
- * with 3 days attached, which the corrected schema no longer supports.
+ * Creates booking packages for EVERY unite — both booking_type modes
+ * ('hours' and 'days') on each one, matching the explicit request to
+ * cover all venues rather than a demonstrative subset. Field choices vary
+ * sensibly by venue type: stadium/hall get an evening-focused 'hours'
+ * package (matching how those venues are actually used), lounge/camp get
+ * a daytime-focused one; 'days' packages vary in span (1, 3, or 6 nights)
+ * across the set so every duration_days wraparound case in
+ * UniteBookingPackage::computeDurationDays() gets real seeded data behind
+ * it, not just my own standalone verification of the math.
  */
 class UniteBookingPackagesTableSeeder extends Seeder
 {
     public function run(): void
     {
-        // Looked up by name rather than assumed IDs — matches how every
-        // other seeder in this project resolves dependent data, since
-        // service IDs aren't guaranteed stable across re-seeds.
-        $serviceNames = fn (array $names) => Service::whereIn('name', $names)->pluck('id')->all();
-
-        $packages = [
-            [
-                'unite' => 'ملعب الدمام ب',
-                'name' => 'باقة الجمعة المسائية',
-                'day' => 'friday',
-                'start_time' => '20:00',
-                'end_time' => '23:00',
-                'price' => 500,
-                'services' => $serviceNames(['أضواء كشافة', 'موقف سيارات', 'محطة إسعافات أولية']),
-            ],
-            [
-                'unite' => 'قاعة النور للأعراس',
-                'name' => 'باقة السبت الكاملة',
-                'day' => 'saturday',
-                'start_time' => '10:00',
-                'end_time' => '22:00',
-                'price' => 1500,
-                'services' => $serviceNames(['صالة طعام', 'انترنت', 'موقف سيارات']),
-            ],
-            // "Weekend package" — genuinely 3 separate rows (one per day),
-            // since a single row can no longer span multiple specific days.
-            [
-                'unite' => 'صالة اللؤلؤة',
-                'name' => 'باقة نهاية الأسبوع - الخميس',
-                'day' => 'thursday',
-                'start_time' => '16:00',
-                'end_time' => '23:00',
-                'price' => 800,
-                'services' => $serviceNames(['مسبح مشترك', 'ركن شواء', 'إطلالة']),
-            ],
-            [
-                'unite' => 'صالة اللؤلؤة',
-                'name' => 'باقة نهاية الأسبوع - الجمعة',
-                'day' => 'friday',
-                'start_time' => '16:00',
-                'end_time' => '23:00',
-                'price' => 800,
-                'services' => $serviceNames(['مسبح مشترك', 'ركن شواء', 'إطلالة']),
-            ],
-            [
-                'unite' => 'صالة اللؤلؤة',
-                'name' => 'باقة نهاية الأسبوع - السبت',
-                'day' => 'saturday',
-                'start_time' => '16:00',
-                'end_time' => '23:00',
-                'price' => 800,
-                'services' => $serviceNames(['مسبح مشترك', 'ركن شواء', 'إطلالة']),
-            ],
-            // Camp example — "any day" doesn't exist in the corrected
-            // 4-value system, so this maps to 'week_day' (the regular,
-            // non-thu/fri/sat catch-all), the closest sensible equivalent.
-            [
-                'unite' => 'مخيم الصفا الصحراوي',
-                'name' => 'باقة أيام الأسبوع',
-                'day' => 'week_day',
-                'start_time' => '15:00',
-                'end_time' => '23:59',
-                'price' => 600,
-                'services' => $serviceNames(['حفرة مندي', 'موقد حطب', 'جلسات خارجية']),
-            ],
+        $hoursServicesByType = [
+            'stadium' => 'أضواء كشافة, موقف سيارات, محطة إسعافات أولية',
+            'hall' => 'صالة طعام, انترنت, موقف سيارات',
+            'lounge' => 'مسبح مشترك, ركن شواء, إطلالة',
+            'camp' => 'حفرة مندي, موقد حطب, جلسات خارجية',
         ];
 
-        foreach ($packages as $pkg) {
-            $unite = Unite::where('name', $pkg['unite'])->first();
+        $daysServicesByType = [
+            'stadium' => 'صيانة الأرضية, تنظيف يومي',
+            'hall' => 'تنظيف يومي, أمن وحراسة',
+            'lounge' => 'تنظيف يومي, إفطار مجاني',
+            'camp' => 'إقامة كاملة, وجبات يومية',
+        ];
 
-            if (! $unite) {
-                continue;
-            }
+        // Cycled across units so the seeded 'days' packages exercise
+        // several different spans, not the same one repeated everywhere —
+        // including a wraparound case (friday -> sunday, 3 nights
+        // crossing the week boundary) alongside the two straightforward
+        // ones already covered elsewhere.
+        $dayRangeCycle = [
+            ['from' => 'saturday', 'to' => 'saturday'],   // 1 night
+            ['from' => 'thursday', 'to' => 'saturday'],   // 3 nights
+            ['from' => 'sunday', 'to' => 'friday'],        // 6 nights
+            ['from' => 'friday', 'to' => 'sunday'],        // 3 nights, wraps the week boundary
+        ];
 
-            $bookingPackage = UniteBookingPackage::updateOrCreate(
-                ['unite_id' => $unite->id, 'name' => $pkg['name']],
+        $hoursDayCycle = ['week_day', 'thursday', 'friday', 'saturday'];
+
+        $unites = Unite::all();
+
+        foreach ($unites as $i => $unite) {
+            $basePrice = match ($unite->type) {
+                'stadium' => 400,
+                'hall' => 1200,
+                'lounge' => 600,
+                'camp' => 500,
+                default => 500,
+            };
+
+            // 'hours' mode
+            UniteBookingPackage::updateOrCreate(
+                ['unite_id' => $unite->id, 'name' => 'باقة الساعات'],
                 [
-                    'day' => $pkg['day'],
-                    'start_time' => $pkg['start_time'],
-                    'end_time' => $pkg['end_time'],
-                    'price' => $pkg['price'],
+                    'booking_type' => 'hours',
+                    'day' => $hoursDayCycle[$i % count($hoursDayCycle)],
+                    'start_time' => in_array($unite->type, ['stadium', 'hall']) ? '19:00' : '10:00',
+                    'end_time' => in_array($unite->type, ['stadium', 'hall']) ? '22:00' : '15:00',
+                    'day_from' => null,
+                    'day_to' => null,
+                    'duration_days' => null,
+                    'price' => $basePrice + ($i * 10),
+                    'services' => array_map('trim', explode(',', $hoursServicesByType[$unite->type] ?? '')),
                     'status' => 'active',
                 ]
             );
 
-            if (! empty($pkg['services'])) {
-                $bookingPackage->services()->sync($pkg['services']);
-            }
+            // 'days' mode
+            $range = $dayRangeCycle[$i % count($dayRangeCycle)];
+            $duration = UniteBookingPackage::computeDurationDays($range['from'], $range['to']);
+
+            UniteBookingPackage::updateOrCreate(
+                ['unite_id' => $unite->id, 'name' => 'باقة الأيام'],
+                [
+                    'booking_type' => 'days',
+                    'day' => null,
+                    'start_time' => null,
+                    'end_time' => null,
+                    'day_from' => $range['from'],
+                    'day_to' => $range['to'],
+                    'duration_days' => $duration,
+                    'price' => ($basePrice * $duration) + ($i * 20),
+                    'services' => array_map('trim', explode(',', $daysServicesByType[$unite->type] ?? '')),
+                    'status' => 'active',
+                ]
+            );
         }
     }
 }

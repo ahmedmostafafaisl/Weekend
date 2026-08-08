@@ -263,8 +263,12 @@
                         <thead class="table-light">
                             <tr>
                                 <th>{{ __('lang.th_hash') }}</th><th>{{ __('lang.name') }}</th><th>{{ __('lang.th_period') }}</th>
-                                @if($unite->type !== 'stadium')<th>{{ __('lang.th_morning') }}</th><th>{{ __('lang.th_evening') }}</th>@endif
-                                <th>{{ __('lang.th_full_day') }}</th><th>{{ __('lang.status') }}</th>
+                                @if($unite->type === 'stadium')
+                                    <th>{{ __('lang.day_rate') }}</th><th>{{ __('lang.night_rate') }}</th>
+                                @else
+                                    <th>{{ __('lang.th_morning') }}</th><th>{{ __('lang.th_evening') }}</th><th>{{ __('lang.th_full_day') }}</th>
+                                @endif
+                                <th>{{ __('lang.status') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -273,11 +277,14 @@
                                 <td class="text-muted small">{{ $i+1 }}</td>
                                 <td class="small">{{ $offer->name ?? '—' }}</td>
                                 <td class="small text-muted">{{ $offer->start }} → {{ $offer->end }}</td>
-                                @if($unite->type !== 'stadium')
+                                @if($unite->type === 'stadium')
+                                    <td class="small">{{ $offer->day_hour_price ?? '—' }}</td>
+                                    <td class="small">{{ $offer->night_hour_price ?? '—' }}</td>
+                                @else
                                     <td class="small">{{ $offer->morning_price ?? '—' }}</td>
                                     <td class="small">{{ $offer->evening_price ?? '—' }}</td>
+                                    <td class="small">{{ $offer->full_day_price ?? '—' }}</td>
                                 @endif
-                                <td class="small">{{ $offer->full_day_price ?? '—' }}</td>
                                 <td>
                                     <span class="badge {{ $offer->status === 'active' ? 'bg-success' : 'bg-secondary' }}">
                                         {{ __('lang.'.$offer->status) }}
@@ -289,6 +296,65 @@
                     </table>
                 @else
                     <div class="text-muted small">{{ __('lang.no_offers') }}</div>
+                @endif
+            </div>
+        </div>
+
+
+        {{-- ── Booking Packages ── --}}
+        <div class="card card-soft shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0">🎁 {{ __('lang.booking_packages') }}</h6>
+                    <span class="badge bg-light text-dark border">{{ $unite->bookingPackages->count() }}</span>
+                </div>
+                @if(! $unite->package_booking_enabled)
+                    <div class="text-muted small">{{ __('lang.package_booking_disabled_for_venue') }}</div>
+                @elseif($unite->bookingPackages->count())
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>{{ __('lang.name') }}</th>
+                                <th>{{ __('lang.booking_type') }}</th>
+                                <th>{{ __('lang.booking_package_when') }}</th>
+                                <th>{{ __('lang.th_price') }}</th>
+                                <th>{{ __('lang.included_services') }}</th>
+                                <th>{{ __('lang.status') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($unite->bookingPackages as $pkg)
+                            <tr>
+                                <td class="small">{{ $pkg->name ?? '—' }}</td>
+                                <td class="small">
+                                    <span class="badge {{ $pkg->booking_type === 'days' ? 'bg-info text-dark' : 'bg-light text-dark border' }}">
+                                        {{ $pkg->booking_type === 'days' ? __('lang.booking_type_days') : __('lang.booking_type_hours') }}
+                                    </span>
+                                </td>
+                                <td class="small text-muted">
+                                    @if($pkg->booking_type === 'days')
+                                        {{ __('lang.'.$pkg->day_from) }} → {{ __('lang.'.$pkg->day_to) }}
+                                        <span class="text-muted">({{ $pkg->duration_days }} {{ __('lang.days_unit') }})</span>
+                                    @else
+                                        @php($hoursDayLabels = ['week_day'=>__('lang.weekday'),'thursday'=>__('lang.thursday'),'friday'=>__('lang.friday'),'saturday'=>__('lang.saturday')])
+                                        {{ $hoursDayLabels[$pkg->day] ?? $pkg->day }} · {{ $pkg->start_time }} → {{ $pkg->end_time }}
+                                    @endif
+                                </td>
+                                <td class="small fw-semibold">{{ number_format($pkg->price, 2) }}</td>
+                                <td class="small text-muted">
+                                    {{ $pkg->services && count($pkg->services) ? implode(', ', $pkg->services) : '—' }}
+                                </td>
+                                <td>
+                                    <span class="badge {{ $pkg->status === 'active' ? 'bg-success' : 'bg-secondary' }}">
+                                        {{ __('lang.'.$pkg->status) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="text-muted small">{{ __('lang.no_booking_packages') }}</div>
                 @endif
             </div>
         </div>

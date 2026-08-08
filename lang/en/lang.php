@@ -1388,4 +1388,17 @@ return [
     'booking_package_days' => 'Day',
     'any_day' => 'Any day',
     'included_services' => 'Included Services',
+
+    'booking_type' => 'Type',
+    'booking_package_when' => 'When',
+    'booking_type_hours' => 'Hours',
+    'booking_type_days' => 'Days',
+    'booking_package_from' => 'from',
+    'booking_package_to' => 'to',
+    'included_services_placeholder' => 'e.g. Daily cleaning, Free breakfast, Parking',
+    'included_services_hint' => 'Enter services separated by commas — plain text, not selected from a list.',
+
+    'package_booking_disabled_for_venue' => 'Package booking is not enabled for this venue.',
+    'no_booking_packages' => 'No booking packages have been added yet.',
+    'days_unit' => 'days',
 ];

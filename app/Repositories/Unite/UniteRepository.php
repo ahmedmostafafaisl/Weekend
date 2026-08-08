@@ -797,7 +797,10 @@ class UniteRepository implements UniteRepositoryInterface
                 'price' => $pkg['price'] ?? 0,
                 // Free text the provider typed in — not a relation, so no
                 // sync() call needed, just stored directly as a JSON array.
-                'services' => array_values(array_filter($pkg['services'] ?? [])),
+                'services' => array_values(array_filter(array_map(
+                    'trim',
+                    explode(',', $pkg['services_text'] ?? '')
+                ))),
                 'status' => $pkg['status'] ?? 'active',
             ]);
         }
