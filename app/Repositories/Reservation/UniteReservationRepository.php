@@ -883,41 +883,7 @@ class UniteReservationRepository implements UniteReservationInterface
         ?int $ignoreId = null,
         ?string $endDate = null
     ): void {
-        $endDate = $endDate ?? $startDate;
-        $isMultiDayRequest = $endDate !== $startDate;
-
-        $query = UniteReservation::where('unite_id', $uniteId)
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                // Date-range overlap, treating a single-day reservation's
-                // implicit range as [reservation_date, reservation_date]
-                // via COALESCE — one formula covers both single-day and
-                // multi-day existing reservations correctly.
-                $q->where('reservation_date', '<=', $endDate)
-                    ->where(function ($q2) use ($startDate) {
-                        $q2->whereRaw('COALESCE(end_date, reservation_date) >= ?', [$startDate]);
-                    });
-            });
-
-        // Time-overlap only matters when this is genuinely a single-day
-        // vs single-day comparison — a multi-day request or a multi-day
-        // existing reservation both occupy whole days regardless of hours.
-        if (! $isMultiDayRequest && $fromTime && $toTime) {
-            $query->where(function ($q) use ($fromTime, $toTime) {
-                $q->whereNotNull('end_date') // existing reservation is multi-day -> whole-day conflict, time irrelevant
-                    ->orWhere(function ($q2) use ($fromTime, $toTime) {
-                        $q2->whereNull('end_date') // existing reservation is single-day -> check actual time overlap
-                            ->where('from_time', '<', $toTime)
-                            ->where('to_time', '>', $fromTime);
-                    });
-            });
-        }
-
-        if ($ignoreId) {
-            $query->where('id', '!=', $ignoreId);
-        }
-
-        if ($query->exists()) {
+        if (UniteReservation::conflicting($uniteId, $startDate, $endDate, $fromTime, $toTime, $ignoreId)->exists()) {
             abort(422, __('lang.time_slot_conflict'));
         }
     }

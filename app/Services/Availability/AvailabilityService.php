@@ -40,6 +40,10 @@ class AvailabilityService
             ->where('end', '>=', $start->toDateString())
             ->get();
 
+        $bookingPackages = $unite->package_booking_enabled
+            ? $unite->bookingPackages()->where('status', 'active')->get()
+            : collect();
+
         // Existing reservations for the whole month (pending + confirmed only)
         $reservations = UniteReservation::where('unite_id', $unite->id)
             ->whereBetween('reservation_date', [$start->toDateString(), $end->toDateString()])
@@ -56,7 +60,8 @@ class AvailabilityService
                 $slots,
                 $prices,
                 $activeOffers,
-                $reservations->get($date->format('Y-m-d'), collect())
+                $reservations->get($date->format('Y-m-d'), collect()),
+                $bookingPackages
             );
         }
 
@@ -80,7 +85,8 @@ class AvailabilityService
         Collection $slots,
         Collection $prices,
         Collection $activeOffers,
-        Collection $dayReservations
+        Collection $dayReservations,
+        Collection $bookingPackages
     ): array {
         $dayKey = strtolower($date->englishDayOfWeek);   // 'monday'
         $priceKey = $this->toPriceDay($dayKey);            // 'thursday' | 'friday' | 'saturday' | 'week_day'
@@ -89,7 +95,18 @@ class AvailabilityService
         $slot = $slots->get($dayKey);
         $price = $prices->get($priceKey);
 
-        // No slot config means this day is not bookable
+        // Packages are a genuinely separate booking mechanism from the
+        // regular hourly/period system — they have their own day/day_from
+        // fields, entirely independent of unite_slots. A package can
+        // still be bookable on a day the venue's regular slot is closed,
+        // so this is computed unconditionally, before the "no slot
+        // config" early return below, rather than only when the slot
+        // itself is open.
+        $availablePackages = $this->buildAvailablePackages($unite, $bookingPackages, $date, $dayKey);
+
+        // No slot config means this day is not bookable via the regular
+        // hourly/period system — packages (just computed above) are
+        // unaffected by this.
         if (! $slot || $slot->status !== 'available') {
             return [
                 'date' => $date->toDateString(),
@@ -99,6 +116,7 @@ class AvailabilityService
                 'reason' => $slot ? 'day_closed' : 'no_slot_config',
                 'is_past' => $isPast,
                 'periods' => [],
+                'available_packages' => $availablePackages,
             ];
         }
 
@@ -120,7 +138,78 @@ class AvailabilityService
             'display_status' => $this->mapDisplayStatus($availability),
             'is_past' => $isPast,
             'periods' => $periods,
+            'available_packages' => $availablePackages,
         ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Packages — a separate booking mechanism from periods/hourly, checked
+    // against the shared conflicting() scope so this always reflects the
+    // exact same rule the reservation-creation flow itself enforces
+    // -------------------------------------------------------------------------
+
+    /**
+     * For a given date, returns every active package that actually applies
+     * to that date's day-type, each annotated with whether IT specifically
+     * (not the venue as a whole) is available for that date.
+     *
+     * Key behavior confirmed explicitly: a package tied to a day-type
+     * (e.g. 'friday' for 'hours' mode, or day_from='friday' for 'days'
+     * mode) stays available on every OTHER Friday even once one specific
+     * Friday gets booked through it — only that exact date (or, for a
+     * 'days' package, that exact date range) becomes unavailable, not the
+     * day-type itself.
+     */
+    private function buildAvailablePackages(Unite $unite, Collection $bookingPackages, Carbon $date, string $dayKey): array
+    {
+        $isPastDate = $date->isPast() && ! $date->isToday();
+        $result = [];
+
+        foreach ($bookingPackages as $package) {
+            if (! $package->appliesToDay($dayKey)) {
+                continue;
+            }
+
+            if ($package->booking_type === 'days') {
+                $endDate = $date->copy()->addDays(max(1, $package->duration_days ?? 1) - 1)->format('Y-m-d');
+                $conflict = UniteReservation::conflicting($unite->id, $date->toDateString(), $endDate)->exists();
+
+                $result[] = [
+                    'id' => $package->id,
+                    'name' => $package->name,
+                    'booking_type' => 'days',
+                    'day_from' => $package->day_from,
+                    'day_to' => $package->day_to,
+                    'duration_days' => $package->duration_days,
+                    'end_date' => $endDate,
+                    'price' => (float) $package->price,
+                    'services' => $package->services ?? [],
+                    'availability' => $isPastDate ? 'past' : ($conflict ? 'booked' : 'available'),
+                ];
+            } else {
+                $conflict = UniteReservation::conflicting(
+                    $unite->id,
+                    $date->toDateString(),
+                    $date->toDateString(),
+                    $package->start_time,
+                    $package->end_time
+                )->exists();
+
+                $result[] = [
+                    'id' => $package->id,
+                    'name' => $package->name,
+                    'booking_type' => 'hours',
+                    'day' => $package->day,
+                    'start_time' => $package->start_time,
+                    'end_time' => $package->end_time,
+                    'price' => (float) $package->price,
+                    'services' => $package->services ?? [],
+                    'availability' => $isPastDate ? 'past' : ($conflict ? 'booked' : 'available'),
+                ];
+            }
+        }
+
+        return $result;
     }
 
     // -------------------------------------------------------------------------

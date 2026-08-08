@@ -70,6 +70,52 @@ class UniteReservation extends Model
             && ! $this->reservation_date->lt(now()->startOfDay());
     }
 
+    /**
+     * Shared date-range conflict query — the exact same overlap logic
+     * UniteReservationRepository::ensureNoConflict() uses when actually
+     * creating/rescheduling a reservation, extracted here so
+     * AvailabilityService can ask "would this be available?" using the
+     * identical formula, rather than risking a second implementation
+     * drifting out of sync with the one that actually enforces it.
+     *
+     * $startDate/$endDate: the range being checked — pass the same date
+     * for both for a normal single-day check. Time-overlap only applies
+     * when BOTH the range being checked and the existing reservation are
+     * genuinely single-day on the exact same date; a multi-day range on
+     * either side occupies whole days regardless of specific hours.
+     */
+    public function scopeConflicting($query, int $uniteId, string $startDate, ?string $endDate = null, ?string $fromTime = null, ?string $toTime = null, ?int $ignoreId = null)
+    {
+        $endDate = $endDate ?? $startDate;
+        $isMultiDayRequest = $endDate !== $startDate;
+
+        $query->where('unite_id', $uniteId)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->where('reservation_date', '<=', $endDate)
+                    ->where(function ($q2) use ($startDate) {
+                        $q2->whereRaw('COALESCE(end_date, reservation_date) >= ?', [$startDate]);
+                    });
+            });
+
+        if (! $isMultiDayRequest && $fromTime && $toTime) {
+            $query->where(function ($q) use ($fromTime, $toTime) {
+                $q->whereNotNull('end_date')
+                    ->orWhere(function ($q2) use ($fromTime, $toTime) {
+                        $q2->whereNull('end_date')
+                            ->where('from_time', '<', $toTime)
+                            ->where('to_time', '>', $fromTime);
+                    });
+            });
+        }
+
+        if ($ignoreId) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        return $query;
+    }
+
     public function isPaid(): bool
     {
         return $this->payment?->isPaid() ?? false;
