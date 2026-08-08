@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UniteViewing extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'unite_id',
         'user_id',
@@ -32,6 +35,17 @@ class UniteViewing extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Every registered user linked to this appointment, including the
+     * primary booker themselves — "Number of People: 3" means exactly 3
+     * rows in this relationship, not 3 additional people on top of the
+     * booker.
+     */
+    public function attendees()
+    {
+        return $this->belongsToMany(User::class, 'unite_viewing_user');
     }
 
     public function viewingTime()

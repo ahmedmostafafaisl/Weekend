@@ -15,6 +15,7 @@
     $showPayments         = $me && $me->can('payments.view');
     $showBroadcast        = $me && $me->hasRole(['super_admin','admin']);
     $showReservations     = $me && $me->can('reservations.view');
+    $showViewings         = $me && $me->can('unite_viewings.view');
     $showReviewers        = $me && $me->hasRole(['super_admin','admin']);
     $showPromoCodes       = true;
     $showServiceFees      = $me && $me->can('service_fees.view');
@@ -125,6 +126,12 @@
         <a class="nav-link-dark {{ str_starts_with($r,'admin.reservations') ? 'active' : '' }}"
            href="{{ route('admin.reservations.index') }}">
             <i class="ti ti-calendar-event"></i> {{ __('lang.sidebar_reservations') }}
+        </a>
+        @endif
+        @if($showViewings && Route::has('admin.viewings.index'))
+        <a class="nav-link-dark {{ str_starts_with($r,'admin.viewings') ? 'active' : '' }}"
+           href="{{ route('admin.viewings.index') }}">
+            <i class="ti ti-door-enter"></i> {{ __('lang.sidebar_viewings') }}
         </a>
         @endif
         @if($showPayments)

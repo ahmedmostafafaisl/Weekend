@@ -149,6 +149,25 @@ Route::prefix('admin/ads')->middleware(['auth:admin', 'admin.guard', 'permission
 // Payment result pages — accessible by anyone (Geidea redirects here)
 Route::get('/payment-complete', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'success'])->name('payment.success');
 
+// Viewing appointments — admin can see every booked appointment across
+// all venues, and view/add/remove the registered users attached to a
+// single one ("all people associated with the appointment can be viewed
+// and managed from the control panel").
+Route::prefix('admin/viewings')->middleware(['auth:admin', 'admin.guard'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\Viewing\UniteViewingController::class, 'index'])
+        ->middleware('permission:unite_viewings.view')
+        ->name('admin.viewings.index');
+    Route::get('/{id}', [\App\Http\Controllers\Admin\Viewing\UniteViewingController::class, 'show'])
+        ->middleware('permission:unite_viewings.view')
+        ->name('admin.viewings.show');
+    Route::post('/{id}/attendees', [\App\Http\Controllers\Admin\Viewing\UniteViewingController::class, 'addAttendee'])
+        ->middleware('permission:unite_viewings.update')
+        ->name('admin.viewings.attendees.add');
+    Route::delete('/{id}/attendees/{userId}', [\App\Http\Controllers\Admin\Viewing\UniteViewingController::class, 'removeAttendee'])
+        ->middleware('permission:unite_viewings.update')
+        ->name('admin.viewings.attendees.remove');
+});
+
 // Service fee settings — a fixed set of payment categories (reservation,
 // ad_package, property_package), each with an editable amount + toggle.
 // See App\Models\ServiceFee::feeFor() for where these are actually applied.

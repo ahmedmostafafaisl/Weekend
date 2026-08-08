@@ -48,6 +48,7 @@ class AdminRolesPermissionsSeeder extends Seeder
 
             // ── Reservations & payments ───────────────────────────────────────
             'reservations',
+            'unite_viewings',
             'payments',
             'promo_codes',
             'service_fees',

@@ -59,6 +59,17 @@ class UniteViewingRepository
 
         $depositRequired = (bool) $unite->viewing_deposit_enabled;
 
+        // The booker is always one of the attendees — confirmed
+        // explicitly: "Number of People: 3" counts the booker as one of
+        // the three, not as a 4th person on top of three others. Dedupe
+        // rather than reject if a client happens to send the booker's own
+        // ID in attendee_user_ids too.
+        $attendeeIds = collect($data['attendee_user_ids'] ?? [])
+            ->push($userId)
+            ->unique()
+            ->values()
+            ->all();
+
         if (! $depositRequired) {
             // No deposit — nothing to pay for, so the appointment is
             // confirmed immediately with no Payment row at all.
@@ -73,8 +84,10 @@ class UniteViewingRepository
                 'deposit_refundable' => null,
             ]);
 
+            $viewing->attendees()->attach($attendeeIds);
+
             return [
-                'viewing' => $viewing->load(['user', 'unite', 'viewingTime']),
+                'viewing' => $viewing->load(['user', 'unite', 'viewingTime', 'attendees']),
                 'payment' => null,
                 'payment_url' => null,
             ];
@@ -100,7 +113,7 @@ class UniteViewingRepository
         }
 
         $result = DB::transaction(function () use (
-            $unite, $data, $userId, $viewingTime, $depositAmount, $depositRefundable, $gateway, $paymentMethod
+            $unite, $data, $userId, $viewingTime, $depositAmount, $depositRefundable, $gateway, $paymentMethod, $attendeeIds
         ) {
             $viewing = UniteViewing::create([
                 'unite_id' => $unite->id,
@@ -112,6 +125,8 @@ class UniteViewingRepository
                 'deposit_amount' => $depositAmount,
                 'deposit_refundable' => $depositRefundable,
             ]);
+
+            $viewing->attendees()->attach($attendeeIds);
 
             $user = $viewing->user ?? auth()->user();
             $phone = $user?->phone ?? $data['phone'] ?? null;
@@ -158,7 +173,7 @@ class UniteViewingRepository
             $payment->update(['payment_id' => $gatewayResult['item_id']]);
 
             return [
-                'viewing' => $viewing->load(['user', 'unite', 'viewingTime', 'payment']),
+                'viewing' => $viewing->load(['user', 'unite', 'viewingTime', 'payment', 'attendees']),
                 'payment' => $payment->fresh()->load('items'),
                 'payment_url' => $gatewayResult['payment_url'],
             ];
