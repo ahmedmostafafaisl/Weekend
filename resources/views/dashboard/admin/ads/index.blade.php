@@ -2,6 +2,7 @@
 @section('title', 'Weekend | Ads')
 
 @section('content')
+@php $me = auth('admin')->user(); @endphp
 @if(session('success'))
     <div class="alert alert-success alert-dismissible fade show">{{ session('success') }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 @endif
@@ -11,7 +12,9 @@
         <h4 class="fw-bold mb-1">{{ __('lang.ads') }}</h4>
         <div class="text-muted small">{{ __('lang.ads_subtitle') }}</div>
     </div>
-    <a href="{{ route('admin.ads.create') }}" class="btn btn-accent">{{ __('lang.new_ad') }}</a>
+    @if($me && $me->can('ads.create'))
+        <a href="{{ route('admin.ads.create') }}" class="btn btn-accent">{{ __('lang.new_ad') }}</a>
+    @endif
 </div>
 
 {{-- Filters --}}
@@ -103,27 +106,33 @@
                     </td>
                   <td class="pe-3">
     <div class="d-flex gap-2 justify-content-end">
-        <a href="{{ route('admin.ads.show', $ad) }}"
-           class="btn btn-sm btn-outline-info">
-            <i class="fas fa-eye me-1"></i> {{ __('lang.view') }}
-        </a>
+        @if($me && $me->can('ads.view'))
+            <a href="{{ route('admin.ads.show', $ad) }}"
+               class="btn btn-sm btn-outline-info">
+                <i class="fas fa-eye me-1"></i> {{ __('lang.view') }}
+            </a>
+        @endif
 
-        <a href="{{ route('admin.ads.edit', $ad) }}"
-           class="btn btn-sm btn-outline-primary">
-            <i class="fas fa-edit me-1"></i> {{ __('lang.edit') }}
-        </a>
+        @if($me && $me->can('ads.update'))
+            <a href="{{ route('admin.ads.edit', $ad) }}"
+               class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-edit me-1"></i> {{ __('lang.edit') }}
+            </a>
+        @endif
 
-        <form action="{{ route('admin.ads.destroy', $ad) }}"
-              method="POST"
-              onsubmit="return confirm('{{ __('lang.delete_confirm_ad') }}')"
-              class="d-inline">
-            @csrf
-            @method('DELETE')
+        @if($me && $me->can('ads.delete'))
+            <form action="{{ route('admin.ads.destroy', $ad) }}"
+                  method="POST"
+                  onsubmit="return confirm('{{ __('lang.delete_confirm_ad') }}')"
+                  class="d-inline">
+                @csrf
+                @method('DELETE')
 
-            <button type="submit" class="btn btn-sm btn-outline-danger">
-                <i class="fas fa-trash me-1"></i> {{ __('lang.delete') }}
-            </button>
-        </form>
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="fas fa-trash me-1"></i> {{ __('lang.delete') }}
+                </button>
+            </form>
+        @endif
     </div>
 </td>
                 </tr>

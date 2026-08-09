@@ -3,9 +3,12 @@
 @section('content')
 @if(session('success'))<div class="alert alert-success alert-dismissible fade show">{{ session('success') }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>@endif
 
+@php $me = auth('admin')->user(); @endphp
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div><h4 class="fw-bold mb-1">Transfer Policies</h4><div class="text-muted small">Define fund transfer rules for providers</div></div>
-    <a href="{{ route('admin.transfers.policy.create') }}" class="btn btn-accent">{{ __('lang.new_policy') }}</a>
+    @if($me && $me->can('transfers.create'))
+        <a href="{{ route('admin.transfers.policy.create') }}" class="btn btn-accent">{{ __('lang.new_policy') }}</a>
+    @endif
 </div>
 
 <div class="card card-soft shadow-sm">
@@ -30,11 +33,15 @@
                     <td><span class="badge {{ $p->is_active ? 'bg-success' : 'bg-secondary' }}">{{ $p->is_active ? 'Active' : 'Inactive' }}</span></td>
                     <td class="pe-3">
                         <div class="d-flex gap-1 justify-content-end">
-                            <a href="{{ route('admin.transfers.policy.edit', $p) }}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11px">{{ __('lang.edit') }}</a>
-                            <form action="{{ route('admin.transfers.policy.destroy', $p) }}" method="POST" onsubmit="return confirm('Delete this policy?')">
-                                @csrf @method('DELETE')
-                                <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:11px">{{ __('lang.delete') }}</button>
-                            </form>
+                            @if($me && $me->can('transfers.update'))
+                                <a href="{{ route('admin.transfers.policy.edit', $p) }}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11px">{{ __('lang.edit') }}</a>
+                            @endif
+                            @if($me && $me->can('transfers.delete'))
+                                <form action="{{ route('admin.transfers.policy.destroy', $p) }}" method="POST" onsubmit="return confirm('Delete this policy?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:11px">{{ __('lang.delete') }}</button>
+                                </form>
+                            @endif
                         </div>
                     </td>
                 </tr>

@@ -1,6 +1,7 @@
 @extends('dashboard.admin.layouts.app')
 @section('title', 'Weekend | Ad — ' . $ad->title)
 @section('content')
+@php $me = auth('admin')->user(); @endphp
 <div class="d-flex align-items-center gap-3 mb-4">
     <a href="{{ route('admin.ads.index') }}" class="btn btn-sm btn-outline-secondary">← {{ __('lang.back') }}</a>
     <h4 class="fw-bold mb-0">{{ $ad->title }}</h4>
@@ -80,11 +81,15 @@
         @endif
 
         <div class="d-flex gap-2">
+            @if($me && $me->can('ads.update'))
             <a href="{{ route('admin.ads.edit', $ad) }}" class="btn btn-accent btn-sm">{{ __('lang.edit') }}</a>
+            @endif
+            @if($me && $me->can('ads.delete'))
             <form action="{{ route('admin.ads.destroy', $ad) }}" method="POST" onsubmit="return confirm('{{ __('lang.delete_confirm_ad') }}')">
                 @csrf @method('DELETE')
                 <button class="btn btn-outline-danger btn-sm">{{ __('lang.delete') }}</button>
             </form>
+            @endif
         </div>
     </div>
 </div>

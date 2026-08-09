@@ -3,6 +3,10 @@
     $me = auth('admin')->user();
 
     $showDashboard        = $me && $me->can('dashboard.view');
+    $showAnalytics        = $me && $me->can('analytics.view');
+    $showReports          = $me && $me->can('reports.view');
+    $showAdsManagement    = $me && $me->can('ads.view');
+    $showAdsPending       = $me && $me->can('ads.review');
     $showAdmins           = $me && $me->can('admins.view');
     $showRoles            = $me && $me->can('roles.view');
     $showPerms            = $me && $me->can('permissions.view');
@@ -13,12 +17,26 @@
     $showSubscriptions    = $me && $me->can('subscriptions.view');
     $showUnits            = $me && $me->can('units.view');
     $showPayments         = $me && $me->can('payments.view');
-    $showBroadcast        = $me && $me->hasRole(['super_admin','admin']);
+    $showTransfers        = $me && $me->can('transfers.view');
+    // BUG FIX: these three used a hardcoded role-name check (or, for
+    // promo codes, a literal `true`) instead of the actual permission —
+    // meaning a custom role granted the correct permission but not
+    // literally named super_admin/admin (or any role at all, for promo
+    // codes) was shown or hidden incorrectly regardless of what
+    // permissions it actually held. The whole point of a permission-driven
+    // UI is that it reflects the role's assigned permissions, not a
+    // hardcoded list of role names.
+    $showBroadcast        = $me && $me->can('notifications.view');
     $showReservations     = $me && $me->can('reservations.view');
     $showViewings         = $me && $me->can('unite_viewings.view');
-    $showReviewers        = $me && $me->hasRole(['super_admin','admin']);
-    $showPromoCodes       = true;
+    $showReviewers        = $me && $me->can('reviewers.view');
+    $showPromoCodes       = $me && $me->can('promo_codes.view');
     $showServiceFees      = $me && $me->can('service_fees.view');
+    $showServiceGroups    = $me && $me->can('service_groups.view');
+    $showServices         = $me && $me->can('services.view');
+    $showStadiumTypes     = $me && $me->can('stadium_types.view');
+    $showInsurancePolicies = $me && $me->can('insurance_policies.view');
+    $showSuggestions      = $me && $me->can('suggestions.view');
 
     $initials = collect(explode(' ', $me?->name ?? 'A'))->map(fn($w) => strtoupper($w[0]))->take(2)->implode('');
 @endphp
@@ -34,19 +52,19 @@
            href="{{ route('admin.dashboard') }}">
             <i class="ti ti-layout-dashboard"></i> {{ __('lang.sidebar_dashboard') }}
         </a>
-        @if(Route::has('admin.analytics.index'))
+        @if($showAnalytics && Route::has('admin.analytics.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.analytics') ? 'active' : '' }}"
            href="{{ route('admin.analytics.index') }}">
             <i class="ti ti-chart-line"></i> {{ __('lang.sidebar_analytics') }}
         </a>
         @endif
-        @if(Route::has('admin.reports.index'))
+        @if($showReports && Route::has('admin.reports.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.reports') ? 'active' : '' }}"
            href="{{ route('admin.reports.index') }}">
             <i class="ti ti-report-analytics"></i> {{ __('lang.sidebar_reports') }}
         </a>
         @endif
-        @if(Route::has('admin.ads.index'))
+        @if($showAdsManagement && Route::has('admin.ads.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.ads') && $r !== 'admin.ads.pending' ? 'active' : '' }}"
            href="{{ route('admin.ads.index') }}">
             <i class="ti ti-speakerphone"></i> {{ __('lang.sidebar_ads') }}
@@ -64,7 +82,7 @@
             </a>
             @endif
         @endcan
-        @if(Route::has('admin.transfers.index'))
+        @if($showTransfers && Route::has('admin.transfers.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.transfers') ? 'active' : '' }}"
            href="{{ route('admin.transfers.index') }}">
             <i class="ti ti-transfer"></i> {{ __('lang.sidebar_transfers') }}
@@ -74,7 +92,7 @@
     @endif
 
     {{-- Access Control section --}}
-    @if($showAdmins || $showRoles || $showPerms || $showUsers || $showDepartments || $showPropertyPackages || $showAdPackages || $showSubscriptions)
+    @if($showAdmins || $showRoles || $showPerms || $showUsers)
     <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">{{ __('lang.sidebar_access_control') }}</div>
     <nav class="nav flex-column gap-1 mb-2">
@@ -106,7 +124,7 @@
     @endif
 
     {{-- Organization section --}}
-    @if($showDepartments || $showPropertyPackages || $showAdPackages || $showSubscriptions || $showBroadcast || $showReservations || $showReviewers || $showPayments || $showPromoCodes || $showUnits)
+    @if($showDepartments || $showPropertyPackages || $showAdPackages || $showSubscriptions || $showBroadcast || $showReservations || $showViewings || $showReviewers || $showPayments || $showServiceFees || $showPromoCodes || $showUnits || $showServiceGroups || $showServices || $showStadiumTypes || $showInsurancePolicies || $showSuggestions)
     <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">{{ __('lang.sidebar_organization') }}</div>
     <nav class="nav flex-column gap-1 mb-2">
@@ -182,26 +200,36 @@
             <i class="ti ti-eye"></i> {{ __('lang.sidebar_reviewers') }}
         </a>
         @endif
+        @if($showServiceGroups)
         <a class="nav-link-dark {{ str_starts_with($r,'admin.service-groups') ? 'active' : '' }}"
            href="{{ route('admin.service-groups.index') }}">
             <i class="ti ti-apps"></i> {{ __('lang.sidebar_service_groups') }}
         </a>
+        @endif
+        @if($showServices)
         <a class="nav-link-dark {{ str_starts_with($r,'admin.services') ? 'active' : '' }}"
            href="{{ route('admin.services.index') }}">
             <i class="ti ti-tools"></i> {{ __('lang.sidebar_services') }}
         </a>
+        @endif
+        @if($showStadiumTypes)
         <a class="nav-link-dark {{ str_starts_with($r,'admin.stadium_types') ? 'active' : '' }}"
            href="{{ route('admin.stadium_types.index') }}">
             <i class="ti ti-topology-star"></i> {{ __('lang.sidebar_stadium_types') }}
         </a>
+        @endif
+        @if($showInsurancePolicies)
         <a class="nav-link-dark {{ str_starts_with($r,'admin.insurance_policies') ? 'active' : '' }}"
            href="{{ route('admin.insurance_policies.index') }}">
             <i class="ti ti-shield-check"></i> {{ __('lang.sidebar_insurance_policies') }}
         </a>
+        @endif
+        @if($showSuggestions)
         <a class="nav-link-dark {{ str_starts_with($r,'admin.suggestions') ? 'active' : '' }}"
            href="{{ route('admin.suggestions.index') }}">
             <i class="ti ti-bulb"></i> {{ __('lang.sidebar_suggestions') }}
         </a>
+        @endif
     </nav>
     @endif
 

@@ -3,15 +3,20 @@
 @section('content')
 @if(session('success'))<div class="alert alert-success alert-dismissible fade show">{{ session('success') }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>@endif
 
+@php $me = auth('admin')->user(); @endphp
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h4 class="fw-bold mb-1">{{ __('lang.provider_transfers') }}</h4>
         <div class="text-muted small">{{ __('lang.manage_fund_transfers') }}</div>
     </div>
     <div class="d-flex gap-2">
-        <a href="{{ route('admin.transfers.requests') }}" class="btn btn-outline-secondary btn-sm">📋 {{ __('lang.transfer_requests') }}</a>
-        <a href="{{ route('admin.transfers.policy.index') }}" class="btn btn-outline-secondary btn-sm">⚙️ {{ __('lang.policies') }}</a>
-        <a href="{{ route('admin.transfers.create') }}" class="btn btn-accent">{{ __('lang.new_transfer') }}</a>
+        @if($me && $me->can('transfers.view'))
+            <a href="{{ route('admin.transfers.requests') }}" class="btn btn-outline-secondary btn-sm">📋 {{ __('lang.transfer_requests') }}</a>
+            <a href="{{ route('admin.transfers.policy.index') }}" class="btn btn-outline-secondary btn-sm">⚙️ {{ __('lang.policies') }}</a>
+        @endif
+        @if($me && $me->can('transfers.create'))
+            <a href="{{ route('admin.transfers.create') }}" class="btn btn-accent">{{ __('lang.new_transfer') }}</a>
+        @endif
     </div>
 </div>
 
@@ -82,22 +87,26 @@
                     <td class="small text-muted">{{ $t->reference ?? '—' }}</td>
                   <td class="pe-3">
     <div class="d-flex gap-2">
-        <a href="{{ route('admin.transfers.edit', $t) }}"
-           class="btn btn-sm btn-outline-primary">
-            <i class="fas fa-edit me-1"></i> {{ __('lang.edit') }}
-        </a>
+        @if($me && $me->can('transfers.update'))
+            <a href="{{ route('admin.transfers.edit', $t) }}"
+               class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-edit me-1"></i> {{ __('lang.edit') }}
+            </a>
+        @endif
 
-        <form action="{{ route('admin.transfers.destroy', $t) }}"
-              method="POST"
-              class="d-inline"
-              onsubmit="return confirm('{{ __('lang.delete_confirm_transfer') }}')">
-            @csrf
-            @method('DELETE')
+        @if($me && $me->can('transfers.delete'))
+            <form action="{{ route('admin.transfers.destroy', $t) }}"
+                  method="POST"
+                  class="d-inline"
+                  onsubmit="return confirm('{{ __('lang.delete_confirm_transfer') }}')">
+                @csrf
+                @method('DELETE')
 
-            <button type="submit" class="btn btn-sm btn-outline-danger">
-                <i class="fas fa-trash me-1"></i> {{ __('lang.delete') }}
-            </button>
-        </form>
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="fas fa-trash me-1"></i> {{ __('lang.delete') }}
+                </button>
+            </form>
+        @endif
     </div>
 </td>
                 </tr>

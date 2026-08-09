@@ -2,10 +2,11 @@
 @php
 $months = app()->getLocale() === 'ar'
     ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
-    : @json($months);
+    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 @endphp
 @section('title','Weekend | Reservations Report')
 @section('content')
+@php $me = auth('admin')->user(); @endphp
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div><h4 class="fw-bold mb-1">📅 {{ __('lang.reservations_report') }}</h4><div class="text-muted small">{{ $year }}</div></div>
     <div class="d-flex gap-2">
@@ -14,7 +15,9 @@ $months = app()->getLocale() === 'ar'
                 @foreach($availableYears as $y)<option value="{{ $y }}" {{ $y==$year?'selected':'' }}>{{ $y }}</option>@endforeach
             </select>
         </form>
+        @if($me && $me->can('reports.export'))
         <a href="{{ route('admin.reports.export',['type'=>'reservations','year'=>$year]) }}" class="btn btn-sm btn-outline-secondary">{{ __('lang.export_csv') }}</a>
+        @endif
         <a href="{{ route('admin.reports.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('lang.overview') }}</a>
     </div>
 </div>

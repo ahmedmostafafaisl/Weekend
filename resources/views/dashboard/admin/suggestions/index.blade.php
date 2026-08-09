@@ -2,6 +2,7 @@
 @section('title', 'Weekend | Suggestions')
 
 @section('content')
+@php $me = auth('admin')->user(); @endphp
 
 @if(session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
@@ -13,11 +14,13 @@
         <div class="text-muted">{{ __('lang.manage_all_suggestions') }}</div>
     </div>
 
+    @if($me && $me->can('suggestions.create'))
     <button class="btn btn-accent"
             data-bs-toggle="modal"
             data-bs-target="#createSuggestionModal">
         + {{ __('lang.create_suggestion') }}
     </button>
+    @endif
 </div>
 
 <div class="card card-soft shadow-sm">
@@ -51,11 +54,14 @@
 
                         <td class="text-end">
 
+                            @if($me && $me->can('suggestions.view'))
                             <a href="{{ route('admin.suggestions.show', $suggestion->id) }}"
                                class="btn btn-sm btn-outline-secondary">
                                 {{ __('lang.view') }}
                             </a>
+                            @endif
 
+                            @if($me && $me->can('suggestions.update'))
                             <button class="btn btn-sm btn-outline-primary"
                                     data-bs-toggle="modal"
                                     data-bs-target="#editSuggestionModal"
@@ -64,7 +70,9 @@
                                     data-user-id="{{ $suggestion->user_id }}">
                                 {{ __('lang.edit') }}
                             </button>
+                            @endif
 
+                            @if($me && $me->can('suggestions.delete'))
                             <form action="{{ route('admin.suggestions.destroy', $suggestion->id) }}"
                                   method="POST"
                                   class="d-inline">
@@ -76,6 +84,7 @@
                                     {{ __('lang.delete') }}
                                 </button>
                             </form>
+                            @endif
 
                         </td>
                     </tr>
@@ -96,6 +105,7 @@
 </div>
 
 {{-- CREATE MODAL --}}
+@if($me && $me->can('suggestions.create'))
 <div class="modal fade" id="createSuggestionModal" tabindex="-1">
     <div class="modal-dialog">
         <form class="modal-content"
@@ -137,6 +147,9 @@
 </div>
 
 {{-- EDIT MODAL --}}
+@endif
+
+@if($me && $me->can('suggestions.update'))
 <div class="modal fade" id="editSuggestionModal" tabindex="-1">
     <div class="modal-dialog">
         <form class="modal-content"
@@ -185,6 +198,7 @@
         </form>
     </div>
 </div>
+@endif
 
 @endsection
 

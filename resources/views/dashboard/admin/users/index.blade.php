@@ -16,7 +16,7 @@
 
     @if($me && $me->can('users.create'))
         <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#createUserModal">
-           {{ __('lang.create_user') }}
+            + {{ __('lang.create_user') }}
         </button>
     @endif
 </div>
@@ -59,6 +59,7 @@
                                 <span class="badge {{ $u->status === 'active' ? 'bg-success' : 'bg-secondary' }}">
                                     {{ __('lang.'.$u->status) }}
                                 </span>
+                                @if($me && $me->can('users.update'))
                                 <form action="{{ route('admin.users.toggle-status', $u->id) }}" method="POST">
                                     @csrf @method('PATCH')
                                     <div class="form-check form-switch mb-0" title="{{ $u->status === 'active' ? __('lang.deactivate') : __('lang.activate') }}">
@@ -68,6 +69,7 @@
                                                style="cursor:pointer">
                                     </div>
                                 </form>
+                                @endif
                             </div>
                         </td>
                         <td>

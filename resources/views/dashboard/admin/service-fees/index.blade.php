@@ -3,6 +3,7 @@
 @section('title', 'Weekend | Service Fees')
 
 @section('content')
+    @php $me = auth('admin')->user(); @endphp
     <div class="mb-4">
         <h4 class="fw-bold mb-1">{{ __('lang.service_fees') }}</h4>
         <div class="text-muted small">{{ __('lang.service_fees_subtitle') }}</div>
@@ -64,8 +65,10 @@
             </div>
         </div>
 
+        @if($me && $me->can('service_fees.update'))
         <div class="mt-3">
             <button type="submit" class="btn btn-accent">{{ __('lang.save') }}</button>
         </div>
+        @endif
     </form>
 @endsection

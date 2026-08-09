@@ -184,8 +184,8 @@ Route::get('/payment-cancelled', [\App\Http\Controllers\Admin\Payment\PaymentCon
 
 // Admin dashboard payment routes
 Route::prefix('admin')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/payments', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'index'])->name('admin.payments.index');
-    Route::get('/payments/{id}', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'show'])->name('admin.payments.show');
+    Route::get('/payments', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'index'])->name('admin.payments.index')->middleware('permission:payments.view');
+    Route::get('/payments/{id}', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'show'])->name('admin.payments.show')->middleware('permission:payments.view');
 });
 
 // Admin Authentication Routes
@@ -216,25 +216,25 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin.guard'])->group(functio
         ->middleware('permission:admins.delete');
 
     // Roles
-    Route::get('/roles', [RolePageController::class, 'index'])->name('admin.roles.index');
-    Route::post('/roles', [RolePageController::class, 'store'])->name('admin.roles.store');
-    Route::put('/roles/{role}', [RolePageController::class, 'update'])->name('admin.roles.update');
-    Route::delete('/roles/{role}', [RolePageController::class, 'destroy'])->name('admin.roles.destroy');
+    Route::get('/roles', [RolePageController::class, 'index'])->name('admin.roles.index')->middleware('permission:roles.view');
+    Route::post('/roles', [RolePageController::class, 'store'])->name('admin.roles.store')->middleware('permission:roles.create');
+    Route::put('/roles/{role}', [RolePageController::class, 'update'])->name('admin.roles.update')->middleware('permission:roles.update');
+    Route::delete('/roles/{role}', [RolePageController::class, 'destroy'])->name('admin.roles.destroy')->middleware('permission:roles.delete');
 
     // Permissions
-    Route::get('/permissions', [PermissionPageController::class, 'index'])->name('admin.permissions.index');
-    Route::post('/permissions', [PermissionPageController::class, 'store'])->name('admin.permissions.store');
-    Route::put('/permissions/{permission}', [PermissionPageController::class, 'update'])->name('admin.permissions.update');
-    Route::delete('/permissions/{permission}', [PermissionPageController::class, 'destroy'])->name('admin.permissions.destroy');
+    Route::get('/permissions', [PermissionPageController::class, 'index'])->name('admin.permissions.index')->middleware('permission:permissions.view');
+    Route::post('/permissions', [PermissionPageController::class, 'store'])->name('admin.permissions.store')->middleware('permission:permissions.create');
+    Route::put('/permissions/{permission}', [PermissionPageController::class, 'update'])->name('admin.permissions.update')->middleware('permission:permissions.update');
+    Route::delete('/permissions/{permission}', [PermissionPageController::class, 'destroy'])->name('admin.permissions.destroy')->middleware('permission:permissions.delete');
 });
 // users Routes
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin'])->group(function () {
-    Route::get('/users', [UserController::class, 'index'])->name('users.index');
-    Route::get('/users/{id}', [UserController::class, 'show'])->name('users.show');
-    Route::patch('/users/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
-    Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    Route::put('/users/{id}', [UserController::class, 'update'])->name('users.update');
-    Route::delete('/users/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+    Route::get('/users', [UserController::class, 'index'])->name('users.index')->middleware('permission:users.view');
+    Route::get('/users/{id}', [UserController::class, 'show'])->name('users.show')->middleware('permission:users.view');
+    Route::patch('/users/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status')->middleware('permission:users.update');
+    Route::post('/users', [UserController::class, 'store'])->name('users.store')->middleware('permission:users.create');
+    Route::put('/users/{id}', [UserController::class, 'update'])->name('users.update')->middleware('permission:users.update');
+    Route::delete('/users/{id}', [UserController::class, 'destroy'])->name('users.destroy')->middleware('permission:users.delete');
 });
 
 // Reservation cancel web route
@@ -451,44 +451,44 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard']
 });
 
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/service-groups', [ServiceGroupController::class, 'index'])->name('service-groups.index');
-    Route::post('/service-groups', [ServiceGroupController::class, 'store'])->name('service-groups.store');
-    Route::get('/service-groups/{service_group}', [ServiceGroupController::class, 'show'])->name('service-groups.show');
-    Route::put('/service-groups/{service_group}', [ServiceGroupController::class, 'update'])->name('service-groups.update');
-    Route::delete('/service-groups/{service_group}', [ServiceGroupController::class, 'destroy'])->name('service-groups.destroy');
+    Route::get('/service-groups', [ServiceGroupController::class, 'index'])->name('service-groups.index')->middleware('permission:service_groups.view');
+    Route::post('/service-groups', [ServiceGroupController::class, 'store'])->name('service-groups.store')->middleware('permission:service_groups.create');
+    Route::get('/service-groups/{service_group}', [ServiceGroupController::class, 'show'])->name('service-groups.show')->middleware('permission:service_groups.view');
+    Route::put('/service-groups/{service_group}', [ServiceGroupController::class, 'update'])->name('service-groups.update')->middleware('permission:service_groups.update');
+    Route::delete('/service-groups/{service_group}', [ServiceGroupController::class, 'destroy'])->name('service-groups.destroy')->middleware('permission:service_groups.delete');
 
-    Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
-    Route::post('/services', [ServiceController::class, 'store'])->name('services.store');
-    Route::get('/services/{service}', [ServiceController::class, 'show'])->name('services.show');
-    Route::put('/services/{service}', [ServiceController::class, 'update'])->name('services.update');
-    Route::delete('/services/{service}', [ServiceController::class, 'destroy'])->name('services.destroy');
+    Route::get('/services', [ServiceController::class, 'index'])->name('services.index')->middleware('permission:services.view');
+    Route::post('/services', [ServiceController::class, 'store'])->name('services.store')->middleware('permission:services.create');
+    Route::get('/services/{service}', [ServiceController::class, 'show'])->name('services.show')->middleware('permission:services.view');
+    Route::put('/services/{service}', [ServiceController::class, 'update'])->name('services.update')->middleware('permission:services.update');
+    Route::delete('/services/{service}', [ServiceController::class, 'destroy'])->name('services.destroy')->middleware('permission:services.delete');
 });
 
 // stadium types routes
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/stadium_types', [StadiumTypeController::class, 'index'])->name('stadium_types.index');
-    Route::post('/stadium_types', [StadiumTypeController::class, 'store'])->name('stadium_types.store');
-    Route::get('/stadium_types/{id}', [StadiumTypeController::class, 'show'])->name('stadium_types.show');
-    Route::put('/stadium_types/{id}', [StadiumTypeController::class, 'update'])->name('stadium_types.update');
-    Route::delete('/stadium_types/{id}', [StadiumTypeController::class, 'destroy'])->name('stadium_types.destroy');
+    Route::get('/stadium_types', [StadiumTypeController::class, 'index'])->name('stadium_types.index')->middleware('permission:stadium_types.view');
+    Route::post('/stadium_types', [StadiumTypeController::class, 'store'])->name('stadium_types.store')->middleware('permission:stadium_types.create');
+    Route::get('/stadium_types/{id}', [StadiumTypeController::class, 'show'])->name('stadium_types.show')->middleware('permission:stadium_types.view');
+    Route::put('/stadium_types/{id}', [StadiumTypeController::class, 'update'])->name('stadium_types.update')->middleware('permission:stadium_types.update');
+    Route::delete('/stadium_types/{id}', [StadiumTypeController::class, 'destroy'])->name('stadium_types.destroy')->middleware('permission:stadium_types.delete');
 });
 
 // insurance policies routes
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/insurance_policies', [InsurancePolicyController::class, 'index'])->name('insurance_policies.index');
-    Route::post('/insurance_policies', [InsurancePolicyController::class, 'store'])->name('insurance_policies.store');
-    Route::get('/insurance_policies/{id}', [InsurancePolicyController::class, 'show'])->name('insurance_policies.show');
-    Route::put('/insurance_policies/{id}', [InsurancePolicyController::class, 'update'])->name('insurance_policies.update');
-    Route::delete('/insurance_policies/{id}', [InsurancePolicyController::class, 'destroy'])->name('insurance_policies.destroy');
+    Route::get('/insurance_policies', [InsurancePolicyController::class, 'index'])->name('insurance_policies.index')->middleware('permission:insurance_policies.view');
+    Route::post('/insurance_policies', [InsurancePolicyController::class, 'store'])->name('insurance_policies.store')->middleware('permission:insurance_policies.create');
+    Route::get('/insurance_policies/{id}', [InsurancePolicyController::class, 'show'])->name('insurance_policies.show')->middleware('permission:insurance_policies.view');
+    Route::put('/insurance_policies/{id}', [InsurancePolicyController::class, 'update'])->name('insurance_policies.update')->middleware('permission:insurance_policies.update');
+    Route::delete('/insurance_policies/{id}', [InsurancePolicyController::class, 'destroy'])->name('insurance_policies.destroy')->middleware('permission:insurance_policies.delete');
 });
 
 // Suggestion Routes
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/suggestions', [SuggestionController::class, 'index'])->name('suggestions.index');
-    Route::post('/suggestions', [SuggestionController::class, 'store'])->name('suggestions.store');
-    Route::get('/suggestions/{id}', [SuggestionController::class, 'show'])->name('suggestions.show');
-    Route::put('/suggestions/{id}', [SuggestionController::class, 'update'])->name('suggestions.update');
-    Route::delete('/suggestions/{id}', [SuggestionController::class, 'destroy'])->name('suggestions.destroy');
+    Route::get('/suggestions', [SuggestionController::class, 'index'])->name('suggestions.index')->middleware('permission:suggestions.view');
+    Route::post('/suggestions', [SuggestionController::class, 'store'])->name('suggestions.store')->middleware('permission:suggestions.create');
+    Route::get('/suggestions/{id}', [SuggestionController::class, 'show'])->name('suggestions.show')->middleware('permission:suggestions.view');
+    Route::put('/suggestions/{id}', [SuggestionController::class, 'update'])->name('suggestions.update')->middleware('permission:suggestions.update');
+    Route::delete('/suggestions/{id}', [SuggestionController::class, 'destroy'])->name('suggestions.destroy')->middleware('permission:suggestions.delete');
 });
 
 // Provider Dashboard (session auth via sanctum stateful)
@@ -517,45 +517,51 @@ Route::prefix('provider')->name('provider.')->middleware(['auth'])->group(functi
 // Admin Transfer Management
 Route::prefix('admin')->name('admin.transfers.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
     // Transfer Policies
-    Route::get('/transfer-policies', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyIndex'])->name('policy.index');
-    Route::get('/transfer-policies/create', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyCreate'])->name('policy.create');
-    Route::post('/transfer-policies', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyStore'])->name('policy.store');
-    Route::get('/transfer-policies/{policy}/edit', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyEdit'])->name('policy.edit');
-    Route::put('/transfer-policies/{policy}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyUpdate'])->name('policy.update');
-    Route::delete('/transfer-policies/{policy}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyDestroy'])->name('policy.destroy');
+    Route::get('/transfer-policies', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyIndex'])->name('policy.index')->middleware('permission:transfers.view');
+    Route::get('/transfer-policies/create', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyCreate'])->name('policy.create')->middleware('permission:transfers.create');
+    Route::post('/transfer-policies', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyStore'])->name('policy.store')->middleware('permission:transfers.create');
+    Route::get('/transfer-policies/{policy}/edit', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyEdit'])->name('policy.edit')->middleware('permission:transfers.update');
+    Route::put('/transfer-policies/{policy}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyUpdate'])->name('policy.update')->middleware('permission:transfers.update');
+    Route::delete('/transfer-policies/{policy}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'policyDestroy'])->name('policy.destroy')->middleware('permission:transfers.delete');
     // Transfers
-    Route::get('/transfers', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'index'])->name('index');
-    Route::get('/transfers/create', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'create'])->name('create');
-    Route::post('/transfers', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'store'])->name('store');
-    Route::get('/transfers/{transfer}/edit', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'edit'])->name('edit');
-    Route::put('/transfers/{transfer}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'update'])->name('update');
-    Route::delete('/transfers/{transfer}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'destroy'])->name('destroy');
+    Route::get('/transfers', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'index'])->name('index')->middleware('permission:transfers.view');
+    Route::get('/transfers/create', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'create'])->name('create')->middleware('permission:transfers.create');
+    Route::post('/transfers', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'store'])->name('store')->middleware('permission:transfers.create');
+    Route::get('/transfers/{transfer}/edit', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'edit'])->name('edit')->middleware('permission:transfers.update');
+    Route::put('/transfers/{transfer}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'update'])->name('update')->middleware('permission:transfers.update');
+    Route::delete('/transfers/{transfer}', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'destroy'])->name('destroy')->middleware('permission:transfers.delete');
     // Transfer Requests
-    Route::get('/transfer-requests', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'requests'])->name('requests');
-    Route::post('/transfer-requests/{transferRequest}/approve', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'approveRequest'])->name('approve-request');
-    Route::post('/transfer-requests/{transferRequest}/reject', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'rejectRequest'])->name('reject-request');
+    Route::get('/transfer-requests', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'requests'])->name('requests')->middleware('permission:transfers.view');
+    Route::post('/transfer-requests/{transferRequest}/approve', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'approveRequest'])->name('approve-request')->middleware('permission:transfers.update');
+    Route::post('/transfer-requests/{transferRequest}/reject', [\App\Http\Controllers\Admin\Transfer\AdminTransferController::class, 'rejectRequest'])->name('reject-request')->middleware('permission:transfers.update');
 });
 
 // Admin Ads management
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::resource('ads', AdminAdController::class);
+    Route::get('/ads', [AdminAdController::class, 'index'])->name('ads.index')->middleware('permission:ads.view');
+    Route::get('/ads/create', [AdminAdController::class, 'create'])->name('ads.create')->middleware('permission:ads.create');
+    Route::post('/ads', [AdminAdController::class, 'store'])->name('ads.store')->middleware('permission:ads.create');
+    Route::get('/ads/{ad}', [AdminAdController::class, 'show'])->name('ads.show')->middleware('permission:ads.view');
+    Route::get('/ads/{ad}/edit', [AdminAdController::class, 'edit'])->name('ads.edit')->middleware('permission:ads.update');
+    Route::put('/ads/{ad}', [AdminAdController::class, 'update'])->name('ads.update')->middleware('permission:ads.update');
+    Route::delete('/ads/{ad}', [AdminAdController::class, 'destroy'])->name('ads.destroy')->middleware('permission:ads.delete');
 });
 
 // Analytics dashboard
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index')->middleware('permission:analytics.view');
 });
 
 // Admin Reports
 Route::prefix('admin')->name('admin.reports.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/reports', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'index'])->name('index');
-    Route::get('/reports/revenue', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'revenue'])->name('revenue');
-    Route::get('/reports/reservations', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'reservations'])->name('reservations');
-    Route::get('/reports/users', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'users'])->name('users');
-    Route::get('/reports/subscriptions', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'subscriptions'])->name('subscriptions');
-    Route::get('/reports/venues', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'venues'])->name('venues');
-    Route::get('/reports/transfers', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'transfers'])->name('transfers');
-    Route::get('/reports/export', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'export'])->name('export');
+    Route::get('/reports', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'index'])->name('index')->middleware('permission:reports.view');
+    Route::get('/reports/revenue', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'revenue'])->name('revenue')->middleware('permission:reports.view');
+    Route::get('/reports/reservations', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'reservations'])->name('reservations')->middleware('permission:reports.view');
+    Route::get('/reports/users', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'users'])->name('users')->middleware('permission:reports.view');
+    Route::get('/reports/subscriptions', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'subscriptions'])->name('subscriptions')->middleware('permission:reports.view');
+    Route::get('/reports/venues', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'venues'])->name('venues')->middleware('permission:reports.view');
+    Route::get('/reports/transfers', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'transfers'])->name('transfers')->middleware('permission:reports.view');
+    Route::get('/reports/export', [\App\Http\Controllers\Admin\Reports\AdminReportsController::class, 'export'])->name('export')->middleware('permission:reports.export');
 });
 
 // Provider Reports
@@ -569,31 +575,31 @@ Route::prefix('provider')->name('provider.reports.')->middleware(['auth'])->grou
 
 // Broadcast / promotion notifications
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/broadcast', [BroadcastNotificationController::class, 'index'])->name('broadcast.index');
-    Route::post('/broadcast', [BroadcastNotificationController::class, 'send'])->name('broadcast.send');
-    Route::post('/notifications/test', [BroadcastNotificationController::class, 'test'])->name('broadcast.test');
-    Route::get('/users/search', [BroadcastNotificationController::class, 'searchUsers'])->name('broadcast.users.search');
+    Route::get('/broadcast', [BroadcastNotificationController::class, 'index'])->name('broadcast.index')->middleware('permission:notifications.view');
+    Route::post('/broadcast', [BroadcastNotificationController::class, 'send'])->name('broadcast.send')->middleware('permission:notifications.create');
+    Route::post('/notifications/test', [BroadcastNotificationController::class, 'test'])->name('broadcast.test')->middleware('permission:notifications.create');
+    Route::get('/users/search', [BroadcastNotificationController::class, 'searchUsers'])->name('broadcast.users.search')->middleware('permission:notifications.view');
 });
 
 // Reservations admin page
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
+    Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index')->middleware('permission:reservations.view');
 });
 
 // Reviewer management
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/reviewers', [ReviewerController::class, 'index'])->name('reviewers.index');
-    Route::post('/reviewers', [ReviewerController::class, 'store'])->name('reviewers.store');
-    Route::put('/reviewers/{reviewer}', [ReviewerController::class, 'update'])->name('reviewers.update');
-    Route::delete('/reviewers/{reviewer}', [ReviewerController::class, 'destroy'])->name('reviewers.destroy');
+    Route::get('/reviewers', [ReviewerController::class, 'index'])->name('reviewers.index')->middleware('permission:reviewers.view');
+    Route::post('/reviewers', [ReviewerController::class, 'store'])->name('reviewers.store')->middleware('permission:reviewers.create');
+    Route::put('/reviewers/{reviewer}', [ReviewerController::class, 'update'])->name('reviewers.update')->middleware('permission:reviewers.update');
+    Route::delete('/reviewers/{reviewer}', [ReviewerController::class, 'destroy'])->name('reviewers.destroy')->middleware('permission:reviewers.delete');
 });
 
 // Promo code routes
 Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/promo-codes', [PromoCodeController::class, 'index'])->name('promo-codes.index');
-    Route::post('/promo-codes', [PromoCodeController::class, 'store'])->name('promo-codes.store');
-    Route::get('/promo-codes/{promoCode}', [PromoCodeController::class, 'show'])->name('promo-codes.show');
-    Route::put('/promo-codes/{promoCode}', [PromoCodeController::class, 'update'])->name('promo-codes.update');
-    Route::delete('/promo-codes/{promoCode}', [PromoCodeController::class, 'destroy'])->name('promo-codes.destroy');
-    Route::patch('/promo-codes/{promoCode}/toggle', [PromoCodeController::class, 'toggle'])->name('promo-codes.toggle');
+    Route::get('/promo-codes', [PromoCodeController::class, 'index'])->name('promo-codes.index')->middleware('permission:promo_codes.view');
+    Route::post('/promo-codes', [PromoCodeController::class, 'store'])->name('promo-codes.store')->middleware('permission:promo_codes.create');
+    Route::get('/promo-codes/{promoCode}', [PromoCodeController::class, 'show'])->name('promo-codes.show')->middleware('permission:promo_codes.view');
+    Route::put('/promo-codes/{promoCode}', [PromoCodeController::class, 'update'])->name('promo-codes.update')->middleware('permission:promo_codes.update');
+    Route::delete('/promo-codes/{promoCode}', [PromoCodeController::class, 'destroy'])->name('promo-codes.destroy')->middleware('permission:promo_codes.delete');
+    Route::patch('/promo-codes/{promoCode}/toggle', [PromoCodeController::class, 'toggle'])->name('promo-codes.toggle')->middleware('permission:promo_codes.update');
 });

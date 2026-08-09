@@ -6,11 +6,14 @@ $months = app()->getLocale() === 'ar'
 @endphp
 @section('title','Weekend | Transfers Report')
 @section('content')
+@php $me = auth('admin')->user(); @endphp
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div><h4 class="fw-bold mb-1">💸 {{ __('lang.transfers_report') }}</h4><div class="text-muted small">{{ $year }}</div></div>
     <div class="d-flex gap-2">
         <form method="GET" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" style="width:110px">@foreach($availableYears as $y)<option value="{{ $y }}" {{ $y==$year?'selected':'' }}>{{ $y }}</option>@endforeach</select></form>
+        @if($me && $me->can('reports.export'))
         <a href="{{ route('admin.reports.export',['type'=>'transfers','year'=>$year]) }}" class="btn btn-sm btn-outline-secondary">{{ __('lang.export_csv') }}</a>
+        @endif
         <a href="{{ route('admin.reports.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('lang.overview') }}</a>
     </div>
 </div>

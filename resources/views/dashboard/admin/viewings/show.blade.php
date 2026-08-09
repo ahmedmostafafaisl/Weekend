@@ -3,6 +3,7 @@
 @section('title', 'Weekend | ' . __('lang.viewing_appointments'))
 
 @section('content')
+@php $me = auth('admin')->user(); @endphp
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="fw-bold mb-0">{{ __('lang.viewing_appointments') }} #{{ $viewing->id }}</h4>
         <a href="{{ route('admin.viewings.index') }}" class="btn btn-sm btn-outline-secondary">← {{ __('lang.back') }}</a>
@@ -103,7 +104,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if($attendee->id !== $viewing->user_id)
+                                        @if($attendee->id !== $viewing->user_id && $me && $me->can('unite_viewings.update'))
                                             <form action="{{ route('admin.viewings.attendees.remove', [$viewing->id, $attendee->id]) }}" method="POST"
                                                   onsubmit="return confirm('{{ __('lang.remove_attendee_confirm') }}')">
                                                 @csrf
@@ -117,6 +118,7 @@
                         </tbody>
                     </table>
 
+                    @if($me && $me->can('unite_viewings.update'))
                     <form action="{{ route('admin.viewings.attendees.add', $viewing->id) }}" method="POST" class="d-flex gap-2">
                         @csrf
                         <input type="number" name="user_id" class="form-control form-control-sm"
@@ -126,6 +128,7 @@
                     @error('user_id')
                         <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
+                    @endif
                 </div>
             </div>
         </div>

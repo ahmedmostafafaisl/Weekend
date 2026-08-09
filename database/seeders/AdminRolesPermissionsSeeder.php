@@ -20,6 +20,7 @@ class AdminRolesPermissionsSeeder extends Seeder
         $modules = [
             // ── Core platform ─────────────────────────────────────────────────
             'dashboard',
+            'analytics',
             'admins',
             'users',
             'user_profiles',
@@ -48,8 +49,11 @@ class AdminRolesPermissionsSeeder extends Seeder
 
             // ── Reservations & payments ───────────────────────────────────────
             'reservations',
+            'reviewers',
             'unite_viewings',
             'payments',
+            'transfers',
+            'reports',
             'promo_codes',
             'service_fees',
 
@@ -86,6 +90,16 @@ class AdminRolesPermissionsSeeder extends Seeder
         // matches), so only super_admin needs the explicit addition here.
         $allPermissions[] = Permission::firstOrCreate([
             'name' => 'ads.review',
+            'guard_name' => $guard,
+        ]);
+
+        // 'export' is likewise not a standard CRUD action — reports has no
+        // create/update/delete concept at all, but exporting the
+        // underlying data is a distinct, higher-impact action from simply
+        // viewing a report on-screen, so it gets its own permission
+        // rather than being folded into reports.view.
+        $allPermissions[] = Permission::firstOrCreate([
+            'name' => 'reports.export',
             'guard_name' => $guard,
         ]);
 

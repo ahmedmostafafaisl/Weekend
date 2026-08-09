@@ -42,8 +42,9 @@
                         <span class="badge bg-{{ $c[$req->status] ?? 'secondary' }}">{{ ucfirst($req->status) }}</span>
                     </td>
                     <td class="small text-muted">{{ $req->created_at->format('d M Y') }}</td>
+@php $me = auth('admin')->user(); @endphp
                     <td class="pe-3">
-                        @if($req->status === 'pending')
+                        @if($req->status === 'pending' && $me && $me->can('transfers.update'))
                         <div class="d-flex gap-1">
                             <form action="{{ route('admin.transfers.approve-request', $req) }}" method="POST" class="d-flex gap-1">
                                 @csrf
@@ -56,7 +57,7 @@
                                 <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:11px">{{ __('lang.reject') }}</button>
                             </form>
                         </div>
-                        @else
+                        @elseif($req->status !== 'pending')
                         <span class="text-muted small">{{ $req->admin_response }}</span>
                         @endif
                     </td>
