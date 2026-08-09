@@ -72,4 +72,28 @@ class UniteViewingController extends Controller
             ],
         ], 201);
     }
+
+    /**
+     * Cancels the authenticated customer's own free (no-deposit) viewing
+     * appointment. Deposit-based appointments are deliberately rejected
+     * here — see UniteViewingRepository::cancel() for why.
+     */
+    public function cancel(int $id, \Illuminate\Http\Request $request): JsonResponse
+    {
+        $viewing = $this->repo->cancel($id, $request->user()->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.viewing_cancelled_successfully'),
+            'data' => [
+                'viewing' => [
+                    'id' => $viewing->id,
+                    'unite_id' => $viewing->unite_id,
+                    'unite_name' => $viewing->unite->name ?? null,
+                    'viewing_date' => $viewing->viewing_date?->format('Y-m-d'),
+                    'status' => $viewing->status,
+                ],
+            ],
+        ]);
+    }
 }

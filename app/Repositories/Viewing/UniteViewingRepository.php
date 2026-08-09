@@ -181,4 +181,38 @@ class UniteViewingRepository
 
         return $result;
     }
+
+    /**
+     * Cancels a customer's own free viewing appointment. Deliberately
+     * restricted to deposit_required=false — a deposit-based appointment
+     * involves real money already taken (or about to be), which needs
+     * its own refund-aware cancellation path, not this simple one. The
+     * viewing row is never deleted, only its status changes to
+     * 'cancelled' — preserving the full history of what was booked.
+     */
+    public function cancel(int $viewingId, int $userId): UniteViewing
+    {
+        $viewing = UniteViewing::where('id', $viewingId)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $viewing) {
+            abort(404, __('lang.viewing_not_found'));
+        }
+
+        if ($viewing->deposit_required) {
+            abort(422, __('lang.viewing_deposit_cancel_not_allowed'));
+        }
+
+        // A viewing already cancelled or completed (the visit already
+        // happened) can't be cancelled again — one check against both
+        // disallowed states rather than a separate one per status.
+        if (in_array($viewing->status, ['cancelled', 'completed'], true)) {
+            abort(422, __('lang.viewing_cannot_be_cancelled'));
+        }
+
+        $viewing->update(['status' => 'cancelled']);
+
+        return $viewing->load(['unite', 'viewingTime', 'attendees']);
+    }
 }

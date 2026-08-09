@@ -1429,4 +1429,9 @@ return [
     'add_attendee' => 'إضافة',
     'sidebar_viewings' => 'مواعيد المعاينة',
     'all' => 'الكل',
+
+    'viewing_not_found' => 'موعد المعاينة غير موجود.',
+    'viewing_deposit_cancel_not_allowed' => 'لا يمكن إلغاء المواعيد التي تتطلب عربونًا من خلال هذا المسار. يرجى التواصل مع الدعم.',
+    'viewing_cannot_be_cancelled' => 'لا يمكن إلغاء هذا الموعد — تم إلغاؤه أو إتمامه مسبقًا.',
+    'viewing_cancelled_successfully' => 'تم إلغاء موعد المعاينة بنجاح.',
 ];

@@ -1435,4 +1435,9 @@ return [
     'add_attendee' => 'Add',
     'sidebar_viewings' => 'Viewing Appointments',
     'all' => 'All',
+
+    'viewing_not_found' => 'Viewing appointment not found.',
+    'viewing_deposit_cancel_not_allowed' => 'Appointments with a deposit can\'t be cancelled through this endpoint. Please contact support.',
+    'viewing_cannot_be_cancelled' => 'This appointment can\'t be cancelled — it\'s already cancelled or completed.',
+    'viewing_cancelled_successfully' => 'Your viewing appointment has been cancelled.',
 ];

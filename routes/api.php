@@ -229,6 +229,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // inside UniteViewingRepository, matching the reservation flow's
     // exact gateway-integration pattern.
     Route::post('/unite-viewings', [\App\Http\Controllers\Viewing\UniteViewingController::class, 'store']);
+    Route::post('/unite-viewings/{id}/cancel', [\App\Http\Controllers\Viewing\UniteViewingController::class, 'cancel']);
 
     // Store/update FCM device token for push notifications
     // POST /api/fcm/token  { "fcm_token": "..." }

@@ -17,12 +17,49 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
+    <div class="card card-soft shadow-sm mb-3">
+        <div class="card-body">
+            <form method="GET" action="{{ route('admin.viewings.index') }}" class="row g-2 align-items-end">
+                @if(request('status'))
+                    <input type="hidden" name="status" value="{{ request('status') }}">
+                @endif
+                <div class="col-md-4">
+                    <label class="form-label small">{{ __('lang.venue') }}</label>
+                    <select name="unite_id" class="form-select form-select-sm">
+                        <option value="">{{ __('lang.all') }}</option>
+                        @foreach($unitesWithViewings as $unite)
+                            <option value="{{ $unite->id }}" {{ (string) request('unite_id') === (string) $unite->id ? 'selected' : '' }}>
+                                {{ $unite->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">{{ __('lang.date_from') }}</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">{{ __('lang.date_to') }}</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-accent flex-grow-1">{{ __('lang.filter') }}</button>
+                    @if(request('unite_id') || request('date_from') || request('date_to'))
+                        <a href="{{ route('admin.viewings.index', request('status') ? ['status' => request('status')] : []) }}"
+                           class="btn btn-sm btn-outline-secondary">{{ __('lang.clear') }}</a>
+                    @endif
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="btn-group mb-3">
-        <a href="{{ route('admin.viewings.index') }}" class="btn btn-sm {{ ! request('status') ? 'btn-secondary' : 'btn-outline-secondary' }}">{{ __('lang.all') }}</a>
-        <a href="{{ route('admin.viewings.index', ['status' => 'pending']) }}" class="btn btn-sm {{ request('status') === 'pending' ? 'btn-warning' : 'btn-outline-warning' }}">{{ __('lang.pending') }}</a>
-        <a href="{{ route('admin.viewings.index', ['status' => 'confirmed']) }}" class="btn btn-sm {{ request('status') === 'confirmed' ? 'btn-success' : 'btn-outline-success' }}">{{ __('lang.confirmed') }}</a>
-        <a href="{{ route('admin.viewings.index', ['status' => 'cancelled']) }}" class="btn btn-sm {{ request('status') === 'cancelled' ? 'btn-danger' : 'btn-outline-danger' }}">{{ __('lang.cancelled') }}</a>
-        <a href="{{ route('admin.viewings.index', ['status' => 'completed']) }}" class="btn btn-sm {{ request('status') === 'completed' ? 'btn-primary' : 'btn-outline-primary' }}">{{ __('lang.completed') }}</a>
+        @php($otherFilters = request()->except('status'))
+        <a href="{{ route('admin.viewings.index', $otherFilters) }}" class="btn btn-sm {{ ! request('status') ? 'btn-secondary' : 'btn-outline-secondary' }}">{{ __('lang.all') }}</a>
+        <a href="{{ route('admin.viewings.index', $otherFilters + ['status' => 'pending']) }}" class="btn btn-sm {{ request('status') === 'pending' ? 'btn-warning' : 'btn-outline-warning' }}">{{ __('lang.pending') }}</a>
+        <a href="{{ route('admin.viewings.index', $otherFilters + ['status' => 'confirmed']) }}" class="btn btn-sm {{ request('status') === 'confirmed' ? 'btn-success' : 'btn-outline-success' }}">{{ __('lang.confirmed') }}</a>
+        <a href="{{ route('admin.viewings.index', $otherFilters + ['status' => 'cancelled']) }}" class="btn btn-sm {{ request('status') === 'cancelled' ? 'btn-danger' : 'btn-outline-danger' }}">{{ __('lang.cancelled') }}</a>
+        <a href="{{ route('admin.viewings.index', $otherFilters + ['status' => 'completed']) }}" class="btn btn-sm {{ request('status') === 'completed' ? 'btn-primary' : 'btn-outline-primary' }}">{{ __('lang.completed') }}</a>
     </div>
 
     <div class="card card-soft shadow-sm">

@@ -19,10 +19,21 @@ class UniteViewingController extends Controller
     {
         $viewings = UniteViewing::with(['unite', 'user', 'viewingTime', 'attendees'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->query('unite_id'), fn ($q, $uniteId) => $q->where('unite_id', $uniteId))
+            ->when($request->query('date_from'), fn ($q, $date) => $q->where('viewing_date', '>=', $date))
+            ->when($request->query('date_to'), fn ($q, $date) => $q->where('viewing_date', '<=', $date))
             ->latest('viewing_date')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
-        return view('dashboard.admin.viewings.index', compact('viewings'));
+        // For the venue filter dropdown — every venue that has at least
+        // one viewing appointment, not every venue in the system, so an
+        // admin isn't scrolling through venues with nothing to show.
+        $unitesWithViewings = \App\Models\Unite::whereHas('viewings')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('dashboard.admin.viewings.index', compact('viewings', 'unitesWithViewings'));
     }
 
     public function show(int $id)
