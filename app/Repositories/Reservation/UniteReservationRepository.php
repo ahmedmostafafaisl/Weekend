@@ -78,7 +78,18 @@ class UniteReservationRepository implements UniteReservationInterface
         }
         $chargeAmount = $this->resolveChargeAmount($unite, $fullPrice);
 
-        if ($chargeAmount <= 0) {
+        // BUG FIX: this used to reject unconditionally whenever
+        // $chargeAmount was 0 — but that can no longer distinguish
+        // "pricing was never configured" (now caught earlier, inside
+        // resolvePrice()/resolveHourlyPrice(), which abort with a
+        // specific error the moment they find a missing/null price
+        // field) from "the provider deliberately priced this at 0".
+        // Only a genuinely negative amount is guarded here — which
+        // should never happen given every price field is validated as
+        // min:0 wherever it's set, but costs nothing to catch defensively
+        // — while an explicit 0 passes through as the valid free booking
+        // it's meant to be.
+        if ($chargeAmount < 0) {
             abort(422, __('lang.venue_no_price_configured'));
         }
 
@@ -819,25 +830,45 @@ class UniteReservationRepository implements UniteReservationInterface
 
         $price = $unite->prices()->where('day', $mappedDay)->first();
 
+        // BUG FIX: this used to silently `return 0` when no matching
+        // UnitePrice row existed at all, letting a reservation through at
+        // zero cost with nothing anywhere flagging that pricing was never
+        // actually configured for this venue/day. A missing row (or a row
+        // that exists but has the relevant field left null — never set,
+        // as distinct from explicitly set to 0) now rejects immediately
+        // with a specific error, so this can never again slip through as
+        // a silent free booking. hourly never reaches this function (see
+        // the create()/reschedule() branching above), so it doesn't need
+        // handling here — resolveHourlyPrice() already has its own,
+        // equivalent check.
         if (! $price) {
-            return 0;
+            abort(422, __('lang.no_pricing_configured_for_day'));
         }
 
         if ($unite->type === 'stadium') {
+            if (is_null($price->price)) {
+                abort(422, __('lang.no_pricing_configured_for_day'));
+            }
+
             return (float) $price->price;
         }
 
-        // Hourly price is calculated separately; resolvePrice returns 0 for it
-        if ($periodType === 'hourly') {
-            return 0.0;
+        $field = match ($periodType) {
+            'morning' => 'morning_price',
+            'evening' => 'evening_price',
+            'full_day', 'custom' => 'full_price',
+            default => null,
+        };
+
+        // $field is only null for a period_type this function was never
+        // meant to price (e.g. 'package', which has its own resolver) —
+        // genuinely unreachable via the real create()/reschedule() flows,
+        // but abort rather than silently return 0 if it ever is.
+        if ($field === null || is_null($price->{$field})) {
+            abort(422, __('lang.no_pricing_configured_for_day'));
         }
 
-        return (float) match ($periodType) {
-            'morning' => $price->morning_price,
-            'evening' => $price->evening_price,
-            'full_day', 'custom' => $price->full_price,
-            default => 0,
-        };
+        return (float) $price->{$field};
     }
 
     // -------------------------------------------------------------------------
@@ -922,7 +953,12 @@ class UniteReservationRepository implements UniteReservationInterface
             abort(422, __('lang.no_pricing_configured_for_day'));
         }
 
-        if (! $priceRow->hourly_enabled || ! $priceRow->day_hour_price) {
+        // BUG FIX: "! $priceRow->day_hour_price" was falsy for BOTH null
+        // (never configured) and 0 (deliberately configured as free) —
+        // conflating "not set up" with "explicitly free". is_null() only
+        // rejects the genuinely-unconfigured case, letting a real 0 rate
+        // through as the valid free booking it's meant to be.
+        if (! $priceRow->hourly_enabled || is_null($priceRow->day_hour_price)) {
             abort(422, __('lang.hourly_booking_unavailable_for_day'));
         }
 
@@ -948,12 +984,13 @@ class UniteReservationRepository implements UniteReservationInterface
             $effectiveRow->night_hour_price = $offer->night_hour_price ?? $offer->day_hour_price;
         }
 
-        $total = $effectiveRow->calculateHourlyPrice($fromTime, $toTime);
-
-        if ($total <= 0) {
-            abort(422, __('lang.hourly_price_calc_failed'));
-        }
-
-        return $total;
+        // BUG FIX: this used to reject any calculated total of 0 outright
+        // — but with day_hour_price already confirmed genuinely
+        // configured (not null) above, the only way the total can still
+        // be 0 here is a deliberately-configured free rate, which must
+        // succeed, not be rejected. There's no longer a distinct
+        // "calculation failed" case this check was catching that isn't
+        // already covered by the configuration checks above it.
+        return $effectiveRow->calculateHourlyPrice($fromTime, $toTime);
     }
 }
