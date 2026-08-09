@@ -75,6 +75,96 @@ class AvailabilityService
         ];
     }
 
+    /**
+     * Availability across an arbitrary date range (not necessarily aligned
+     * to a calendar month) — e.g. start_date=2026-08-09&end_date=2026-08-12.
+     * Reuses the exact same per-day data and buildDateEntry() logic as
+     * monthCalendar(), so a date's status here is always identical to
+     * what the month view would show for that same date.
+     *
+     * Also answers the specific question a multi-day full_day booking
+     * needs: is EVERY day in this range available for full_day, with
+     * nothing already booked, and (if applicable) is the venue even a
+     * full_day-supporting type at all. full_day_range_available is only
+     * ever true for venue types that support full_day at all — for a
+     * stadium (hourly-only), it's false for every range, matching
+     * Unite::allowedPeriodTypes() exactly rather than duplicating that
+     * matrix here.
+     *
+     * @return array{
+     *   unite_id: int,
+     *   unite_name: string,
+     *   unite_type: string,
+     *   start_date: string,
+     *   end_date: string,
+     *   supports_full_day: bool,
+     *   full_day_range_available: bool,
+     *   unavailable_dates: array,
+     *   dates: array
+     * }
+     */
+    public function rangeAvailability(Unite $unite, Carbon $start, Carbon $end): array
+    {
+        $slots = $unite->slots()->get()->keyBy('day_of_week');
+        $prices = $unite->prices()->get()->keyBy('day');
+
+        $activeOffers = $unite->offers()
+            ->where('status', 'active')
+            ->where('start', '<=', $end->toDateString())
+            ->where('end', '>=', $start->toDateString())
+            ->get();
+
+        $bookingPackages = $unite->package_booking_enabled
+            ? $unite->bookingPackages()->where('status', 'active')->get()
+            : collect();
+
+        $reservations = UniteReservation::where('unite_id', $unite->id)
+            ->whereBetween('reservation_date', [$start->toDateString(), $end->toDateString()])
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->get()
+            ->groupBy(fn ($r) => $r->reservation_date->format('Y-m-d'));
+
+        $supportsFullDay = in_array('full_day', $unite->allowedPeriodTypes(), true);
+
+        $dates = [];
+        $unavailableDates = [];
+
+        foreach (CarbonPeriod::create($start, $end) as $date) {
+            $entry = $this->buildDateEntry(
+                $unite,
+                $date,
+                $slots,
+                $prices,
+                $activeOffers,
+                $reservations->get($date->format('Y-m-d'), collect()),
+                $bookingPackages
+            );
+            $dates[] = $entry;
+
+            if ($supportsFullDay) {
+                $fullDayPeriod = collect($entry['periods'])->firstWhere('period_type', 'full_day');
+                $dayIsAvailable = $fullDayPeriod && $fullDayPeriod['availability'] === 'available';
+                if (! $dayIsAvailable) {
+                    $unavailableDates[] = $entry['date'];
+                }
+            } else {
+                $unavailableDates[] = $entry['date'];
+            }
+        }
+
+        return [
+            'unite_id' => $unite->id,
+            'unite_name' => $unite->name,
+            'unite_type' => $unite->type,
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'supports_full_day' => $supportsFullDay,
+            'full_day_range_available' => $supportsFullDay && count($unavailableDates) === 0,
+            'unavailable_dates' => $unavailableDates,
+            'dates' => $dates,
+        ];
+    }
+
     // -------------------------------------------------------------------------
     // Build one date entry
     // -------------------------------------------------------------------------

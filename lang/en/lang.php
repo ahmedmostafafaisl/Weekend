@@ -1440,4 +1440,10 @@ return [
     'viewing_deposit_cancel_not_allowed' => 'Appointments with a deposit can\'t be cancelled through this endpoint. Please contact support.',
     'viewing_cannot_be_cancelled' => 'This appointment can\'t be cancelled — it\'s already cancelled or completed.',
     'viewing_cancelled_successfully' => 'Your viewing appointment has been cancelled.',
+
+    'date_range_too_large' => 'The selected date range is too large — please choose 90 days or fewer.',
+
+    'end_date_only_for_full_day' => 'end_date is only used for full_day bookings — remove it or change period_type to full_day.',
+    'no_slot_config_for_day_in_range' => 'This venue is not open on :day (:date) — every day in a multi-day booking must be available.',
+    'venue_does_not_offer_period_on_date' => 'This venue does not offer full-day booking on :date.',
 ];

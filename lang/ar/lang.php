@@ -1434,4 +1434,10 @@ return [
     'viewing_deposit_cancel_not_allowed' => 'لا يمكن إلغاء المواعيد التي تتطلب عربونًا من خلال هذا المسار. يرجى التواصل مع الدعم.',
     'viewing_cannot_be_cancelled' => 'لا يمكن إلغاء هذا الموعد — تم إلغاؤه أو إتمامه مسبقًا.',
     'viewing_cancelled_successfully' => 'تم إلغاء موعد المعاينة بنجاح.',
+
+    'date_range_too_large' => 'النطاق الزمني المحدد كبير جدًا — يرجى اختيار 90 يومًا أو أقل.',
+
+    'end_date_only_for_full_day' => 'end_date يُستخدم فقط لحجوزات اليوم الكامل — يرجى إزالته أو تغيير نوع الفترة إلى full_day.',
+    'no_slot_config_for_day_in_range' => 'هذه الوحدة غير متاحة يوم :day (:date) — يجب أن تكون جميع أيام الحجز المتعدد متاحة.',
+    'venue_does_not_offer_period_on_date' => 'لا تقدم هذه الوحدة حجز اليوم الكامل بتاريخ :date.',
 ];

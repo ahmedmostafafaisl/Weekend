@@ -73,6 +73,12 @@ class UniteReservationRepository implements UniteReservationInterface
             // eligible discount/promo still apply on top of it further
             // down, exactly like every other period_type.
             $fullPrice = $this->resolvePackagePrice($unite, $data);
+        } elseif ($data['period_type'] === 'full_day' && $endDate !== null) {
+            // Multi-day full_day span — sum each individual day's price
+            // rather than pricing the whole stay at a single day's rate,
+            // since weekday vs Thursday/Friday/Saturday rates can
+            // genuinely differ within the same multi-day booking.
+            $fullPrice = $this->resolveFullDayRangePrice($unite, $data['reservation_date'], $endDate);
         } else {
             $fullPrice = $this->resolvePrice($unite, $data['period_type'], $data['reservation_date']);
         }
@@ -262,6 +268,7 @@ class UniteReservationRepository implements UniteReservationInterface
 
         $payload = array_merge([
             'reservation_date' => $reservation->reservation_date?->format('Y-m-d'),
+            'end_date' => $reservation->end_date?->format('Y-m-d'),
             'period_type' => $reservation->period_type,
             'from_time' => $reservation->from_time,
             'to_time' => $reservation->to_time,
@@ -273,12 +280,18 @@ class UniteReservationRepository implements UniteReservationInterface
         // reservations would have gone through resolvePrice(), which
         // explicitly returns 0 for hourly (see its own comment further
         // down), and package reservations would have tried to resolve a
-        // price with no package context. Matches the same 3-way branch
-        // already used in create().
+        // price with no package context. Matches the same branch
+        // already used in create() — now also including the multi-day
+        // full_day range case, so rescheduling a multi-day booking prices
+        // it the same way creating one does, rather than falling through
+        // to the single-day resolvePrice() call and silently pricing
+        // only the start date.
         if ($payload['period_type'] === 'hourly') {
             $price = $this->resolveHourlyPrice($reservation->unite, $fromTime, $toTime, $payload['reservation_date']);
         } elseif ($payload['period_type'] === 'package') {
             $price = $this->resolvePackagePrice($reservation->unite, $payload);
+        } elseif ($payload['period_type'] === 'full_day' && $endDate !== null) {
+            $price = $this->resolveFullDayRangePrice($reservation->unite, $payload['reservation_date'], $endDate);
         } else {
             $price = $this->resolvePrice($reservation->unite, $payload['period_type'], $payload['reservation_date']);
         }
@@ -653,6 +666,16 @@ class UniteReservationRepository implements UniteReservationInterface
             return $this->resolvePackageTimes($unite, $data);
         }
 
+        // Multi-day full_day span — e.g. reservation_date=2026-08-09,
+        // end_date=2026-08-12, one continuous booking across 4 days.
+        // Triggered only when end_date is genuinely provided and later
+        // than reservation_date; a single-day full_day booking (no
+        // end_date, or end_date === reservation_date) falls straight
+        // through to the normal single-day logic below, unchanged.
+        if ($data['period_type'] === 'full_day' && ! empty($data['end_date']) && $data['end_date'] !== $data['reservation_date']) {
+            return $this->resolveFullDayRangeTimes($unite, $data);
+        }
+
         $dayOfWeek = strtolower(Carbon::parse($data['reservation_date'])->englishDayOfWeek);
 
         // Use already-loaded collection first to avoid an extra query
@@ -707,6 +730,79 @@ class UniteReservationRepository implements UniteReservationInterface
         }
 
         return [$from, $to, null];
+    }
+
+    /**
+     * Resolves a multi-day full_day reservation spanning reservation_date
+     * through end_date inclusive — e.g. a 4-night hall booking. Every
+     * single day in the range must have a genuinely configured, available
+     * slot with full_start/full_end set — not just the start date, since
+     * a venue could easily be open on some days and closed on others
+     * (e.g. closed midweek). The first day's hours become the stored
+     * from_time/to_time (representing check-in time); the span itself is
+     * carried by end_date, matching exactly how the existing 'days'-type
+     * package reservations already represent a multi-day span on this
+     * same table.
+     */
+    protected function resolveFullDayRangeTimes(Unite $unite, array $data): array
+    {
+        $startDate = Carbon::parse($data['reservation_date']);
+        $endDate = Carbon::parse($data['end_date']);
+
+        $firstFrom = null;
+        $firstTo = null;
+
+        foreach (\Carbon\CarbonPeriod::create($startDate, $endDate) as $date) {
+            $dayOfWeek = strtolower($date->englishDayOfWeek);
+
+            $slot = $unite->relationLoaded('slots')
+                ? $unite->slots->firstWhere('day_of_week', $dayOfWeek)
+                : $unite->slots()->where('day_of_week', $dayOfWeek)->first();
+
+            if (! $slot && $unite->relationLoaded('slots')) {
+                $slot = $unite->slots->firstWhere('day_of_week', 'weekday')
+                    ?? $unite->slots->first();
+            }
+
+            if (! $slot || $slot->status !== 'available') {
+                abort(422, str_replace(
+                    [':day', ':date'],
+                    [$dayOfWeek, $date->toDateString()],
+                    __('lang.no_slot_config_for_day_in_range')
+                ));
+            }
+
+            if (is_null($slot->full_start) || is_null($slot->full_end)) {
+                abort(422, str_replace(':date', $date->toDateString(), __('lang.venue_does_not_offer_period_on_date')));
+            }
+
+            if ($firstFrom === null) {
+                $firstFrom = $slot->full_start;
+                $firstTo = $slot->full_end;
+            }
+        }
+
+        return [$firstFrom, $firstTo, $endDate->toDateString()];
+    }
+
+    /**
+     * Sums the individual full_day price for every day in the range,
+     * reusing resolvePrice() per day rather than a separate calculation —
+     * this means a day missing genuine pricing configuration correctly
+     * aborts the whole booking (via resolvePrice()'s own validation),
+     * and a promotional offer covering only some days within the range
+     * is correctly applied only to those specific days, not the whole
+     * stay at one rate.
+     */
+    protected function resolveFullDayRangePrice(Unite $unite, string $startDate, string $endDate): float
+    {
+        $total = 0.0;
+
+        foreach (\Carbon\CarbonPeriod::create(Carbon::parse($startDate), Carbon::parse($endDate)) as $date) {
+            $total += $this->resolvePrice($unite, 'full_day', $date->toDateString());
+        }
+
+        return $total;
     }
 
     /**

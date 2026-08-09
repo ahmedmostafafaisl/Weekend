@@ -125,6 +125,7 @@ Route::get('unites/nearby', NearbyUniteController::class);
 // Specific routes BEFORE the {unite} wildcard — Laravel matches top-down.
 // Without this order, 'unites/4/availability' is swallowed by 'unites/{unite}'.
 Route::get('unites/{unite}/availability/date', [AvailabilityController::class, 'date']);
+Route::get('unites/{unite}/availability/range', [AvailabilityController::class, 'range']);
 Route::get('unites/{unite}/availability', [AvailabilityController::class, 'month']);
 
 // Generic wildcard — must be last among GET /unites/* routes

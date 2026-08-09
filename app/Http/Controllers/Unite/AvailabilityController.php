@@ -121,4 +121,56 @@ class AvailabilityController extends Controller
             'data' => $entry,
         ]);
     }
+
+    /**
+     * GET /api/unites/{unite}/availability/range
+     *
+     * Query params:
+     *   start_date — Y-m-d (required)
+     *   end_date   — Y-m-d (required, >= start_date)
+     *
+     * Checks availability across an arbitrary multi-day range — e.g.
+     * start_date=2026-08-09&end_date=2026-08-12 — specifically for
+     * venues that support full_day reservations (hall/lounge/camp).
+     * full_day_range_available answers "can this whole range be booked
+     * as one multi-day full_day reservation right now" — false for a
+     * stadium (hourly-only) regardless of the dates requested, and false
+     * for any range where even one day is already booked or the venue is
+     * closed that day.
+     */
+    public function range(Request $request, int $uniteId): JsonResponse
+    {
+        $request->validate([
+            'start_date' => ['required', 'date', 'date_format:Y-m-d'],
+            'end_date' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+        ]);
+
+        $unite = Unite::with(['slots', 'prices', 'offers'])->findOrFail($uniteId);
+
+        if ($unite->status !== 'active') {
+            return response()->json([
+                'success' => false,
+                'message' => __('lang.venue_not_currently_active'),
+            ], 422);
+        }
+
+        $start = \Carbon\Carbon::parse($request->start_date);
+        $end = \Carbon\Carbon::parse($request->end_date);
+
+        // Capped to avoid an unbounded range turning into an accidental
+        // full-table scan / thousands of computed date entries.
+        if ($start->diffInDays($end) > 90) {
+            return response()->json([
+                'success' => false,
+                'message' => __('lang.date_range_too_large'),
+            ], 422);
+        }
+
+        $result = $this->service->rangeAvailability($unite, $start, $end);
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
 }
