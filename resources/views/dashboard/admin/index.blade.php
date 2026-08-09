@@ -3,6 +3,7 @@
 @section('title', 'Weekend | Dashboard')
 
 @section('content')
+    @php $me = auth('admin')->user(); @endphp
     <div class="mb-4">
         <h3 class="fw-bold mb-1">{{ __('lang.analytics_dashboard') }}</h3>
         <div class="text-muted">{{ __('lang.monitor_admin_users_roles_permissions') }}</div>
@@ -10,6 +11,7 @@
 
     {{-- Cards --}}
     <div class="row g-3">
+        @if($me && $me->can('users.view'))
         <div class="col-md-4">
             <div class="card card-soft shadow-sm">
                 <div class="card-body">
@@ -19,7 +21,9 @@
                 </div>
             </div>
         </div>
+        @endif
 
+        @if($me && $me->can('roles.view'))
         <div class="col-md-4">
             <div class="card card-soft shadow-sm">
                 <div class="card-body">
@@ -29,7 +33,9 @@
                 </div>
             </div>
         </div>
+        @endif
 
+        @if($me && $me->can('permissions.view'))
         <div class="col-md-4">
             <div class="card card-soft shadow-sm">
                 <div class="card-body">
@@ -39,6 +45,7 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 
     {{-- Placeholder sections like charts --}}

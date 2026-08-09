@@ -70,8 +70,7 @@
             <i class="ti ti-speakerphone"></i> {{ __('lang.sidebar_ads') }}
         </a>
         @endif
-        @can('ads.review')
-            @if(Route::has('admin.ads.pending'))
+        @if($showAdsPending && Route::has('admin.ads.pending'))
             <a class="nav-link-dark {{ $r === 'admin.ads.pending' ? 'active' : '' }}"
                href="{{ route('admin.ads.pending') }}">
                 <i class="ti ti-clipboard-check"></i> {{ __('lang.sidebar_pending_ads') }}
@@ -80,8 +79,7 @@
                     <span class="badge bg-warning text-dark ms-1">{{ $pendingCount }}</span>
                 @endif
             </a>
-            @endif
-        @endcan
+        @endif
         @if($showTransfers && Route::has('admin.transfers.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.transfers') ? 'active' : '' }}"
            href="{{ route('admin.transfers.index') }}">
