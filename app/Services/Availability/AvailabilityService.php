@@ -14,16 +14,6 @@ class AvailabilityService
     // Entry point — build a full month calendar for a unite
     // -------------------------------------------------------------------------
 
-    /**
-     * @return array{
-     *   unite_id: int,
-     *   unite_name: string,
-     *   unite_type: string,
-     *   year: int,
-     *   month: int,
-     *   dates: array
-     * }
-     */
     public function monthCalendar(Unite $unite, int $year, int $month): array
     {
         $start = Carbon::create($year, $month, 1)->startOfDay();
@@ -128,6 +118,7 @@ class AvailabilityService
 
         $dates = [];
         $unavailableDates = [];
+        $totalPrice = $supportsFullDay ? 0.0 : null;
 
         foreach (CarbonPeriod::create($start, $end) as $date) {
             $entry = $this->buildDateEntry(
@@ -147,6 +138,18 @@ class AvailabilityService
                 if (! $dayIsAvailable) {
                     $unavailableDates[] = $entry['date'];
                 }
+
+                // Summed straight from the same per-day price already
+                // shown in periods[] above — total_price can never
+                // disagree with what the client sees broken out per day
+                // in this same response, since it's not a separate
+                // calculation, just an accumulation of the one already
+                // done. Included regardless of that specific day's
+                // availability, so a partially-blocked range still shows
+                // what the full stay would have cost.
+                if ($fullDayPeriod) {
+                    $totalPrice += (float) $fullDayPeriod['price'];
+                }
             } else {
                 $unavailableDates[] = $entry['date'];
             }
@@ -161,6 +164,7 @@ class AvailabilityService
             'supports_full_day' => $supportsFullDay,
             'full_day_range_available' => $supportsFullDay && count($unavailableDates) === 0,
             'unavailable_dates' => $unavailableDates,
+            'total_price' => $totalPrice,
             'dates' => $dates,
         ];
     }
