@@ -333,6 +333,20 @@ class UniteRepository implements UniteRepositoryInterface
             });
         }
 
+        // Dedicated city filter — distinct from 'search' above, which
+        // covers name/description/location_name but never checked city
+        // specifically. Matches either field with a partial (LIKE) match,
+        // since a city name is commonly embedded within location_name
+        // (e.g. "الرياض - العليا") rather than stored identically in both.
+        if (! empty($filters['city'])) {
+            $city = $filters['city'];
+
+            $query->where(function ($q) use ($city) {
+                $q->where('location_name', 'like', "%{$city}%")
+                    ->orWhere('city', 'like', "%{$city}%");
+            });
+        }
+
         if (! empty($filters['filter_by_type'])) {
             $query->where('type', $filters['filter_by_type']);
         }

@@ -176,9 +176,50 @@ class UniteReservationController extends Controller
         $perPage = min((int) ($request->per_page ?? 15), 50);
         $paginator = $query->paginate($perPage);
 
+        // Viewing appointments — a genuinely separate booking mechanism
+        // from reservations (different model, different status enum:
+        // pending/confirmed/cancelled/completed vs confirmed/pending/
+        // cancelled), so returned as its own key rather than merged into
+        // the same paginated reservations list. The same date_from/
+        // date_to/upcoming filters apply where they sensibly carry over —
+        // 'status' and 'payment_status' don't, since a viewing's status
+        // values differ and most viewings have no payment at all.
+        $viewingsQuery = \App\Models\UniteViewing::with(['unite', 'viewingTime', 'payment'])
+            ->where('user_id', $user->id)
+            ->latest('viewing_date');
+
+        if ($request->filled('date_from')) {
+            $viewingsQuery->whereDate('viewing_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $viewingsQuery->whereDate('viewing_date', '<=', $request->date_to);
+        }
+
+        if ($request->boolean('upcoming')) {
+            $viewingsQuery->whereDate('viewing_date', '>=', now()->toDateString())
+                ->whereIn('status', ['confirmed', 'pending']);
+        }
+
+        $viewings = $viewingsQuery->limit(50)->get();
+
         return response()->json([
             'success' => true,
             'data' => ReservationResource::collection($paginator->items()),
+            'viewings' => $viewings->map(fn ($v) => [
+                'id' => $v->id,
+                'unite_id' => $v->unite_id,
+                'unite_name' => $v->unite->name ?? null,
+                'viewing_date' => $v->viewing_date?->format('Y-m-d'),
+                'day_of_week' => $v->viewingTime->day_of_week ?? null,
+                'start_time' => $v->viewingTime->start_time ?? null,
+                'end_time' => $v->viewingTime->end_time ?? null,
+                'status' => $v->status,
+                'deposit_required' => (bool) $v->deposit_required,
+                'deposit_amount' => $v->deposit_amount ? (float) $v->deposit_amount : null,
+                'deposit_refundable' => $v->deposit_refundable,
+                'payment_status' => $v->payment->status ?? null,
+            ])->values(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),

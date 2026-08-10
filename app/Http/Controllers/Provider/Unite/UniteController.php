@@ -119,7 +119,7 @@ class UniteController extends Controller
     public function index2(Request $req)
     {
         $filters = $req->only([
-            'search', 'nearest_to_lat_long', 'lat', 'long',
+            'search', 'city', 'nearest_to_lat_long', 'lat', 'long',
             'rating', 'services', 'new_place',
             'price_from', 'price_to', 'filter_by_type', 'filter_by',
         ]);
