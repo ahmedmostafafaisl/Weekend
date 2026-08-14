@@ -124,7 +124,7 @@ class UniteRepository implements UniteRepositoryInterface
 
         // ── Price filter — against the friday price (peak day proxy) ─────────
 
-        if (! empty($filters['max_price'])) {
+        if (isset($filters['max_price']) && $filters['max_price'] !== '') {
             $max = (float) $filters['max_price'];
 
             $q->whereHas('prices', function ($query) use ($max, $filters) {
@@ -150,7 +150,7 @@ class UniteRepository implements UniteRepositoryInterface
 
         // ── Min-price filter ─────────────────────────────────────────────────
 
-        if (! empty($filters['min_price'])) {
+        if (isset($filters['min_price']) && $filters['min_price'] !== '') {
             $min = (float) $filters['min_price'];
             $period = $filters['period_type'] ?? null;
 
@@ -708,6 +708,16 @@ class UniteRepository implements UniteRepositoryInterface
         }
     }
 
+    /**
+     * Sunday through Wednesday — the 4 individual days that 'week_day'
+     * expands into. Matches UnitePrice's day-category grouping, and the
+     * identical expansion already implemented in UniteSlotRepository for
+     * the dedicated admin/unites/{unite}/slots CRUD endpoints — this is a
+     * separate code path (the inline bulk slots section on the unite
+     * create/edit form) that needed the same fix independently.
+     */
+    private const SLOT_WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday'];
+
     protected function storeSlots(Unite $unite, array $slots, string $type): void
     {
         foreach ($slots as $slot) {
@@ -732,13 +742,23 @@ class UniteRepository implements UniteRepositoryInterface
                 $payload['full_end'] = $slot['full_end'] ?? null;
             }
 
-            $unite->slots()->updateOrCreate(
-                [
-                    'unite_id' => $unite->id,
-                    'day_of_week' => $payload['day_of_week'],
-                ],
-                $payload
-            );
+            // 'week_day' is a request-layer shorthand only — the day_of_week
+            // column itself is a strict enum of the 7 real day names and
+            // has no 'week_day' value at all, so this must expand into 4
+            // real rows rather than being passed through as-is.
+            $daysToWrite = $payload['day_of_week'] === 'week_day'
+                ? self::SLOT_WEEK_DAYS
+                : [$payload['day_of_week']];
+
+            foreach ($daysToWrite as $day) {
+                $unite->slots()->updateOrCreate(
+                    [
+                        'unite_id' => $unite->id,
+                        'day_of_week' => $day,
+                    ],
+                    array_merge($payload, ['day_of_week' => $day])
+                );
+            }
         }
     }
 
@@ -902,9 +922,12 @@ class UniteRepository implements UniteRepositoryInterface
             $query->where('type', $filters['filter_by_type']);
         }
 
-        if (! empty($filters['price_from']) || ! empty($filters['price_to'])) {
-            $priceFrom = $filters['price_from'] ?? 0;
-            $priceTo = $filters['price_to'] ?? 999999999;
+        $hasPriceFrom = isset($filters['price_from']) && $filters['price_from'] !== '';
+        $hasPriceTo = isset($filters['price_to']) && $filters['price_to'] !== '';
+
+        if ($hasPriceFrom || $hasPriceTo) {
+            $priceFrom = $hasPriceFrom ? $filters['price_from'] : 0;
+            $priceTo = $hasPriceTo ? $filters['price_to'] : 999999999;
 
             $query->whereHas('prices', function ($q) use ($priceFrom, $priceTo) {
                 $q->where(function ($sub) use ($priceFrom, $priceTo) {

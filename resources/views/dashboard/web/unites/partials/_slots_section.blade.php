@@ -12,7 +12,7 @@
             </div>
             <button type="button" class="btn btn-sm btn-outline-primary"
                     onclick="addRow('slots-body','slot-tpl')"
-                    @if(($uniteType ?? ($unite->type ?? '')) === 'stadium' || (($uniteType ?? ($unite->type ?? '')) === 'hall' && $unite)) style="display:none" @endif>
+                    @if(($uniteType ?? ($unite->type ?? '')) === 'stadium' || $unite) style="display:none" @endif>
                 + {{ __('lang.add_slot') }}</button>
         </div>
         <div class="table-responsive">
@@ -35,7 +35,7 @@
                             <th>{{ __('lang.full_start') }}</th><th>{{ __('lang.full_end') }}</th>
                         @endif
                         <th>{{ __('lang.status') }}</th>
-                        @unless(($uniteType ?? ($unite->type ?? '')) === 'stadium' || (($uniteType ?? ($unite->type ?? '')) === 'hall' && $unite))
+                        @unless(($uniteType ?? ($unite->type ?? '')) === 'stadium' || $unite)
                             <th></th>
                         @endunless
                     </tr>
@@ -50,8 +50,9 @@
                              provider-specific, unlike stadium's fixed 24hr
                              window. Hall on CREATE still uses the dynamic
                              dropdown-based rows below, unchanged. --}}
-                        @foreach(['sunday','monday','tuesday','wednesday','thursday','friday','saturday'] as $i => $d)
-                            @php($sl = $unite ? $unite->slots->firstWhere('day_of_week', $d) : null)
+                        @foreach(['week_day','thursday','friday','saturday'] as $i => $d)
+                            @php($lookupDay = $d === 'week_day' ? 'sunday' : $d)
+                            @php($sl = $unite ? $unite->slots->firstWhere('day_of_week', $lookupDay) : null)
                             <tr>
                                 <td>
                                     <input type="hidden" name="slots[{{ $i }}][day_of_week]" value="{{ $d }}">
@@ -75,25 +76,24 @@
                             </tr>
                         @endforeach
                     @elseif($unite)
-                        @foreach($unite->slots as $i => $sl)
+                        @foreach(['week_day','thursday','friday','saturday'] as $i => $d)
+                            @php($lookupDay = $d === 'week_day' ? 'sunday' : $d)
+                            @php($sl = $unite->slots->firstWhere('day_of_week', $lookupDay))
                         <tr>
                             <td>
-                                <select class="form-select form-select-sm" name="slots[{{ $i }}][day_of_week]">
-                                    @foreach(['sunday','monday','tuesday','wednesday','thursday','friday','saturday','weekday'] as $d)
-                                        <option value="{{ $d }}" {{ ($sl->day_of_week ?? '') === $d ? 'selected' : '' }}>{{ __('lang.'.$d) }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="hidden" name="slots[{{ $i }}][day_of_week]" value="{{ $d }}">
+                                <span class="fw-semibold small">{{ __('lang.'.$d) }}</span>
                             </td>
                             @if($unite->type === 'hall')
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_start]" value="{{ $sl->full_start }}"></td>
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_end]"   value="{{ $sl->full_end }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_start]" value="{{ $sl->full_start ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_end]"   value="{{ $sl->full_end ?? '' }}"></td>
                             @else
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][morning_start]" value="{{ $sl->morning_start }}"></td>
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][morning_end]"   value="{{ $sl->morning_end }}"></td>
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][evening_start]" value="{{ $sl->evening_start }}"></td>
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][evening_end]"   value="{{ $sl->evening_end }}"></td>
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_start]"    value="{{ $sl->full_start }}"></td>
-                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_end]"      value="{{ $sl->full_end }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][morning_start]" value="{{ $sl->morning_start ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][morning_end]"   value="{{ $sl->morning_end ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][evening_start]" value="{{ $sl->evening_start ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][evening_end]"   value="{{ $sl->evening_end ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_start]"    value="{{ $sl->full_start ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_end]"      value="{{ $sl->full_end ?? '' }}"></td>
                             @endif
                             <td>
                                 <select class="form-select form-select-sm" name="slots[{{ $i }}][status]">
@@ -102,7 +102,6 @@
                                     @endforeach
                                 </select>
                             </td>
-                            <td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()">✕</button></td>
                         </tr>
                         @endforeach
                     @endif
@@ -117,7 +116,7 @@
     <tr>
         <td>
             <select class="form-select form-select-sm" name="slots[__I__][day_of_week]">
-                @foreach(['sunday','monday','tuesday','wednesday','thursday','friday','saturday','weekday'] as $d)
+                @foreach(['week_day','thursday','friday','saturday'] as $d)
                     <option value="{{ $d }}">{{ __('lang.'.$d) }}</option>
                 @endforeach
             </select>
