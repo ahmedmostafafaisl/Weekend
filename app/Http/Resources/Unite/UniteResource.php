@@ -34,23 +34,11 @@ class UniteResource extends JsonResource
             'features' => $this->features,
             'offers' => $this->offers,
 
-            'reservations' => $this->reservations->map(function ($reservation) {
-                return [
-                    'id' => $reservation->id,
-                    'user_id' => $reservation->user_id,
-                    'reservation_date' => optional($reservation->reservation_date)->format('Y-m-d'),
-                    'period_type' => $reservation->period_type,
-                    'from_time' => $reservation->from_time,
-                    'to_time' => $reservation->to_time,
-                    'price' => $reservation->price,
-                    'status' => $reservation->status,
-                ];
-            })->values(),
-
             'slots' => $this->formatSlotsByType(),
             'prices' => $this->formatPricesByType(),
             'packages' => $this->packages,
             'new_features' => $this->newFeatures,
+            'councils' => $this->councils,
             'services' => $this->services,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

@@ -282,8 +282,18 @@ class StoreUniteRequest extends FormRequest
             'lounge.kitchen' => ['boolean'],
             'lounge.pool' => ['boolean'],
             'lounge.council' => ['boolean'],
-            'lounge.council_number' => ['nullable', 'integer'],
-            'lounge.council_type' => ['nullable', 'string'],
+            'lounge.council_number' => ['nullable', 'integer', 'min:0'],
+            'lounge.councils' => [
+                'nullable',
+                'array',
+                function ($attribute, $value, $fail) {
+                    $number = (int) ($this->input('lounge.council_number') ?? 0);
+                    if ($number > 0 && count($value ?? []) !== $number) {
+                        $fail(__('lang.councils_count_must_match_council_number'));
+                    }
+                },
+            ],
+            'lounge.councils.*' => ['nullable', 'string'],
             'lounge.morning_start_time' => ['nullable', 'date_format:H:i'],
             'lounge.morning_end_time' => ['nullable', 'date_format:H:i'],
             'lounge.evening_start_time' => ['nullable', 'date_format:H:i'],

@@ -3,6 +3,7 @@
 namespace App\Repositories\Unite;
 
 use App\Models\Unite;
+use App\Models\UniteCouncil;
 use App\Models\UniteDetail;
 use App\Models\UniteFeature;
 use App\Models\UniteNewFeature;
@@ -31,6 +32,7 @@ class UniteRepository implements UniteRepositoryInterface
             'bookingPackages',
             'viewingTimes',
             'newFeatures',
+            'councils',
             'services',
             'department',
         ]);
@@ -481,6 +483,7 @@ class UniteRepository implements UniteRepositoryInterface
             'bookingPackages',
             'viewingTimes',
             'newFeatures',
+            'councils',
             'favorites',
             'department.user.receivedVendorRatings',
             'department.unites.images',
@@ -528,6 +531,7 @@ class UniteRepository implements UniteRepositoryInterface
                 'bookingPackages',
                 'viewingTimes',
                 'newFeatures',
+                'councils',
             ]);
             // all_men_count / all_women_count are now computed accessors on
             // UniteDetail itself (see App\Models\UniteDetail) — no manual
@@ -602,6 +606,7 @@ class UniteRepository implements UniteRepositoryInterface
                 'bookingPackages',
                 'viewingTimes',
                 'newFeatures',
+                'councils',
             ]);
             // all_men_count / all_women_count are now computed accessors on
             // UniteDetail itself (see App\Models\UniteDetail) — no manual
@@ -618,6 +623,9 @@ class UniteRepository implements UniteRepositoryInterface
         // model shared by all unite types. $type is kept as a parameter for
         // backward compatibility with existing call sites, but is unused
         // internally now.
+        $councilTypes = $detail['councils'] ?? [];
+        unset($detail['councils']);
+
         $detail['unite_id'] = $unite->id;
 
         if ($updating) {
@@ -627,6 +635,26 @@ class UniteRepository implements UniteRepositoryInterface
             );
         } else {
             UniteDetail::create($detail);
+        }
+
+        $this->storeCouncils($unite, $councilTypes);
+    }
+
+    /**
+     * One UniteCouncil row per entry in $councilTypes — each can carry its
+     * own optional type, replacing the old single flat council_type
+     * string that could only describe one shared type for however many
+     * councils council_number said existed.
+     */
+    protected function storeCouncils(Unite $unite, array $councilTypes): void
+    {
+        $unite->councils()->delete();
+
+        foreach ($councilTypes as $councilType) {
+            UniteCouncil::create([
+                'unite_id' => $unite->id,
+                'type' => $councilType ?: null,
+            ]);
         }
     }
 

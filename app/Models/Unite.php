@@ -92,6 +92,17 @@ class Unite extends Model
         return $this->hasMany(UniteOffer::class);
     }
 
+    /**
+     * Individual council (sitting area) entries — a lounge can have
+     * several, each with its own optional type. See UniteCouncil for
+     * the full explanation of why this replaced the old flat
+     * council_type string.
+     */
+    public function councils()
+    {
+        return $this->hasMany(UniteCouncil::class);
+    }
+
     public function reservations()
     {
         return $this->hasMany(UniteReservation::class);

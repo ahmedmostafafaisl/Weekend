@@ -106,19 +106,6 @@ class SingleUniteResource extends JsonResource
 
             'prices' => $this->formatPricesByType(),
 
-            'reservations' => $this->reservations->map(function ($reservation) {
-                return [
-                    'id' => $reservation->id,
-                    'user_id' => $reservation->user_id,
-                    'reservation_date' => optional($reservation->reservation_date)->format('Y-m-d'),
-                    'period_type' => $reservation->period_type,
-                    'from_time' => $reservation->from_time,
-                    'to_time' => $reservation->to_time,
-                    'price' => $reservation->price,
-                    'status' => $reservation->status,
-                ];
-            })->values(),
-
             // Not applicable to stadiums — hourly-only booking has no
             // capacity-tier concept. Key stays present (empty array) rather
             // than vanishing, so the response shape is consistent across
@@ -130,6 +117,19 @@ class SingleUniteResource extends JsonResource
                     'men_capacity' => $package->men_capacity,
                     'women_capacity' => $package->women_capacity,
                     'price' => $package->price,
+                ];
+            })->values(),
+
+            // Individual council (sitting area) entries — replaces the old
+            // single flat council_type string, which could only describe
+            // one shared type for however many councils council_number
+            // said existed. That column still exists on 'details' below
+            // for backward compatibility, but this list is the source of
+            // truth once a venue has more than one council.
+            'councils' => $this->councils->map(function ($council) {
+                return [
+                    'id' => $council->id,
+                    'type' => $council->type,
                 ];
             })->values(),
 

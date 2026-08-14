@@ -1517,4 +1517,9 @@ return [
 
     'week_day' => 'أيام الأسبوع (أحد-أربعاء)',
     'day_of_week' => 'اليوم',
+
+    'councils_count_must_match_council_number' => 'يجب أن يتطابق عدد المجالس المُرسلة مع قيمة عدد المجالس (council_number).',
+
+    'councils' => 'المجالس',
+    'councils_auto_sync_hint' => 'يتم تحديث هذه الحقول تلقائيًا لتطابق عدد المجالس أعلاه.',
 ];

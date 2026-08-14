@@ -1523,4 +1523,9 @@ return [
 
     'week_day' => 'Week day (Sun-Wed)',
     'day_of_week' => 'Day',
+
+    'councils_count_must_match_council_number' => 'The number of councils provided must match council_number.',
+
+    'councils' => 'Councils',
+    'councils_auto_sync_hint' => 'These fields update automatically to match the council count above.',
 ];

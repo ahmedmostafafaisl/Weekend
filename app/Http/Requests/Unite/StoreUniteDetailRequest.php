@@ -88,8 +88,18 @@ class StoreUniteDetailRequest extends FormRequest
             'kitchen' => ['nullable', 'boolean'],
             'pool' => ['nullable', 'boolean'],
             'council' => ['nullable', 'boolean'],
-            'council_number' => ['nullable', 'integer'],
-            'council_type' => ['nullable', 'string'],
+            'council_number' => ['nullable', 'integer', 'min:0'],
+            'councils' => [
+                'nullable',
+                'array',
+                function ($attribute, $value, $fail) {
+                    $number = (int) ($this->input('council_number') ?? 0);
+                    if ($number > 0 && count($value ?? []) !== $number) {
+                        $fail(__('lang.councils_count_must_match_council_number'));
+                    }
+                },
+            ],
+            'councils.*' => ['nullable', 'string'],
             'morning_start_time' => ['nullable', 'date_format:H:i'],
             'morning_end_time' => ['nullable', 'date_format:H:i'],
             'evening_start_time' => ['nullable', 'date_format:H:i'],

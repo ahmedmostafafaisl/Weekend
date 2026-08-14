@@ -206,8 +206,12 @@
             <div class="col-md-3"><label class="form-label">{{ __('lang.single_beds') }}</label><input class="form-control" name="lounge[single_bed]" type="number" value="{{ old('lounge.single_bed', $detail->single_bed ?? '') }}"></div>
             <div class="col-md-3"><label class="form-label">{{ __('lang.double_beds') }}</label><input class="form-control" name="lounge[big_bed]" type="number" value="{{ old('lounge.big_bed', $detail->big_bed ?? '') }}"></div>
             <div class="col-md-3"><label class="form-label">{{ __('lang.bathrooms') }}</label><input class="form-control" name="lounge[bathroom_number]" type="number" value="{{ old('lounge.bathroom_number', $detail->bathroom_number ?? '') }}"></div>
-            <div class="col-md-3"><label class="form-label">{{ __('lang.council_number') }}</label><input class="form-control" name="lounge[council_number]" type="number" value="{{ old('lounge.council_number', $detail->council_number ?? '') }}"></div>
-            <div class="col-md-3"><label class="form-label">{{ __('lang.council_type') }}</label><input class="form-control" name="lounge[council_type]" value="{{ old('lounge.council_type', $detail->council_type ?? '') }}"></div>
+            <div class="col-md-3"><label class="form-label">{{ __('lang.council_number') }}</label><input class="form-control" id="councilNumberInput" name="lounge[council_number]" type="number" min="0" value="{{ old('lounge.council_number', $detail->council_number ?? '') }}"></div>
+            <div class="col-md-9">
+                <label class="form-label">{{ __('lang.councils') }}</label>
+                <div id="councilsFields" class="d-flex flex-wrap gap-2"></div>
+                <div class="form-text">{{ __('lang.councils_auto_sync_hint') }}</div>
+            </div>
             @foreach([['bedroom',__('lang.bedroom')],['bathroom',__('lang.bathroom')],['kitchen',__('lang.kitchen')],['pool',__('lang.pool')],['council',__('lang.council')]] as [$field,$label])
             <div class="col-md-2">
                 <label class="form-label">{{ $label }}</label>
@@ -228,3 +232,39 @@
     </div>
 </div>
 @endif
+
+@push('js')
+<script>
+(function () {
+    const councilNumberInput = document.getElementById('councilNumberInput');
+    if (!councilNumberInput) {
+        return;
+    }
+
+    const container = document.getElementById('councilsFields');
+    const existing = @json(
+        old('lounge.councils', $unite?->councils->pluck('type')->values() ?? [])
+    );
+
+    function renderCouncilInputs() {
+        const count = Math.max(parseInt(councilNumberInput.value, 10) || 0, 0);
+        const current = Array.from(container.querySelectorAll('input')).map(i => i.value);
+
+        container.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-control form-control-sm';
+            input.style.width = '160px';
+            input.name = 'lounge[councils][]';
+            input.placeholder = @json(__('lang.council_type'));
+            input.value = current[i] ?? existing[i] ?? '';
+            container.appendChild(input);
+        }
+    }
+
+    councilNumberInput.addEventListener('input', renderCouncilInputs);
+    renderCouncilInputs();
+})();
+</script>
+@endpush
