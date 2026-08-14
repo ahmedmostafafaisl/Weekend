@@ -46,10 +46,10 @@ class UniteSlotController extends Controller
 
     public function store(StoreUniteSlotRequest $request, Unite $unite)
     {
-        $slot = $this->repo->createForUnite($unite, $request->validated());
+        $slots = $this->repo->createForUnite($unite, $request->validated());
 
         return $request->wantsJson()
-            ? new UniteSlotResource($slot)
+            ? UniteSlotResource::collection($slots)
             : redirect()->route('admin.unite-slots.index', $unite->id)
                 ->with('success', __('lang.slot_created_successfully_msg'));
     }
@@ -65,11 +65,11 @@ class UniteSlotController extends Controller
 
     public function update(StoreUniteSlotRequest $request, Unite $unite, int $slot)
     {
-        $slot = $this->repo->updateForUnite($unite, $slot, $request->validated());
+        $slots = $this->repo->updateForUnite($unite, $slot, $request->validated());
 
         return $request->wantsJson()
-            ? new UniteSlotResource($slot)
-            : redirect()->route('admin.unite-slots.show', [$unite->id, $slot->id])
+            ? UniteSlotResource::collection($slots)
+            : redirect()->route('admin.unite-slots.index', $unite->id)
                 ->with('success', __('lang.slot_updated_successfully_msg'));
     }
 

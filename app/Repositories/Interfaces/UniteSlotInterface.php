@@ -12,9 +12,9 @@ interface UniteSlotInterface
 
     public function findByUnite(Unite $unite, int $slotId): ?UniteSlot;
 
-    public function createForUnite(Unite $unite, array $data): UniteSlot;
+    public function createForUnite(Unite $unite, array $data): Collection;
 
-    public function updateForUnite(Unite $unite, int $slotId, array $data): UniteSlot;
+    public function updateForUnite(Unite $unite, int $slotId, array $data): Collection;
 
     public function deleteForUnite(Unite $unite, int $slotId): bool;
 

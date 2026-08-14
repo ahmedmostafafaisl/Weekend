@@ -25,8 +25,8 @@
     <div class="card-body">
         <div class="row g-3">
             <div class="col-md-6">
-                <div class="text-muted small">{{ __('lang.th_date') }}</div>
-                <div class="fw-semibold">{{ optional($slot->slot_date)->format('Y-m-d') }}</div>
+                <div class="text-muted small">{{ __('lang.day_of_week') }}</div>
+                <div class="fw-semibold">{{ $slot->day_of_week ? __('lang.'.$slot->day_of_week) : '—' }}</div>
             </div>
 
             <div class="col-md-6">

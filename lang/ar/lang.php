@@ -1440,4 +1440,81 @@ return [
     'end_date_only_for_full_day' => 'end_date يُستخدم فقط لحجوزات اليوم الكامل — يرجى إزالته أو تغيير نوع الفترة إلى full_day.',
     'no_slot_config_for_day_in_range' => 'هذه الوحدة غير متاحة يوم :day (:date) — يجب أن تكون جميع أيام الحجز المتعدد متاحة.',
     'venue_does_not_offer_period_on_date' => 'لا تقدم هذه الوحدة حجز اليوم الكامل بتاريخ :date.',
+
+    'no_reservations_found' => 'لا توجد حجوزات مطابقة للفلاتر المحددة.',
+
+    'confirmed_today' => 'مؤكد اليوم',
+    'no_upcoming_bookings' => 'لا توجد حجوزات قادمة.',
+    'loading_word' => 'جاري التحميل…',
+    'no_data_found' => 'لا توجد بيانات',
+    'done_word' => 'تم',
+    'your_statistics' => 'إحصائياتك',
+    'sales_word' => 'المبيعات',
+    'bookings_word' => 'الحجوزات',
+    'units_word' => 'الوحدات',
+    'earnings_word' => 'أرباح',
+    'best_month_earning' => 'أكبر ربح في شهر',
+    'earnings_increase_this_month' => '% زيادة أرباح لهذا الشهر',
+    'dashboard_word' => 'لوحة التحكم',
+    'provider_dashboard_title' => 'لوحة تحكم مزود الخدمة',
+
+    'th_rating' => 'التقييم',
+    'venues_report_title' => 'تقرير الوحدات',
+
+    'revenue_report_title' => 'تقرير الأرباح',
+    'revenue_by_venue' => 'الأرباح حسب الوحدة',
+
+    'by_period' => 'حسب الفترة',
+    'by_venue' => 'حسب الوحدة',
+    'reservations_report_title' => 'تقرير الحجوزات',
+
+    'net_word' => 'صافي',
+
+    'per_hour' => '/ساعة',
+    'equals_day_rate' => '= السعر النهاري',
+
+    'there_were_some_errors' => 'حدثت بعض الأخطاء:',
+    'unit_type' => 'نوع الوحدة',
+    'select_unit' => 'اختر الوحدة',
+
+    'unite_word' => 'الوحدة',
+
+    'transfer_policies_title' => 'سياسات التحويل',
+    'define_fund_transfer_rules' => 'تحديد قواعد تحويل الأموال لمزودي الخدمة',
+    'title_word' => 'العنوان',
+    'methods_word' => 'الطرق',
+    'tax_percent' => 'الضريبة %',
+    'platform_fee_percent' => 'رسوم المنصة %',
+    'no_transfer_policies_yet' => 'لا توجد سياسات تحويل حتى الآن.',
+    'transfer_requests_title' => 'طلبات التحويل',
+    'no_transfer_requests' => 'لا توجد طلبات تحويل.',
+
+    'will_send_to' => 'سيتم الإرسال إلى',
+    'users_word' => 'مستخدم(ين)',
+    'no_users_match' => 'لا يوجد مستخدمون مطابقون.',
+    'no_users_selected' => 'لم يتم اختيار مستخدمين',
+    'channels_word' => 'القنوات',
+    'has_fcm' => 'يوجد FCM',
+    'yes_word' => 'نعم',
+    'push_skipped' => 'لا — تم تجاوز الإشعار',
+
+    'ownership_owner' => 'مالك',
+    'ownership_agent' => 'موكل',
+
+    'property_word' => 'عقار',
+
+    'no_data_this_month' => 'لا توجد بيانات لهذا الشهر',
+
+    'admin_word' => 'المشرف',
+
+    'min_abbr' => 'دقيقة',
+
+    'price_already_exists_for_day' => 'يوجد سعر مُعرّف مسبقًا لهذا التصنيف اليومي — يرجى تعديل السعر الموجود بدلاً من إنشاء نسخة مكررة.',
+
+    'slot_needs_at_least_one_window' => 'يرجى تحديد فترة زمنية كاملة واحدة على الأقل — صباحية، مسائية، أو يوم كامل — قبل حفظ هذه الفترة.',
+
+    'slot_already_exists_for_week_days' => 'يوجد فترة زمنية مُعرّفة مسبقًا لهذه الأيام: :days. يرجى تعديلها أو حذفها قبل إنشاء فترة لأيام الأسبوع.',
+
+    'week_day' => 'أيام الأسبوع (أحد-أربعاء)',
+    'day_of_week' => 'اليوم',
 ];

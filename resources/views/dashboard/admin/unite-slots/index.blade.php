@@ -44,7 +44,7 @@
                 @forelse($slots as $slot)
                     <tr>
                         <td>{{ $slot->id }}</td>
-                        <td>{{ optional($slot->slot_date)->format('Y-m-d') }}</td>
+                        <td>{{ $slot->day_of_week ? __('lang.'.$slot->day_of_week) : '—' }}</td>
                         <td>
                             {{ $slot->morning_start && $slot->morning_end ? $slot->morning_start . ' - ' . $slot->morning_end : '—' }}
                         </td>

@@ -1446,4 +1446,81 @@ return [
     'end_date_only_for_full_day' => 'end_date is only used for full_day bookings — remove it or change period_type to full_day.',
     'no_slot_config_for_day_in_range' => 'This venue is not open on :day (:date) — every day in a multi-day booking must be available.',
     'venue_does_not_offer_period_on_date' => 'This venue does not offer full-day booking on :date.',
+
+    'no_reservations_found' => 'No reservations found for the selected filters.',
+
+    'confirmed_today' => 'Confirmed Today',
+    'no_upcoming_bookings' => 'No upcoming bookings.',
+    'loading_word' => 'Loading…',
+    'no_data_found' => 'No data found',
+    'done_word' => 'Done',
+    'your_statistics' => 'Your Statistics',
+    'sales_word' => 'Sales',
+    'bookings_word' => 'Bookings',
+    'units_word' => 'Units',
+    'earnings_word' => 'Earnings',
+    'best_month_earning' => 'Best earning month',
+    'earnings_increase_this_month' => '% earnings increase this month',
+    'dashboard_word' => 'Dashboard',
+    'provider_dashboard_title' => 'Provider Dashboard',
+
+    'th_rating' => 'Rating',
+    'venues_report_title' => 'Venues Report',
+
+    'revenue_report_title' => 'Revenue Report',
+    'revenue_by_venue' => 'Revenue by Venue',
+
+    'by_period' => 'By Period',
+    'by_venue' => 'By Venue',
+    'reservations_report_title' => 'Reservations Report',
+
+    'net_word' => 'net',
+
+    'per_hour' => '/hr',
+    'equals_day_rate' => '= day',
+
+    'there_were_some_errors' => 'There were some errors:',
+    'unit_type' => 'Unit Type',
+    'select_unit' => 'Select Unit',
+
+    'unite_word' => 'Unit',
+
+    'transfer_policies_title' => 'Transfer Policies',
+    'define_fund_transfer_rules' => 'Define fund transfer rules for providers',
+    'title_word' => 'Title',
+    'methods_word' => 'Methods',
+    'tax_percent' => 'Tax %',
+    'platform_fee_percent' => 'Platform Fee %',
+    'no_transfer_policies_yet' => 'No transfer policies yet.',
+    'transfer_requests_title' => 'Transfer Requests',
+    'no_transfer_requests' => 'No transfer requests.',
+
+    'will_send_to' => 'Will send to',
+    'users_word' => 'user(s)',
+    'no_users_match' => 'No users match.',
+    'no_users_selected' => 'No users selected',
+    'channels_word' => 'Channels',
+    'has_fcm' => 'Has FCM',
+    'yes_word' => 'Yes',
+    'push_skipped' => 'No — push skipped',
+
+    'ownership_owner' => 'Owner',
+    'ownership_agent' => 'Agent',
+
+    'property_word' => 'Property',
+
+    'no_data_this_month' => 'No data for this month',
+
+    'admin_word' => 'Admin',
+
+    'min_abbr' => 'min',
+
+    'price_already_exists_for_day' => 'A price is already configured for this day category — edit the existing one instead of creating a duplicate.',
+
+    'slot_needs_at_least_one_window' => 'Set at least one complete time window — morning, evening, or full day — before saving this slot.',
+
+    'slot_already_exists_for_week_days' => 'A slot already exists for the following day(s): :days. Edit or remove them before creating a week_day slot.',
+
+    'week_day' => 'Week day (Sun-Wed)',
+    'day_of_week' => 'Day',
 ];

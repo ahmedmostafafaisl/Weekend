@@ -8,6 +8,7 @@ use App\Repositories\Interfaces\UniteSlotInterface;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class UniteSlotRepository implements UniteSlotInterface
 {
@@ -21,8 +22,18 @@ class UniteSlotRepository implements UniteSlotInterface
         return $unite->slots()->where('id', $slotId)->first();
     }
 
-    public function createForUnite(Unite $unite, array $data): UniteSlot
+    /**
+     * Sunday through Wednesday — the 4 individual days that 'week_day'
+     * expands into. Matches UnitePrice's own day-category grouping exactly.
+     */
+    private const WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday'];
+
+    public function createForUnite(Unite $unite, array $data): Collection
     {
+        if ($data['day_of_week'] === 'week_day') {
+            return $this->createWeekDayGroup($unite, $data);
+        }
+
         $exists = $unite->slots()
             ->where('day_of_week', $data['day_of_week'])
             ->exists();
@@ -31,12 +42,49 @@ class UniteSlotRepository implements UniteSlotInterface
             abort(422, __('lang.slot_already_exists_weekday'));
         }
 
-        return $unite->slots()->create($data);
+        return new Collection([$unite->slots()->create($data)]);
     }
 
-    public function updateForUnite(Unite $unite, int $slotId, array $data): UniteSlot
+    /**
+     * Creates all 4 sunday-wednesday rows with the same submitted time/
+     * status values. Checked upfront against all 4 before creating any of
+     * them — a partial conflict (e.g. 'wednesday' already configured
+     * individually) aborts the whole request rather than silently
+     * creating only the 3 free days, since that would leave the group
+     * inconsistent with no indication anything was skipped.
+     */
+    private function createWeekDayGroup(Unite $unite, array $data): Collection
+    {
+        $conflicting = $unite->slots()
+            ->whereIn('day_of_week', self::WEEK_DAYS)
+            ->pluck('day_of_week');
+
+        if ($conflicting->isNotEmpty()) {
+            abort(422, str_replace(
+                ':days',
+                $conflicting->implode(', '),
+                __('lang.slot_already_exists_for_week_days')
+            ));
+        }
+
+        return DB::transaction(function () use ($unite, $data) {
+            $created = new Collection;
+
+            foreach (self::WEEK_DAYS as $day) {
+                $created->push($unite->slots()->create(array_merge($data, ['day_of_week' => $day])));
+            }
+
+            return $created;
+        });
+    }
+
+    public function updateForUnite(Unite $unite, int $slotId, array $data): Collection
     {
         $slot = $unite->slots()->where('id', $slotId)->firstOrFail();
+
+        if (isset($data['day_of_week']) && $data['day_of_week'] === 'week_day') {
+            return $this->updateWeekDayGroup($unite, $slot, $data);
+        }
 
         if (isset($data['day_of_week'])) {
             $exists = $unite->slots()
@@ -51,7 +99,41 @@ class UniteSlotRepository implements UniteSlotInterface
 
         $slot->update($data);
 
-        return $slot->fresh();
+        return new Collection([$slot->fresh()]);
+    }
+
+    /**
+     * Upserts all 4 sunday-wednesday rows with the submitted time/status
+     * values — updating whichever of the 4 already has a row for this
+     * unite, creating whichever doesn't. If the slot actually being
+     * edited isn't one of those 4 (e.g. it was 'thursday' and is being
+     * converted into the week_day group), it's deleted once the 4
+     * week_day rows are in place, since the intent of submitting
+     * 'week_day' here is to move this configuration into that group, not
+     * leave the old single day behind as a separate, orphaned row.
+     */
+    private function updateWeekDayGroup(Unite $unite, UniteSlot $slot, array $data): Collection
+    {
+        $timeAndStatusData = array_diff_key($data, ['day_of_week' => null]);
+
+        return DB::transaction(function () use ($unite, $slot, $timeAndStatusData) {
+            $result = new Collection;
+
+            foreach (self::WEEK_DAYS as $day) {
+                $result->push(
+                    $unite->slots()->updateOrCreate(
+                        ['day_of_week' => $day],
+                        $timeAndStatusData
+                    )
+                );
+            }
+
+            if (! in_array($slot->day_of_week, self::WEEK_DAYS, true)) {
+                $slot->delete();
+            }
+
+            return $result;
+        });
     }
 
     public function deleteForUnite(Unite $unite, int $slotId): bool
@@ -113,7 +195,7 @@ class UniteSlotRepository implements UniteSlotInterface
                         $reservations,
                         $slot->full_start,
                         $slot->full_end
-                    );
+                    ) && ! is_null($dailyPrices['full_day']);
 
                     $availablePeriods[] = [
                         'type' => 'full_day',
@@ -134,7 +216,7 @@ class UniteSlotRepository implements UniteSlotInterface
                             continue;
                         }
 
-                        $isAvailable = ! $this->hasConflict($reservations, $from, $to);
+                        $isAvailable = ! $this->hasConflict($reservations, $from, $to) && ! is_null($price);
 
                         if ($type === 'full_day') {
                             $fullDayAvailable = $isAvailable;
@@ -273,34 +355,59 @@ class UniteSlotRepository implements UniteSlotInterface
             ? $unite->prices
             : $unite->prices()->get();
 
-        // Try exact day match first, then fall back to week_day, then any price row
-        $price = $pricesCollection->firstWhere('day', $mappedDay)
-            ?? $pricesCollection->firstWhere('day', 'week_day')
-            ?? $pricesCollection->first();
+        // BUG FIX: this used to fall back to the 'week_day' row, or even
+        // just the first price row of any day, when the exact day
+        // category had no configured price at all — silently showing a
+        // bookable price in this preview for a day that the actual
+        // reservation-creation path (resolvePrice(), hardened earlier
+        // this session) would correctly reject with a 422. A customer
+        // could see "available, price: X" here and then be rejected when
+        // actually trying to book. Now reports the same missing-config
+        // condition this preview is supposed to reflect, rather than
+        // masking it.
+        $price = $pricesCollection->firstWhere('day', $mappedDay);
 
         if (! $price) {
             return [
-                'source' => 'default',
+                'source' => 'missing',
                 'morning' => null,
                 'evening' => null,
-                'full_day' => 0,
+                'full_day' => null,
             ];
         }
 
         if ($unite->type === 'stadium') {
+            if (is_null($price->price)) {
+                return [
+                    'source' => 'missing',
+                    'morning' => null,
+                    'evening' => null,
+                    'full_day' => null,
+                ];
+            }
+
             return [
                 'source' => 'default',
                 'morning' => null,
                 'evening' => null,
-                'full_day' => (float) ($price->price ?? 0),
+                'full_day' => (float) $price->price,
+            ];
+        }
+
+        if (is_null($price->morning_price) || is_null($price->evening_price) || is_null($price->full_price)) {
+            return [
+                'source' => 'missing',
+                'morning' => ! is_null($price->morning_price) ? (float) $price->morning_price : null,
+                'evening' => ! is_null($price->evening_price) ? (float) $price->evening_price : null,
+                'full_day' => ! is_null($price->full_price) ? (float) $price->full_price : null,
             ];
         }
 
         return [
             'source' => 'default',
-            'morning' => (float) ($price->morning_price ?? 0),
-            'evening' => (float) ($price->evening_price ?? 0),
-            'full_day' => (float) ($price->full_price ?? 0),
+            'morning' => (float) $price->morning_price,
+            'evening' => (float) $price->evening_price,
+            'full_day' => (float) $price->full_price,
         ];
     }
 }
