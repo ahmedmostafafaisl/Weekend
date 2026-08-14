@@ -205,7 +205,7 @@ class SingleUniteResource extends JsonResource
             'department' => $this->department ? [
                 'id' => $this->department->id,
                 'name' => $this->department->name,
-                'phone' => $this->department->phone,
+                'phone' => (string) $this->department->phone,
                 'facebook' => $this->department->facebook,
                 'twitter' => $this->department->twitter,
                 'instagram' => $this->department->instagram,
