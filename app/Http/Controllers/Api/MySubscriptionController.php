@@ -10,20 +10,6 @@ use Illuminate\Http\Request;
 
 class MySubscriptionController extends Controller
 {
-    /**
-     * GET /api/my-subscriptions
-     *
-     * Returns the authenticated user's subscriptions split into:
-     *   - current:  the single active subscription (or null)
-     *   - expired:  all inactive/expired subscriptions, newest first
-     *
-     * For providers: both 'ad' and 'property' type subscriptions.
-     * For customers: 'ad' type subscriptions only.
-     *
-     * Query params:
-     *   type   — filter by type: ad | property (optional)
-     *   status — filter by status: active | inactive | pending (optional)
-     */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -49,9 +35,22 @@ class MySubscriptionController extends Controller
         $all = $query->latest()->get();
 
         // Eagerly fix any subscriptions whose expiry rules are now met
-        // (end_date passed or count hit zero) — updates DB so status is always accurate
-        $all->each(fn ($s) => $s->expireIfDue());
-        $all = $all->fresh(); // re-fetch after potential status changes
+        // (end_date passed or count hit zero) — single bulk UPDATE rather
+        // than one query per subscription, then the in-memory collection
+        // is updated to match without any further DB round-trip.
+        $dueForExpiryIds = $all
+            ->filter(fn ($s) => $s->status === 'active' && $s->isExpiredByRules())
+            ->pluck('id');
+
+        if ($dueForExpiryIds->isNotEmpty()) {
+            Subscription::whereIn('id', $dueForExpiryIds)->update(['status' => 'inactive']);
+
+            $all->each(function ($s) use ($dueForExpiryIds) {
+                if ($dueForExpiryIds->contains($s->id)) {
+                    $s->status = 'inactive';
+                }
+            });
+        }
 
         // Current = the single active subscription (most recent if multiple)
         $current = $all->firstWhere('status', 'active');
@@ -79,11 +78,6 @@ class MySubscriptionController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/my-subscriptions/{id}
-     *
-     * Show a single subscription belonging to the authenticated user.
-     */
     public function show(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
@@ -92,9 +86,11 @@ class MySubscriptionController extends Controller
             ->where('user_id', $user->id)
             ->findOrFail($id);
 
-        // Fix expiry status on-the-fly if needed
+        // Fix expiry status on-the-fly if needed. expireIfDue() already
+        // updates the in-memory model via ->update() when it changes
+        // anything — a ->refresh() here would just be a redundant extra
+        // SELECT for data already correct in memory.
         $subscription->expireIfDue();
-        $subscription->refresh();
 
         return response()->json([
             'success' => true,
