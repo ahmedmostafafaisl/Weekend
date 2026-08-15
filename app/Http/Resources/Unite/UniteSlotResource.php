@@ -20,6 +20,17 @@ class UniteSlotResource extends JsonResource
             'full_start' => $this->full_start,
             'full_end' => $this->full_end,
             'status' => $this->status,
+            'day_start' => $this->day_start,
+            'day_end' => $this->day_end,
+            'buffer_minutes' => $this->buffer_minutes,
+            'periods' => $this->whenLoaded('periods', function () {
+                return $this->periods->map(fn ($p) => [
+                    'id' => $p->id,
+                    'start_time' => $p->start_time,
+                    'end_time' => $p->end_time,
+                    'status' => $p->status,
+                ])->values();
+            }, []),
             'slot_times' => $this->slot_times,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

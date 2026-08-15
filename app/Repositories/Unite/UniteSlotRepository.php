@@ -14,12 +14,12 @@ class UniteSlotRepository implements UniteSlotInterface
 {
     public function allByUnite(Unite $unite): Collection
     {
-        return $unite->slots()->latest()->get();
+        return $unite->slots()->with('periods')->latest()->get();
     }
 
     public function findByUnite(Unite $unite, int $slotId): ?UniteSlot
     {
-        return $unite->slots()->where('id', $slotId)->first();
+        return $unite->slots()->with('periods')->where('id', $slotId)->first();
     }
 
     /**
@@ -30,8 +30,11 @@ class UniteSlotRepository implements UniteSlotInterface
 
     public function createForUnite(Unite $unite, array $data): Collection
     {
+        $periods = $data['periods'] ?? null;
+        unset($data['periods']);
+
         if ($data['day_of_week'] === 'week_day') {
-            return $this->createWeekDayGroup($unite, $data);
+            return $this->createWeekDayGroup($unite, $data, $periods);
         }
 
         $exists = $unite->slots()
@@ -42,7 +45,13 @@ class UniteSlotRepository implements UniteSlotInterface
             abort(422, __('lang.slot_already_exists_weekday'));
         }
 
-        return new Collection([$unite->slots()->create($data)]);
+        $slot = $unite->slots()->create($data);
+
+        if ($periods !== null) {
+            $this->storePeriodsForSlot($slot, $periods);
+        }
+
+        return new Collection([$slot]);
     }
 
     /**
@@ -53,7 +62,7 @@ class UniteSlotRepository implements UniteSlotInterface
      * creating only the 3 free days, since that would leave the group
      * inconsistent with no indication anything was skipped.
      */
-    private function createWeekDayGroup(Unite $unite, array $data): Collection
+    private function createWeekDayGroup(Unite $unite, array $data, ?array $periods = null): Collection
     {
         $conflicting = $unite->slots()
             ->whereIn('day_of_week', self::WEEK_DAYS)
@@ -67,23 +76,61 @@ class UniteSlotRepository implements UniteSlotInterface
             ));
         }
 
-        return DB::transaction(function () use ($unite, $data) {
+        return DB::transaction(function () use ($unite, $data, $periods) {
             $created = new Collection;
 
             foreach (self::WEEK_DAYS as $day) {
-                $created->push($unite->slots()->create(array_merge($data, ['day_of_week' => $day])));
+                $slot = $unite->slots()->create(array_merge($data, ['day_of_week' => $day]));
+
+                if ($periods !== null) {
+                    $this->storePeriodsForSlot($slot, $periods);
+                }
+
+                $created->push($slot);
             }
 
             return $created;
         });
     }
 
+    /**
+     * Replaces this slot's custom availability periods entirely with the
+     * submitted list — delete-then-create, matching the same pattern
+     * already established for UniteRepository::storeCouncils(). Called
+     * unconditionally whenever 'periods' was actually present in the
+     * request (including an explicitly empty array, which correctly
+     * clears any existing periods); a request that doesn't mention
+     * 'periods' at all leaves whatever's already configured untouched.
+     */
+    private function storePeriodsForSlot(UniteSlot $slot, array $periods): void
+    {
+        $slot->periods()->delete();
+
+        foreach ($periods as $period) {
+            if (empty($period['start_time']) || empty($period['end_time'])) {
+                continue;
+            }
+
+            $slot->periods()->create([
+                'start_time' => $period['start_time'],
+                'end_time' => $period['end_time'],
+                'status' => $period['status'] ?? 'available',
+            ]);
+        }
+
+        $slot->load('periods');
+    }
+
     public function updateForUnite(Unite $unite, int $slotId, array $data): Collection
     {
         $slot = $unite->slots()->where('id', $slotId)->firstOrFail();
 
+        $hasPeriods = array_key_exists('periods', $data);
+        $periods = $data['periods'] ?? null;
+        unset($data['periods']);
+
         if (isset($data['day_of_week']) && $data['day_of_week'] === 'week_day') {
-            return $this->updateWeekDayGroup($unite, $slot, $data);
+            return $this->updateWeekDayGroup($unite, $slot, $data, $hasPeriods ? $periods : null);
         }
 
         if (isset($data['day_of_week'])) {
@@ -99,7 +146,11 @@ class UniteSlotRepository implements UniteSlotInterface
 
         $slot->update($data);
 
-        return new Collection([$slot->fresh()]);
+        if ($hasPeriods) {
+            $this->storePeriodsForSlot($slot, $periods ?? []);
+        }
+
+        return new Collection([$slot->fresh('periods')]);
     }
 
     /**
@@ -112,20 +163,26 @@ class UniteSlotRepository implements UniteSlotInterface
      * 'week_day' here is to move this configuration into that group, not
      * leave the old single day behind as a separate, orphaned row.
      */
-    private function updateWeekDayGroup(Unite $unite, UniteSlot $slot, array $data): Collection
+    private function updateWeekDayGroup(Unite $unite, UniteSlot $slot, array $data, ?array $periods = null): Collection
     {
         $timeAndStatusData = array_diff_key($data, ['day_of_week' => null]);
 
-        return DB::transaction(function () use ($unite, $slot, $timeAndStatusData) {
+        return DB::transaction(function () use ($unite, $slot, $timeAndStatusData, $periods) {
             $result = new Collection;
 
             foreach (self::WEEK_DAYS as $day) {
-                $result->push(
-                    $unite->slots()->updateOrCreate(
-                        ['day_of_week' => $day],
-                        $timeAndStatusData
-                    )
+                $daySlot = $unite->slots()->updateOrCreate(
+                    ['day_of_week' => $day],
+                    $timeAndStatusData
                 );
+
+                if ($periods !== null) {
+                    $this->storePeriodsForSlot($daySlot, $periods);
+                } else {
+                    $daySlot->load('periods');
+                }
+
+                $result->push($daySlot);
             }
 
             if (! in_array($slot->day_of_week, self::WEEK_DAYS, true)) {

@@ -1522,4 +1522,18 @@ return [
 
     'councils' => 'المجالس',
     'councils_auto_sync_hint' => 'يتم تحديث هذه الحقول تلقائيًا لتطابق عدد المجالس أعلاه.',
+
+    'outside_available_window' => 'الوقت المطلوب خارج نطاق أوقات الحجز المتاحة لهذا اليوم.',
+
+    'period_outside_operating_hours' => 'يجب أن تكون هذه الفترة ضمن ساعات العمل اليومية.',
+    'periods_overlap' => 'تتداخل هذه الفترة مع فترة أخرى مُعرّفة مسبقًا.',
+
+    'operating_day_start' => 'بداية ساعات العمل',
+    'operating_day_end' => 'نهاية ساعات العمل',
+    'daily_operating_hours' => 'ساعات العمل اليومية',
+    'custom_availability_periods' => 'فترات إتاحة مخصصة',
+    'add_period' => 'إضافة فترة',
+    'start_time' => 'البداية',
+    'end_time' => 'النهاية',
+    'handover_buffer_minutes' => 'فترة التسليم / الفاصل الزمني (دقائق)',
 ];

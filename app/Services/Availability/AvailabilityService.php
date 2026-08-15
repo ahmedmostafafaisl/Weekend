@@ -20,7 +20,7 @@ class AvailabilityService
         $end = $start->copy()->endOfMonth();
 
         // Load everything we need in 3 queries — no N+1 inside the loop
-        $slots = $unite->slots()->get()->keyBy('day_of_week');
+        $slots = $unite->slots()->with('periods')->get()->keyBy('day_of_week');
 
         $prices = $unite->prices()->get()->keyBy('day');
 
@@ -95,7 +95,7 @@ class AvailabilityService
      */
     public function rangeAvailability(Unite $unite, Carbon $start, Carbon $end): array
     {
-        $slots = $unite->slots()->get()->keyBy('day_of_week');
+        $slots = $unite->slots()->with('periods')->get()->keyBy('day_of_week');
         $prices = $unite->prices()->get()->keyBy('day');
 
         $activeOffers = $unite->offers()
@@ -209,6 +209,8 @@ class AvailabilityService
                 'display_status' => $this->mapDisplayStatus('unavailable'),
                 'reason' => $slot ? 'day_closed' : 'no_slot_config',
                 'is_past' => $isPast,
+                'working_hours' => $this->buildWorkingHours($slot),
+                'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations),
                 'periods' => [],
                 'available_packages' => $availablePackages,
             ];
@@ -231,9 +233,57 @@ class AvailabilityService
             'availability' => $availability,
             'display_status' => $this->mapDisplayStatus($availability),
             'is_past' => $isPast,
+            'working_hours' => $this->buildWorkingHours($slot),
+            'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations),
             'periods' => $periods,
             'available_packages' => $availablePackages,
         ];
+    }
+
+    /**
+     * The daily operating window (requirement 1) for this slot, or null
+     * if not configured — a venue that hasn't opted into day_start/
+     * day_end simply omits this rather than showing a misleading window.
+     */
+    private function buildWorkingHours($slot): ?array
+    {
+        if (! $slot || ! $slot->day_start || ! $slot->day_end) {
+            return null;
+        }
+
+        return [
+            'start' => $slot->day_start,
+            'end' => $slot->day_end,
+        ];
+    }
+
+    /**
+     * Custom availability periods (requirement 3) for this slot, each
+     * annotated with its own availability against THIS SPECIFIC DATE's
+     * reservations — reuses isPeriodBooked() so a custom period's
+     * 'available' flag here can never disagree with whether
+     * isWithinAvailableWindow() would actually accept a booking request
+     * for that same window, buffer included.
+     */
+    private function buildCustomPeriods($slot, ?Collection $dayReservations = null): array
+    {
+        if (! $slot) {
+            return [];
+        }
+
+        $periods = $slot->relationLoaded('periods') ? $slot->periods : $slot->periods()->get();
+        $bufferMinutes = (int) ($slot->buffer_minutes ?? 0);
+
+        return $periods->map(function ($period) use ($dayReservations, $bufferMinutes) {
+            $available = $period->status === 'available'
+                && ($dayReservations === null || ! $this->isPeriodBooked('custom', $period->start_time, $period->end_time, $dayReservations, $bufferMinutes));
+
+            return [
+                'start' => $period->start_time,
+                'end' => $period->end_time,
+                'available' => $available,
+            ];
+        })->values()->all();
     }
 
     // -------------------------------------------------------------------------
@@ -335,7 +385,7 @@ class AvailabilityService
             }
 
             $priceVal = $this->getPriceForPeriod($period, $price, $offer, $unite->type);
-            $booked = $this->isPeriodBooked($period, $start, $end, $dayReservations);
+            $booked = $this->isPeriodBooked($period, $start, $end, $dayReservations, (int) ($slot->buffer_minutes ?? 0));
 
             $periods[] = [
                 'period_type' => $period,
@@ -384,9 +434,17 @@ class AvailabilityService
         // Merge overlapping/adjacent booked ranges first (ensureNoConflict
         // should prevent genuine overlaps from ever being created, but
         // merging defensively means this still produces a clean gap list
-        // even against unexpected data).
+        // even against unexpected data). Each range is expanded by the
+        // slot's buffer first — symmetrically, matching
+        // UniteReservation::scopeConflicting() — so a computed "free" gap
+        // here can't be narrower than what reservation creation would
+        // actually reject once buffer is accounted for.
+        $bufferMinutes = (int) ($slot->buffer_minutes ?? 0);
         $booked = $dayReservations
-            ->map(fn ($r) => ['from' => $r->from_time, 'to' => $r->to_time])
+            ->map(fn ($r) => [
+                'from' => $this->subtractMinutes($r->from_time, $bufferMinutes),
+                'to' => $this->addMinutes($r->to_time, $bufferMinutes),
+            ])
             ->sortBy('from')
             ->values();
 
@@ -481,7 +539,8 @@ class AvailabilityService
         string $period,
         string $fromTime,
         string $toTime,
-        Collection $dayReservations
+        Collection $dayReservations,
+        int $bufferMinutes = 0
     ): bool {
         if ($dayReservations->isEmpty()) {
             return false;
@@ -492,10 +551,41 @@ class AvailabilityService
             return $dayReservations->isNotEmpty();
         }
 
-        // morning / evening: check time overlap
-        return $dayReservations->contains(function ($res) use ($fromTime, $toTime) {
-            return $res->from_time < $toTime && $res->to_time > $fromTime;
+        // morning / evening: check time overlap, symmetrically expanding
+        // each existing reservation's window by the buffer on both sides
+        // first — matching UniteReservation::scopeConflicting() exactly,
+        // so this preview can't show a period as available that actual
+        // reservation creation would then reject.
+        return $dayReservations->contains(function ($res) use ($fromTime, $toTime, $bufferMinutes) {
+            $effectiveFrom = $this->subtractMinutes($res->from_time, $bufferMinutes);
+            $effectiveTo = $this->addMinutes($res->to_time, $bufferMinutes);
+
+            return $effectiveFrom < $toTime && $effectiveTo > $fromTime;
         });
+    }
+
+    /**
+     * Plain string time arithmetic ("H:i" or "H:i:s" in, same format out)
+     * for the buffer expansion above — avoids a Carbon round-trip per
+     * reservation per period just to add/subtract a handful of minutes.
+     *
+     * KNOWN LIMITATION (pre-existing, not introduced by buffer): from_time/
+     * to_time are time-only columns with no date component, so a result
+     * that crosses midnight wraps around (e.g. 23:50 + 15min -> "00:05",
+     * not "next day 00:05") rather than genuinely rolling over. This
+     * mirrors an existing constraint already present throughout the
+     * reservation system — a reservation itself can't span midnight in
+     * this schema today, buffer just inherits the same limitation rather
+     * than introducing a new one.
+     */
+    private function addMinutes(string $time, int $minutes): string
+    {
+        return $minutes === 0 ? $time : Carbon::parse($time)->addMinutes($minutes)->format(strlen($time) > 5 ? 'H:i:s' : 'H:i');
+    }
+
+    private function subtractMinutes(string $time, int $minutes): string
+    {
+        return $minutes === 0 ? $time : Carbon::parse($time)->subMinutes($minutes)->format(strlen($time) > 5 ? 'H:i:s' : 'H:i');
     }
 
     /**

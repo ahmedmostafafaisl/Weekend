@@ -2,14 +2,23 @@
 
 namespace App\Http\Requests\Unite;
 
+use App\Http\Requests\Unite\Concerns\AuthorizesUniteSubResource;
 use App\Models\Unite;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreUniteOfferRequest extends FormRequest
 {
+    use AuthorizesUniteSubResource;
+
     public function authorize(): bool
     {
-        return true;
+        $permission = match (true) {
+            $this->isMethod('post') => 'unites.create',
+            $this->isMethod('put'), $this->isMethod('patch') => 'unites.update',
+            default => 'unites.view',
+        };
+
+        return $this->userMayAccessUniteSubResource($this->user(), $this->route('unite'), $permission);
     }
 
     public function rules(): array
@@ -37,17 +46,6 @@ class StoreUniteOfferRequest extends FormRequest
         return $rules;
     }
 
-    /**
-     * The live route (/unites/{unite}/offers, Admin\Unite\UniteOfferController)
-     * binds Unite via the URL itself — {unite} is resolved by Laravel's
-     * route-model binding before this FormRequest ever runs, so
-     * $this->route('unite') already returns the actual Unite instance, not
-     * just a raw ID. This is the primary path. The type/unite_id form-field
-     * checks below exist only because this same request class is also
-     * referenced by a second, unreachable controller (no live route points
-     * to it) that submits the unite that way instead — kept as a fallback
-     * for correctness rather than assuming that code stays dead forever.
-     */
     private function resolveUniteType(): ?string
     {
         $routeUnite = $this->route('unite');

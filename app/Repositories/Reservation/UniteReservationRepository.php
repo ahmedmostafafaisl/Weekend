@@ -63,7 +63,7 @@ class UniteReservationRepository implements UniteReservationInterface
     {
         $unite = Unite::with(['prices', 'offers', 'slots'])->findOrFail($data['unite_id']);
 
-        [$fromTime, $toTime, $endDate] = $this->resolveTimes($unite, $data);
+        [$fromTime, $toTime, $endDate, $bufferMinutes] = $this->resolveTimes($unite, $data);
         // Hourly bookings: calculate price from from_time/to_time + hourly rates
         if ($data['period_type'] === 'hourly') {
             $fullPrice = $this->resolveHourlyPrice($unite, $fromTime, $toTime, $data['reservation_date']);
@@ -120,7 +120,7 @@ class UniteReservationRepository implements UniteReservationInterface
         $serviceFee = \App\Models\ServiceFee::feeFor('reservation');
         $chargeAmount += $serviceFee;
 
-        $this->ensureNoConflict($unite->id, $data['reservation_date'], $fromTime, $toTime, null, $endDate);
+        $this->ensureNoConflict($unite->id, $data['reservation_date'], $fromTime, $toTime, null, $endDate, $bufferMinutes);
 
         // ── Provider approval mode ────────────────────────────────────────────────
         // If the venue requires approval, create the reservation in pending_approval
@@ -275,7 +275,7 @@ class UniteReservationRepository implements UniteReservationInterface
             'unite_id' => $reservation->unite_id,
         ], $data);
 
-        [$fromTime, $toTime, $endDate] = $this->resolveTimes($reservation->unite, $payload);
+        [$fromTime, $toTime, $endDate, $bufferMinutes] = $this->resolveTimes($reservation->unite, $payload);
         // BUG FIX: this never branched for period_type at all — hourly
         // reservations would have gone through resolvePrice(), which
         // explicitly returns 0 for hourly (see its own comment further
@@ -302,7 +302,8 @@ class UniteReservationRepository implements UniteReservationInterface
             $fromTime,
             $toTime,
             $reservation->id,
-            $endDate
+            $endDate,
+            $bufferMinutes
         );
 
         $reservation->update([
@@ -683,12 +684,6 @@ class UniteReservationRepository implements UniteReservationInterface
             ? $unite->slots->firstWhere('day_of_week', $dayOfWeek)
             : $unite->slots()->where('day_of_week', $dayOfWeek)->first();
 
-        // Try 'weekday' slot as fallback if exact day is missing
-        if (! $slot && $unite->relationLoaded('slots')) {
-            $slot = $unite->slots->firstWhere('day_of_week', 'weekday')
-                ?? $unite->slots->first();
-        }
-
         if (! $slot) {
             abort(422, str_replace(':day', $dayOfWeek, __('lang.no_slot_config_for_day')));
         }
@@ -714,6 +709,10 @@ class UniteReservationRepository implements UniteReservationInterface
             abort(422, str_replace(':period', $data['period_type'], __('lang.venue_does_not_offer_period')));
         }
 
+        if (! $slot->isWithinAvailableWindow($from, $to)) {
+            abort(422, __('lang.outside_available_window'));
+        }
+
         // Hourly: enforce minimum booking duration
         if ($data['period_type'] === 'hourly') {
             $priceRow = $unite->relationLoaded('prices')
@@ -729,7 +728,7 @@ class UniteReservationRepository implements UniteReservationInterface
             }
         }
 
-        return [$from, $to, null];
+        return [$from, $to, null, (int) ($slot->buffer_minutes ?? 0)];
     }
 
     /**
@@ -759,11 +758,6 @@ class UniteReservationRepository implements UniteReservationInterface
                 ? $unite->slots->firstWhere('day_of_week', $dayOfWeek)
                 : $unite->slots()->where('day_of_week', $dayOfWeek)->first();
 
-            if (! $slot && $unite->relationLoaded('slots')) {
-                $slot = $unite->slots->firstWhere('day_of_week', 'weekday')
-                    ?? $unite->slots->first();
-            }
-
             if (! $slot || $slot->status !== 'available') {
                 abort(422, str_replace(
                     [':day', ':date'],
@@ -782,7 +776,7 @@ class UniteReservationRepository implements UniteReservationInterface
             }
         }
 
-        return [$firstFrom, $firstTo, $endDate->toDateString()];
+        return [$firstFrom, $firstTo, $endDate->toDateString(), 0];
     }
 
     /**
@@ -830,12 +824,12 @@ class UniteReservationRepository implements UniteReservationInterface
                 ->addDays(max(1, $package->duration_days ?? 1) - 1)
                 ->format('Y-m-d');
 
-            return [null, null, $endDate];
+            return [null, null, $endDate, 0];
         }
 
         // 'hours' mode — unchanged from before: a single day, specific
         // time window, no end_date.
-        return [(string) $package->start_time, (string) $package->end_time, null];
+        return [(string) $package->start_time, (string) $package->end_time, null, 0];
     }
 
     /**
@@ -1008,9 +1002,10 @@ class UniteReservationRepository implements UniteReservationInterface
         ?string $fromTime = null,
         ?string $toTime = null,
         ?int $ignoreId = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        int $bufferMinutes = 0
     ): void {
-        if (UniteReservation::conflicting($uniteId, $startDate, $endDate, $fromTime, $toTime, $ignoreId)->exists()) {
+        if (UniteReservation::conflicting($uniteId, $startDate, $endDate, $fromTime, $toTime, $ignoreId, $bufferMinutes)->exists()) {
             abort(422, __('lang.time_slot_conflict'));
         }
     }
@@ -1041,9 +1036,7 @@ class UniteReservationRepository implements UniteReservationInterface
             ? $unite->prices
             : $unite->prices()->get();
 
-        $priceRow = $prices->firstWhere('day', $mappedDay)
-            ?? $prices->firstWhere('day', 'week_day')
-            ?? $prices->first();
+        $priceRow = $prices->firstWhere('day', $mappedDay);
 
         if (! $priceRow) {
             abort(422, __('lang.no_pricing_configured_for_day'));

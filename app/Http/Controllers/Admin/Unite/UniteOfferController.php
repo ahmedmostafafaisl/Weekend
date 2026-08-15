@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Unite;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Unite\Concerns\AuthorizesUniteSubResource;
 use App\Http\Requests\Unite\StoreUniteOfferRequest;
 use App\Http\Resources\Unite\UniteOfferResource;
 use App\Models\Unite;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class UniteOfferController extends Controller
 {
+    use AuthorizesUniteSubResource;
+
     public function __construct(
         protected UniteOfferInterface $repo
     ) {}
@@ -75,6 +78,11 @@ class UniteOfferController extends Controller
 
     public function destroy(Request $request, Unite $unite, int $offer)
     {
+        abort_unless(
+            $this->userMayAccessUniteSubResource($request->user(), $unite, 'unites.delete'),
+            403
+        );
+
         $this->repo->deleteForUnite($unite, $offer);
 
         return $request->wantsJson()

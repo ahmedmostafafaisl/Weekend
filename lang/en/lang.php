@@ -1528,4 +1528,18 @@ return [
 
     'councils' => 'Councils',
     'councils_auto_sync_hint' => 'These fields update automatically to match the council count above.',
+
+    'outside_available_window' => 'The requested time is outside this venue\'s available booking window for this day.',
+
+    'period_outside_operating_hours' => 'This period must fall within the daily operating hours.',
+    'periods_overlap' => 'This period overlaps with another configured period.',
+
+    'operating_day_start' => 'Operating Hours Start',
+    'operating_day_end' => 'Operating Hours End',
+    'daily_operating_hours' => 'Daily Operating Hours',
+    'custom_availability_periods' => 'Custom Availability Periods',
+    'add_period' => 'Add Period',
+    'start_time' => 'Start',
+    'end_time' => 'End',
+    'handover_buffer_minutes' => 'Handover / Buffer (minutes)',
 ];

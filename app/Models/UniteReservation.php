@@ -83,8 +83,19 @@ class UniteReservation extends Model
      * when BOTH the range being checked and the existing reservation are
      * genuinely single-day on the exact same date; a multi-day range on
      * either side occupies whole days regardless of specific hours.
+     *
+     * $bufferMinutes: handover/buffer time (requirement 4) — expands
+     * each EXISTING reservation's occupied window symmetrically by this
+     * many minutes on both sides before checking overlap against the new
+     * request's own unmodified [fromTime, toTime]. Symmetric because the
+     * venue genuinely needs the same handover time whether the new
+     * request lands right before or right after an existing booking —
+     * not just the "starts right after" case the requirement's own
+     * example happens to illustrate. Defaults to 0 (no-op: ADDTIME/
+     * SUBTIME by zero minutes changes nothing), so any existing caller
+     * that doesn't pass it behaves exactly as before.
      */
-    public function scopeConflicting($query, int $uniteId, string $startDate, ?string $endDate = null, ?string $fromTime = null, ?string $toTime = null, ?int $ignoreId = null)
+    public function scopeConflicting($query, int $uniteId, string $startDate, ?string $endDate = null, ?string $fromTime = null, ?string $toTime = null, ?int $ignoreId = null, int $bufferMinutes = 0)
     {
         $endDate = $endDate ?? $startDate;
         $isMultiDayRequest = $endDate !== $startDate;
@@ -99,12 +110,12 @@ class UniteReservation extends Model
             });
 
         if (! $isMultiDayRequest && $fromTime && $toTime) {
-            $query->where(function ($q) use ($fromTime, $toTime) {
+            $query->where(function ($q) use ($fromTime, $toTime, $bufferMinutes) {
                 $q->whereNotNull('end_date')
-                    ->orWhere(function ($q2) use ($fromTime, $toTime) {
+                    ->orWhere(function ($q2) use ($fromTime, $toTime, $bufferMinutes) {
                         $q2->whereNull('end_date')
-                            ->where('from_time', '<', $toTime)
-                            ->where('to_time', '>', $fromTime);
+                            ->whereRaw('SUBTIME(from_time, SEC_TO_TIME(? * 60)) < ?', [$bufferMinutes, $toTime])
+                            ->whereRaw('ADDTIME(to_time, SEC_TO_TIME(? * 60)) > ?', [$bufferMinutes, $fromTime]);
                     });
             });
         }

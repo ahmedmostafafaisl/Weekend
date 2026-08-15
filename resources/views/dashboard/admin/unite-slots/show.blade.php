@@ -63,7 +63,47 @@
                 <div class="text-muted small">{{ __('lang.full_end') }}</div>
                 <div class="fw-semibold">{{ $slot->full_end ?? '—' }}</div>
             </div>
+
+            <div class="col-12"><hr class="my-2"></div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">{{ __('lang.operating_day_start') }}</div>
+                <div class="fw-semibold">{{ $slot->day_start ?? '—' }}</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">{{ __('lang.operating_day_end') }}</div>
+                <div class="fw-semibold">{{ $slot->day_end ?? '—' }}</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">{{ __('lang.handover_buffer_minutes') }}</div>
+                <div class="fw-semibold">{{ $slot->buffer_minutes ?? 0 }}</div>
+            </div>
         </div>
+
+        @if($slot->periods->isNotEmpty())
+            <hr class="my-3">
+            <div class="fw-semibold small text-muted mb-2">{{ __('lang.custom_availability_periods') }}</div>
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>{{ __('lang.start_time') }}</th>
+                        <th>{{ __('lang.end_time') }}</th>
+                        <th>{{ __('lang.th_status') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($slot->periods as $period)
+                        <tr>
+                            <td>{{ $period->start_time }}</td>
+                            <td>{{ $period->end_time }}</td>
+                            <td>{{ __('lang.'.$period->status) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
     </div>
 </div>
 @endsection

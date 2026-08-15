@@ -2,23 +2,40 @@
 
 namespace App\Http\Requests\Unite;
 
+use App\Http\Requests\Unite\Concerns\AuthorizesUniteSubResource;
 use App\Models\Unite;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreUnitePriceRequest extends FormRequest
 {
+    use AuthorizesUniteSubResource;
+
     public function authorize(): bool
     {
-        return true;
+        $permission = match (true) {
+            $this->isMethod('post') => 'unites.create',
+            $this->isMethod('put'), $this->isMethod('patch') => 'unites.update',
+            default => 'unites.view',
+        };
+
+        return $this->userMayAccessUniteSubResource($this->user(), $this->route('unite'), $permission);
     }
 
     public function rules(): array
     {
         /** @var Unite|null $unite */
         $unite = $this->route('unite');
+        $currentPriceId = $this->route('price');
 
         $rules = [
-            'day' => ['required', 'in:thursday,friday,saturday,week_day'],
+            'day' => [
+                'required',
+                'in:thursday,friday,saturday,week_day',
+                Rule::unique('unite_prices', 'day')
+                    ->where('unite_id', $unite?->id)
+                    ->ignore($currentPriceId, 'id'),
+            ],
         ];
 
         if ($unite && $unite->type === 'stadium') {
@@ -45,6 +62,7 @@ class StoreUnitePriceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'day.unique' => __('lang.price_already_exists_for_day'),
             'day_hour_price.required_if' => __('lang.day_hour_price_required_if_hourly'),
             'day_end.after' => __('lang.day_end_after_start'),
         ];

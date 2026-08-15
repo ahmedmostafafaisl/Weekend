@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Unite;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Unite\Concerns\AuthorizesUniteSubResource;
 use App\Http\Requests\Unite\StoreUnitePriceRequest;
 use App\Http\Resources\Unite\UnitePriceResource;
 use App\Models\Unite;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class UnitePriceController extends Controller
 {
+    use AuthorizesUniteSubResource;
+
     public function __construct(
         protected UnitePriceInterface $repo
     ) {}
@@ -75,6 +78,11 @@ class UnitePriceController extends Controller
 
     public function destroy(Request $request, Unite $unite, int $price)
     {
+        abort_unless(
+            $this->userMayAccessUniteSubResource($request->user(), $unite, 'unites.delete'),
+            403
+        );
+
         $this->repo->deleteForUnite($unite, $price);
 
         return $request->wantsJson()
