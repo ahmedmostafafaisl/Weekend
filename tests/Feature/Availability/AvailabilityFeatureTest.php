@@ -227,13 +227,20 @@ class AvailabilityFeatureTest extends TestCase
 
         $sunday = Carbon::now()->next(Carbon::SUNDAY)->toDateString();
 
-        $this->repo()->create([
+        $existing = $this->repo()->create([
             'unite_id' => $unite->id,
             'period_type' => 'hourly',
             'reservation_date' => $sunday,
             'from_time' => '16:00',
             'to_time' => '17:00',
         ], $provider->id);
+
+        // scopeConflicting() only treats 'pending'/'confirmed' reservations as
+        // blocking -- this fixture's requires_approval=true means create()
+        // returns a 'pending_approval' reservation by default, which
+        // wouldn't participate in conflict detection at all. Confirming it
+        // isolates the buffer logic itself, which is what this test verifies.
+        $existing['reservation']->update(['status' => 'confirmed']);
 
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
 
@@ -287,13 +294,15 @@ class AvailabilityFeatureTest extends TestCase
 
         $sunday = Carbon::now()->next(Carbon::SUNDAY)->toDateString();
 
-        $this->repo()->create([
+        $existing = $this->repo()->create([
             'unite_id' => $unite->id,
             'period_type' => 'hourly',
             'reservation_date' => $sunday,
             'from_time' => '16:00',
             'to_time' => '17:00',
         ], $provider->id);
+
+        $existing['reservation']->update(['status' => 'confirmed']);
 
         $conflictsWithBuffer = UniteReservation::conflicting($unite->id, $sunday, null, '17:00', '18:00', null, 15)->exists();
         $conflictsWithoutBuffer = UniteReservation::conflicting($unite->id, $sunday, null, '17:00', '18:00', null, 0)->exists();
@@ -370,7 +379,7 @@ class AvailabilityFeatureTest extends TestCase
         $result = $this->service()->rangeAvailability($unite, $sunday, $sunday->copy());
 
         $morningPeriod = collect($result['dates'][0]['periods'])->firstWhere('period_type', 'morning');
-        $this->assertSame('unavailable', $morningPeriod['availability']);
+        $this->assertSame('booked', $morningPeriod['availability']);
     }
 
     // -------------------------------------------------------------------
@@ -425,7 +434,7 @@ class AvailabilityFeatureTest extends TestCase
         // Attempt to reschedule outside operating hours -- should still be rejected
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
 
-        $this->repo()->update($reservation, [
+        $this->repo()->update($reservation->id, [
             'reservation_date' => $sunday,
             'period_type' => 'hourly',
             'from_time' => '23:30',

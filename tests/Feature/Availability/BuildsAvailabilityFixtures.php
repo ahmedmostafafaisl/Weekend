@@ -94,6 +94,12 @@ trait BuildsAvailabilityFixtures
             'morning_price' => 100,
             'evening_price' => 150,
             'full_price' => 300,
+            'hourly_enabled' => true,
+            'day_hour_price' => 100,
+            'night_hour_price' => 150,
+            'day_start' => '06:00',
+            'day_end' => '18:00',
+            'min_booking_minutes' => 1,
         ], $overrides));
     }
 }
