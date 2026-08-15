@@ -10,6 +10,7 @@ use App\Models\UniteNewFeature;
 use App\Models\UniteOffer;
 use App\Models\UnitePackage;
 use App\Models\UniteReservation;
+use App\Models\UniteSlot;
 use App\Repositories\Interfaces\UniteRepositoryInterface;
 use App\Services\Availability\AvailabilityService;
 use Illuminate\Support\Collection;
@@ -770,6 +771,10 @@ class UniteRepository implements UniteRepositoryInterface
                 $payload['full_end'] = $slot['full_end'] ?? null;
             }
 
+            $payload['day_start'] = $slot['day_start'] ?? null;
+            $payload['day_end'] = $slot['day_end'] ?? null;
+            $payload['buffer_minutes'] = $slot['buffer_minutes'] ?? 0;
+
             // 'week_day' is a request-layer shorthand only — the day_of_week
             // column itself is a strict enum of the 7 real day names and
             // has no 'week_day' value at all, so this must expand into 4
@@ -778,15 +783,46 @@ class UniteRepository implements UniteRepositoryInterface
                 ? self::SLOT_WEEK_DAYS
                 : [$payload['day_of_week']];
 
+            $periods = $slot['periods'] ?? null;
+
             foreach ($daysToWrite as $day) {
-                $unite->slots()->updateOrCreate(
+                $daySlot = $unite->slots()->updateOrCreate(
                     [
                         'unite_id' => $unite->id,
                         'day_of_week' => $day,
                     ],
                     array_merge($payload, ['day_of_week' => $day])
                 );
+
+                if ($periods !== null) {
+                    $this->storePeriodsForSlot($daySlot, $periods);
+                }
             }
+        }
+    }
+
+    /**
+     * Replaces a slot's custom availability periods entirely with the
+     * submitted list — delete-then-create, matching the identical pattern
+     * already established in UniteSlotRepository::storePeriodsForSlot()
+     * for the standalone /unites/{id}/slots endpoint. Kept as its own
+     * copy here rather than injecting UniteSlotRepository as a dependency
+     * into this repository purely for one shared method.
+     */
+    protected function storePeriodsForSlot(UniteSlot $slot, array $periods): void
+    {
+        $slot->periods()->delete();
+
+        foreach ($periods as $period) {
+            if (empty($period['start_time']) || empty($period['end_time'])) {
+                continue;
+            }
+
+            $slot->periods()->create([
+                'start_time' => $period['start_time'],
+                'end_time' => $period['end_time'],
+                'status' => $period['status'] ?? 'available',
+            ]);
         }
     }
 

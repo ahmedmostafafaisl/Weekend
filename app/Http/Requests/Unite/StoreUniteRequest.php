@@ -85,8 +85,21 @@ class StoreUniteRequest extends FormRequest
 
         // slots by weekday
         $rules['slots'] = 'nullable|array|min:1';
-        $rules['slots.*.day_of_week'] = 'required|in:sunday,monday,tuesday,wednesday,thursday,friday,saturday';
+        $rules['slots.*.day_of_week'] = 'required|in:week_day,thursday,friday,saturday';
         $rules['slots.*.status'] = 'nullable|in:available,booked,unavailable';
+
+        // Availability feature fields — validated here too so they aren't
+        // silently stripped by validated() when submitted as part of the
+        // same nested unite-creation payload, matching what
+        // StoreUniteSlotRequest already validates on the standalone
+        // /unites/{id}/slots endpoint.
+        $rules['slots.*.day_start'] = 'nullable|date_format:H:i';
+        $rules['slots.*.day_end'] = 'nullable|date_format:H:i|after:slots.*.day_start';
+        $rules['slots.*.buffer_minutes'] = 'nullable|integer|min:0';
+        $rules['slots.*.periods'] = 'nullable|array';
+        $rules['slots.*.periods.*.start_time'] = 'required_with:slots.*.periods|date_format:H:i';
+        $rules['slots.*.periods.*.end_time'] = 'required_with:slots.*.periods|date_format:H:i|after:slots.*.periods.*.start_time';
+        $rules['slots.*.periods.*.status'] = 'nullable|in:available,unavailable';
 
         $type = $this->input('type');
 
