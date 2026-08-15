@@ -1,159 +1,168 @@
 @if($errors->any())
-    <div class="alert alert-danger">
-        <ul class="mb-0">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
+<div class="alert alert-danger">
+    <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+</div>
 @endif
 
-<div class="row g-3">
+{{-- ── Standard pricing ─────────────────────────────────────────────────── --}}
+<div class="row g-3 mb-4">
     <div class="col-md-6">
-        @php
-            $currentDayCategory = old('day_of_week', in_array($slot->day_of_week ?? null, ['sunday', 'monday', 'tuesday', 'wednesday'], true)
-                ? 'week_day'
-                : ($slot->day_of_week ?? ''));
-        @endphp
-        <label class="form-label">{{ __('lang.day_of_week') }}</label>
-        <select name="day_of_week" class="form-select">
-            @foreach(['week_day'=>__('lang.week_day'),'thursday'=>__('lang.thursday'),'friday'=>__('lang.friday'),'saturday'=>__('lang.saturday')] as $day=>$dayLabel)
-                <option value="{{ $day }}" {{ $currentDayCategory === $day ? 'selected' : '' }}>
-                    {{ $dayLabel }}
-                </option>
+        <label class="form-label fw-semibold">{{ __('lang.day_type') }} <span class="text-danger">*</span></label>
+        <select name="day" class="form-select">
+            @foreach(['thursday' => __('lang.thursday'), 'friday' => __('lang.friday'), 'saturday' => __('lang.saturday'), 'week_day' => __('lang.week_day')] as $val => $label)
+                <option value="{{ $val }}" {{ old('day', $price->day ?? '') === $val ? 'selected' : '' }}>{{ $label }}</option>
             @endforeach
         </select>
-    </div>
-
-    <div class="col-md-6">
-        <label class="form-label">{{ __('lang.status') }}</label>
-        <select name="status" class="form-select">
-            @foreach(['available'=>__('lang.available'),'booked'=>__('lang.booked'),'unavailable'=>__('lang.unavailable')] as $status=>$statusLabel)
-                <option value="{{ $status }}" {{ old('status', $slot->status ?? 'available') === $status ? 'selected' : '' }}>
-                    {{ $statusLabel }}
-                </option>
-            @endforeach
-        </select>
-    </div>
-
-    <div class="col-12"><hr class="my-2"></div>
-    <div class="col-12 fw-semibold small text-muted">{{ __('lang.daily_operating_hours') }}</div>
-
-    <div class="col-md-6">
-        <label class="form-label">{{ __('lang.operating_day_start') }}</label>
-        <input type="time" name="day_start" class="form-control" value="{{ old('day_start', $slot->day_start ?? '') }}">
-    </div>
-
-    <div class="col-md-6">
-        <label class="form-label">{{ __('lang.operating_day_end') }}</label>
-        <input type="time" name="day_end" class="form-control" value="{{ old('day_end', $slot->day_end ?? '') }}">
     </div>
 
     @if($unite->type === 'stadium')
         <div class="col-md-6">
-            <label class="form-label">{{ __('lang.full_start') }}</label>
-            <input type="time" name="full_start" class="form-control" value="{{ old('full_start', $slot->full_start ?? '') }}">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.full_end') }}</label>
-            <input type="time" name="full_end" class="form-control" value="{{ old('full_end', $slot->full_end ?? '') }}">
+            <label class="form-label fw-semibold">{{ __('lang.full_day_price') }} (SAR)</label>
+            <input type="number" step="0.01" min="0" name="price" class="form-control"
+                   value="{{ old('price', $price->price ?? '') }}">
         </div>
     @else
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.morning_start') }}</label>
-            <input type="time" name="morning_start" class="form-control" value="{{ old('morning_start', $slot->morning_start ?? '') }}">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">{{ __('lang.morning_price') }} (SAR)</label>
+            <input type="number" step="0.01" min="0" name="morning_price" class="form-control"
+                   value="{{ old('morning_price', $price->morning_price ?? '') }}">
         </div>
-
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.morning_end') }}</label>
-            <input type="time" name="morning_end" class="form-control" value="{{ old('morning_end', $slot->morning_end ?? '') }}">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">{{ __('lang.evening_price') }} (SAR)</label>
+            <input type="number" step="0.01" min="0" name="evening_price" class="form-control"
+                   value="{{ old('evening_price', $price->evening_price ?? '') }}">
         </div>
-
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.evening_start') }}</label>
-            <input type="time" name="evening_start" class="form-control" value="{{ old('evening_start', $slot->evening_start ?? '') }}">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.evening_end') }}</label>
-            <input type="time" name="evening_end" class="form-control" value="{{ old('evening_end', $slot->evening_end ?? '') }}">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.full_start') }}</label>
-            <input type="time" name="full_start" class="form-control" value="{{ old('full_start', $slot->full_start ?? '') }}">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">{{ __('lang.full_end') }}</label>
-            <input type="time" name="full_end" class="form-control" value="{{ old('full_end', $slot->full_end ?? '') }}">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">{{ __('lang.full_day_price') }} (SAR)</label>
+            <input type="number" step="0.01" min="0" name="full_price" class="form-control"
+                   value="{{ old('full_price', $price->full_price ?? '') }}">
         </div>
     @endif
+</div>
 
-    <div class="col-12"><hr class="my-2"></div>
-    <div class="col-12 d-flex justify-content-between align-items-center">
-        <div class="fw-semibold small text-muted">{{ __('lang.custom_availability_periods') }}</div>
-        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addPeriodRow()">+ {{ __('lang.add_period') }}</button>
-    </div>
+{{-- ── Hourly booking toggle ────────────────────────────────────────────────── --}}
+<div class="card border-0 shadow-sm rounded-3 mb-0" style="background:#f8f7ff">
+    <div class="card-body">
+        <div class="form-check form-switch mb-3" style="font-size:15px">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="hourly_enabled" value="1" id="hourlySwitch"
+                   onchange="toggleHourly(this.checked)"
+                   {{ old('hourly_enabled', $price->hourly_enabled ?? false) ? 'checked' : '' }}>
+            <label class="form-check-label fw-semibold" for="hourlySwitch">
+                ⏱ {{ __('lang.hourly_booking') }}
+            </label>
+            <div class="text-muted small mt-1">
+                {{ __('lang.hourly_booking_help') }}
+            </div>
+        </div>
 
-    <div class="col-12">
-        <table class="table table-sm align-middle mb-0">
-            <thead>
-                <tr>
-                    <th style="width:35%">{{ __('lang.start_time') }}</th>
-                    <th style="width:35%">{{ __('lang.end_time') }}</th>
-                    <th>{{ __('lang.th_status') }}</th>
-                    <th class="text-end">{{ __('lang.th_actions') }}</th>
-                </tr>
-            </thead>
-            <tbody id="periods-body">
-                @foreach(old('periods', $slot?->periods ?? []) as $i => $period)
-                    @php($period = is_array($period) ? $period : ['start_time' => $period->start_time, 'end_time' => $period->end_time, 'status' => $period->status])
-                    <tr>
-                        <td><input type="time" name="periods[{{ $i }}][start_time]" class="form-control form-control-sm" value="{{ $period['start_time'] }}"></td>
-                        <td><input type="time" name="periods[{{ $i }}][end_time]" class="form-control form-control-sm" value="{{ $period['end_time'] }}"></td>
-                        <td>
-                            <select name="periods[{{ $i }}][status]" class="form-select form-select-sm">
-                                <option value="available" {{ ($period['status'] ?? 'available') === 'available' ? 'selected' : '' }}>{{ __('lang.available') }}</option>
-                                <option value="unavailable" {{ ($period['status'] ?? '') === 'unavailable' ? 'selected' : '' }}>{{ __('lang.unavailable') }}</option>
-                            </select>
-                        </td>
-                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()">{{ __('lang.delete') }}</button></td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
+        <div id="hourlyFields" style="{{ old('hourly_enabled', $price->hourly_enabled ?? false) ? '' : 'display:none' }}">
 
-    <template id="period-tpl">
-        <tr>
-            <td><input type="time" name="periods[__I__][start_time]" class="form-control form-control-sm"></td>
-            <td><input type="time" name="periods[__I__][end_time]" class="form-control form-control-sm"></td>
-            <td>
-                <select name="periods[__I__][status]" class="form-select form-select-sm">
-                    <option value="available" selected>{{ __('lang.available') }}</option>
-                    <option value="unavailable">{{ __('lang.unavailable') }}</option>
-                </select>
-            </td>
-            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()">{{ __('lang.delete') }}</button></td>
-        </tr>
-    </template>
+            {{-- Day / Night rates --}}
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">
+                        ☀️ {{ __('lang.day_rate') }} (SAR{{ __('lang.per_hour') }})
+                        <span class="text-danger">*</span>
+                        <span class="text-muted small">— {{ __('lang.day_rate_window_help') }}</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" min="0" name="day_hour_price"
+                               id="dayHourPrice" class="form-control"
+                               value="{{ old('day_hour_price', $price->day_hour_price ?? '') }}"
+                               placeholder="e.g. 150.00"
+                               oninput="updatePreview()">
+                        <span class="input-group-text">SAR{{ __('lang.per_hour') }}</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">
+                        🌙 {{ __('lang.night_rate') }} (SAR{{ __('lang.per_hour') }})
+                        <span class="text-muted small">— {{ __('lang.night_rate_help') }}</span>
+                    </label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" min="0" name="night_hour_price"
+                               id="nightHourPrice" class="form-control"
+                               value="{{ old('night_hour_price', $price->night_hour_price ?? '') }}"
+                               placeholder="e.g. 200.00"
+                               oninput="updatePreview()">
+                        <span class="input-group-text">SAR{{ __('lang.per_hour') }}</span>
+                    </div>
+                </div>
+            </div>
 
-    <div class="col-12"><hr class="my-2"></div>
+            {{-- Day / Night boundary times --}}
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">☀️ {{ __('lang.day_start') }}</label>
+                    <input type="time" name="day_start" class="form-control"
+                           id="dayStart"
+                           value="{{ old('day_start', $price->day_start ?? '06:00') }}"
+                           oninput="updatePreview()">
+                    <div class="text-muted small mt-1">{{ __('lang.day_start_help') }}</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">🌙 {{ __('lang.day_end') }}</label>
+                    <input type="time" name="day_end" class="form-control"
+                           id="dayEnd"
+                           value="{{ old('day_end', $price->day_end ?? '18:00') }}"
+                           oninput="updatePreview()">
+                    <div class="text-muted small mt-1">{{ __('lang.day_end_help') }}</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">⏱ {{ __('lang.min_booking') }}</label>
+                    <div class="input-group">
+                        <input type="number" min="15" max="1440" step="15"
+                               name="min_booking_minutes" class="form-control"
+                               value="{{ old('min_booking_minutes', $price->min_booking_minutes ?? 60) }}">
+                        <span class="input-group-text">{{ __('lang.min_abbr') }}</span>
+                    </div>
+                    <div class="text-muted small mt-1">{{ __('lang.min_booking_help') }}</div>
+                </div>
+            </div>
 
-    <div class="col-md-6">
-        <label class="form-label">{{ __('lang.handover_buffer_minutes') }}</label>
-        <input type="number" min="0" step="1" name="buffer_minutes" class="form-control" value="{{ old('buffer_minutes', $slot->buffer_minutes ?? 0) }}">
+            {{-- Live price preview --}}
+            <div id="hourlyPreview" class="alert alert-light border py-2 px-3 small mb-0" style="display:none">
+                <strong>{{ __('lang.preview') }}:</strong> <span id="previewText"></span>
+            </div>
+
+        </div>{{-- /hourlyFields --}}
     </div>
 </div>
 
 <script>
-let periodRowCounter = {{ count(old('periods', $slot?->periods ?? [])) }};
-
-function addPeriodRow() {
-    const i = periodRowCounter++;
-    const tpl = document.getElementById('period-tpl').innerHTML.replaceAll('__I__', i);
-    document.getElementById('periods-body').insertAdjacentHTML('beforeend', tpl);
+const PER_HOUR_SUFFIX_TEXT = @json(' SAR' . __('lang.per_hour'));
+function toggleHourly(on) {
+    document.getElementById('hourlyFields').style.display = on ? '' : 'none';
+    if (on) updatePreview();
 }
+
+function updatePreview() {
+    const dayRate   = parseFloat(document.getElementById('dayHourPrice').value)   || 0;
+    const nightRate = parseFloat(document.getElementById('nightHourPrice').value) || dayRate;
+    const dayStart  = document.getElementById('dayStart').value  || '06:00';
+    const dayEnd    = document.getElementById('dayEnd').value    || '18:00';
+
+    if (dayRate <= 0) {
+        document.getElementById('hourlyPreview').style.display = 'none';
+        return;
+    }
+
+    // Example: 3h during day + 1h during night
+    const exampleDayCost   = (3 * dayRate).toFixed(2);
+    const exampleNightCost = (1 * nightRate).toFixed(2);
+    const exampleTotal     = (parseFloat(exampleDayCost) + parseFloat(exampleNightCost)).toFixed(2);
+
+    document.getElementById('previewText').innerHTML =
+        `Daytime (${dayStart}–${dayEnd}): <strong>${dayRate.toFixed(2)}${PER_HOUR_SUFFIX_TEXT}</strong> &nbsp;|&nbsp; `
+      + `Nighttime: <strong>${nightRate.toFixed(2)}${PER_HOUR_SUFFIX_TEXT}</strong> &nbsp;|&nbsp; `
+      + `Example: 3h day + 1h night = <strong>${exampleTotal} SAR</strong>`;
+    document.getElementById('hourlyPreview').style.display = '';
+}
+
+// Init on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const enabled = {{ old('hourly_enabled', ($price->hourly_enabled ?? false) ? 'true' : 'false') }};
+    if (enabled) { toggleHourly(true); updatePreview(); }
+});
 </script>
