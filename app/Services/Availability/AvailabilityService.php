@@ -213,6 +213,7 @@ class AvailabilityService
                 'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations),
                 'periods' => [],
                 'available_packages' => $availablePackages,
+                'min_booking_minutes' => $this->buildMinBookingMinutes($unite, $price),
             ];
         }
 
@@ -237,7 +238,31 @@ class AvailabilityService
             'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations),
             'periods' => $periods,
             'available_packages' => $availablePackages,
+            'min_booking_minutes' => $this->buildMinBookingMinutes($unite, $price),
         ];
+    }
+
+    /**
+     * Booking-block size for stadiums — day_hour_price/night_hour_price
+     * are priced per block of this many minutes, and booking duration
+     * must be an exact multiple of it (see UnitePrice::
+     * calculateHourlyPrice() and UniteReservationRepository's duration
+     * validation). Scoped to stadium only, per request — other venue
+     * types return null here even if they happen to have hourly_enabled
+     * set, since this field's meaning (the pricing/booking unit for an
+     * hourly-only venue) doesn't carry the same weight for a type where
+     * hourly is an optional add-on rather than the entire booking model.
+     * Also null whenever there's no price row for this date, or hourly
+     * pricing isn't actually enabled on it — the field would be
+     * meaningless without a configured hourly rate to attach it to.
+     */
+    private function buildMinBookingMinutes(Unite $unite, $price): ?int
+    {
+        if ($unite->type !== 'stadium' || ! $price || ! $price->hourly_enabled) {
+            return null;
+        }
+
+        return (int) ($price->min_booking_minutes ?? 60);
     }
 
     /**

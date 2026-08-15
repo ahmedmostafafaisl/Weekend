@@ -28,6 +28,8 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('unite_id');
             $table->string('type')->nullable();
+            $table->unsignedInteger('number')->default(1);
+
             $table->timestamps();
 
             $table->foreign('unite_id')->references('id')->on('unites')->onDelete('cascade');

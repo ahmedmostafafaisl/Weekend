@@ -722,8 +722,8 @@ class UniteReservationRepository implements UniteReservationInterface
             if ($priceRow && $priceRow->hourly_enabled) {
                 $minMinutes = $priceRow->min_booking_minutes ?? 60;
                 $duration = Carbon::parse($from)->diffInMinutes(Carbon::parse($to));
-                if ($duration < $minMinutes) {
-                    abort(422, str_replace([':min', ':requested'], [$minMinutes, $duration], __('lang.min_booking_duration')));
+                if ($duration < $minMinutes || $duration % $minMinutes !== 0) {
+                    abort(422, str_replace([':min', ':requested'], [$minMinutes, $duration], __('lang.min_booking_duration_multiple')));
                 }
             }
         }

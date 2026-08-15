@@ -26,7 +26,10 @@
                                  so no start/end columns are shown at all
                                  (full_start/full_end are still sent as hidden
                                  00:00/23:59 inputs below, satisfying validation
-                                 without asking anyone to type them in). --}}
+                                 without asking anyone to type them in). Custom
+                                 periods are still configurable per row via the
+                                 toggle button in this extra column. --}}
+                            <th></th>
                         @elseif(($uniteType ?? ($unite->type ?? '')) === 'hall')
                             <th>{{ __('lang.full_start') }}</th><th>{{ __('lang.full_end') }}</th>
                         @else
@@ -73,7 +76,50 @@
                                         @endforeach
                                     </select>
                                 </td>
+                                @if($type === 'stadium')
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="togglePeriods({{ $i }})">
+                                            {{ __('lang.custom_availability_periods') }} (<span id="periods-count-{{ $i }}">{{ $sl?->periods->count() ?? 0 }}</span>)
+                                        </button>
+                                    </td>
+                                @endif
                             </tr>
+                            @if($type === 'stadium')
+                                <tr id="periods-row-{{ $i }}" style="display:none">
+                                    <td colspan="3" class="bg-light">
+                                        <input type="hidden" name="slots[{{ $i }}][periods_present]" value="1">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="small fw-semibold text-muted">{{ __('lang.custom_availability_periods') }} — {{ __('lang.'.$d) }}</div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addPeriodRow({{ $i }})">+ {{ __('lang.add_period') }}</button>
+                                        </div>
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width:35%">{{ __('lang.start_time') }}</th>
+                                                    <th style="width:35%">{{ __('lang.end_time') }}</th>
+                                                    <th>{{ __('lang.th_status') }}</th>
+                                                    <th class="text-end">{{ __('lang.th_actions') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="periods-body-{{ $i }}">
+                                                @foreach($sl?->periods ?? [] as $j => $period)
+                                                    <tr>
+                                                        <td><input type="time" name="slots[{{ $i }}][periods][{{ $j }}][start_time]" class="form-control form-control-sm" value="{{ $period->start_time }}"></td>
+                                                        <td><input type="time" name="slots[{{ $i }}][periods][{{ $j }}][end_time]" class="form-control form-control-sm" value="{{ $period->end_time }}"></td>
+                                                        <td>
+                                                            <select name="slots[{{ $i }}][periods][{{ $j }}][status]" class="form-select form-select-sm">
+                                                                <option value="available" {{ $period->status === 'available' ? 'selected' : '' }}>{{ __('lang.available') }}</option>
+                                                                <option value="unavailable" {{ $period->status === 'unavailable' ? 'selected' : '' }}>{{ __('lang.unavailable') }}</option>
+                                                            </select>
+                                                        </td>
+                                                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removePeriodRow(this, {{ $i }})">{{ __('lang.delete') }}</button></td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     @elseif($unite)
                         @foreach(['week_day','thursday','friday','saturday'] as $i => $d)
@@ -142,3 +188,44 @@
         <td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()">✕</button></td>
     </tr>
 </template>
+
+<script>
+let periodRowCounters = {};
+
+function togglePeriods(slotIndex) {
+    const row = document.getElementById('periods-row-' + slotIndex);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function addPeriodRow(slotIndex) {
+    periodRowCounters[slotIndex] = (periodRowCounters[slotIndex] ?? document.querySelectorAll(`#periods-body-${slotIndex} tr`).length);
+    const j = periodRowCounters[slotIndex]++;
+
+    const row = `<tr>
+        <td><input type="time" name="slots[${slotIndex}][periods][${j}][start_time]" class="form-control form-control-sm"></td>
+        <td><input type="time" name="slots[${slotIndex}][periods][${j}][end_time]" class="form-control form-control-sm"></td>
+        <td>
+            <select name="slots[${slotIndex}][periods][${j}][status]" class="form-select form-select-sm">
+                <option value="available" selected>{{ __('lang.available') }}</option>
+                <option value="unavailable">{{ __('lang.unavailable') }}</option>
+            </select>
+        </td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removePeriodRow(this, ${slotIndex})">{{ __('lang.delete') }}</button></td>
+    </tr>`;
+
+    document.getElementById('periods-body-' + slotIndex).insertAdjacentHTML('beforeend', row);
+    updatePeriodsCount(slotIndex);
+}
+
+function removePeriodRow(button, slotIndex) {
+    button.closest('tr').remove();
+    updatePeriodsCount(slotIndex);
+}
+
+function updatePeriodsCount(slotIndex) {
+    const countEl = document.getElementById('periods-count-' + slotIndex);
+    if (countEl) {
+        countEl.textContent = document.querySelectorAll(`#periods-body-${slotIndex} tr`).length;
+    }
+}
+</script>

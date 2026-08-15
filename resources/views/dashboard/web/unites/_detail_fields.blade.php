@@ -206,11 +206,14 @@
             <div class="col-md-3"><label class="form-label">{{ __('lang.single_beds') }}</label><input class="form-control" name="lounge[single_bed]" type="number" value="{{ old('lounge.single_bed', $detail->single_bed ?? '') }}"></div>
             <div class="col-md-3"><label class="form-label">{{ __('lang.double_beds') }}</label><input class="form-control" name="lounge[big_bed]" type="number" value="{{ old('lounge.big_bed', $detail->big_bed ?? '') }}"></div>
             <div class="col-md-3"><label class="form-label">{{ __('lang.bathrooms') }}</label><input class="form-control" name="lounge[bathroom_number]" type="number" value="{{ old('lounge.bathroom_number', $detail->bathroom_number ?? '') }}"></div>
-            <div class="col-md-3"><label class="form-label">{{ __('lang.council_number') }}</label><input class="form-control" id="councilNumberInput" name="lounge[council_number]" type="number" min="0" value="{{ old('lounge.council_number', $detail->council_number ?? '') }}"></div>
+            <div class="col-md-3"><label class="form-label">{{ __('lang.council_number') }}</label><input class="form-control" id="councilNumberInput" name="lounge[council_number]" type="number" min="0" readonly value="{{ old('lounge.council_number', $unite?->councils->sum('number') ?? 0) }}"></div>
             <div class="col-md-9">
-                <label class="form-label">{{ __('lang.councils') }}</label>
-                <div id="councilsFields" class="d-flex flex-wrap gap-2"></div>
-                <div class="form-text">{{ __('lang.councils_auto_sync_hint') }}</div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <label class="form-label mb-0">{{ __('lang.councils') }}</label>
+                    <button type="button" id="addCouncilRow" class="btn btn-sm btn-outline-primary">+ {{ __('lang.add_council_type') }}</button>
+                </div>
+                <div id="councilsFields" class="d-flex flex-column gap-2 mt-1"></div>
+                <div class="form-text">{{ __('lang.councils_number_auto_hint') }}</div>
             </div>
             @foreach([['bedroom',__('lang.bedroom')],['bathroom',__('lang.bathroom')],['kitchen',__('lang.kitchen')],['pool',__('lang.pool')],['council',__('lang.council')]] as [$field,$label])
             <div class="col-md-2">
@@ -237,34 +240,59 @@
 <script>
 (function () {
     const councilNumberInput = document.getElementById('councilNumberInput');
-    if (!councilNumberInput) {
+    const addBtn = document.getElementById('addCouncilRow');
+    if (!councilNumberInput || !addBtn) {
         return;
     }
 
     const container = document.getElementById('councilsFields');
     const existing = @json(
-        old('lounge.councils', $unite?->councils->pluck('type')->values() ?? [])
+        old('lounge.councils', $unite?->councils->map(fn ($c) => ['type' => $c->type, 'number' => $c->number])->values() ?? [])
     );
 
-    function renderCouncilInputs() {
-        const count = Math.max(parseInt(councilNumberInput.value, 10) || 0, 0);
-        const current = Array.from(container.querySelectorAll('input')).map(i => i.value);
-
-        container.innerHTML = '';
-        for (let i = 0; i < count; i++) {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'form-control form-control-sm';
-            input.style.width = '160px';
-            input.name = 'lounge[councils][]';
-            input.placeholder = @json(__('lang.council_type'));
-            input.value = current[i] ?? existing[i] ?? '';
-            container.appendChild(input);
-        }
+    function recalculateTotal() {
+        let total = 0;
+        container.querySelectorAll('.council-number-input').forEach(input => {
+            total += parseInt(input.value, 10) || 0;
+        });
+        councilNumberInput.value = total;
     }
 
-    councilNumberInput.addEventListener('input', renderCouncilInputs);
-    renderCouncilInputs();
+    function renumberRows() {
+        container.querySelectorAll('.council-row').forEach((row, index) => {
+            row.querySelector('.council-type-input').name = `lounge[councils][${index}][type]`;
+            row.querySelector('.council-number-input').name = `lounge[councils][${index}][number]`;
+        });
+    }
+
+    function addCouncilRow(type = '', number = '') {
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 align-items-center council-row';
+        row.innerHTML = `
+            <input type="text" class="form-control form-control-sm council-type-input" style="max-width:220px" placeholder="${@json(__('lang.council_type'))}">
+            <input type="number" min="1" class="form-control form-control-sm council-number-input" style="max-width:100px" placeholder="${@json(__('lang.number'))}">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 remove-council-row">${@json(__('lang.delete'))}</button>
+        `;
+        row.querySelector('.council-type-input').value = type;
+        row.querySelector('.council-number-input').value = number;
+        row.querySelector('.council-number-input').addEventListener('input', recalculateTotal);
+        row.querySelector('.remove-council-row').addEventListener('click', function () {
+            row.remove();
+            renumberRows();
+            recalculateTotal();
+        });
+        container.appendChild(row);
+        renumberRows();
+    }
+
+    addBtn.addEventListener('click', () => addCouncilRow());
+
+    if (existing.length > 0) {
+        existing.forEach(c => addCouncilRow(c.type ?? '', c.number ?? 1));
+    } else {
+        addCouncilRow();
+    }
+    recalculateTotal();
 })();
 </script>
 @endpush

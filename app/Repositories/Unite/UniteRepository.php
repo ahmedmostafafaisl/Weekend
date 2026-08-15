@@ -478,7 +478,7 @@ class UniteRepository implements UniteRepositoryInterface
             'features',
             'offers',
 
-            'slots',
+            'slots.periods',
             'prices',
             'packages',
             'bookingPackages',
@@ -624,7 +624,7 @@ class UniteRepository implements UniteRepositoryInterface
         // model shared by all unite types. $type is kept as a parameter for
         // backward compatibility with existing call sites, but is unused
         // internally now.
-        $councilTypes = $detail['councils'] ?? [];
+        $councils = $detail['councils'] ?? [];
         unset($detail['councils']);
 
         $detail['unite_id'] = $unite->id;
@@ -638,23 +638,36 @@ class UniteRepository implements UniteRepositoryInterface
             UniteDetail::create($detail);
         }
 
-        $this->storeCouncils($unite, $councilTypes);
+        $this->storeCouncils($unite, $councils);
     }
 
     /**
-     * One UniteCouncil row per entry in $councilTypes — each can carry its
-     * own optional type, replacing the old single flat council_type
-     * string that could only describe one shared type for however many
-     * councils council_number said existed.
+     * One UniteCouncil row per distinct type in $councils, each carrying
+     * a number (count) alongside its optional type — replacing the old
+     * one-row-per-individual-council shape (which itself replaced an even
+     * older single flat council_type string that could only describe one
+     * shared type for however many councils council_number said existed).
      */
-    protected function storeCouncils(Unite $unite, array $councilTypes): void
+    protected function storeCouncils(Unite $unite, array $councils): void
     {
         $unite->councils()->delete();
 
-        foreach ($councilTypes as $councilType) {
+        foreach ($councils as $council) {
+            // Defensively accept a plain string too (e.g. an older client
+            // still submitting the pre-change flat format) rather than
+            // hard-failing on it — treated as one council of that type.
+            if (is_string($council)) {
+                $council = ['type' => $council, 'number' => 1];
+            }
+
+            if (empty($council['number'])) {
+                continue;
+            }
+
             UniteCouncil::create([
                 'unite_id' => $unite->id,
-                'type' => $councilType ?: null,
+                'type' => $council['type'] ?: null,
+                'number' => (int) $council['number'],
             ]);
         }
     }
@@ -783,7 +796,8 @@ class UniteRepository implements UniteRepositoryInterface
                 ? self::SLOT_WEEK_DAYS
                 : [$payload['day_of_week']];
 
-            $periods = $slot['periods'] ?? null;
+            $periodsPresent = filter_var($slot['periods_present'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $periods = $slot['periods'] ?? ($periodsPresent ? [] : null);
 
             foreach ($daysToWrite as $day) {
                 $daySlot = $unite->slots()->updateOrCreate(

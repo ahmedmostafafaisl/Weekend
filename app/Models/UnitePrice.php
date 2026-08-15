@@ -67,11 +67,16 @@ class UnitePrice extends Model
     /**
      * Calculate the total price for an hourly booking between two times.
      *
-     * Splits the period at the day/night boundary and charges each minute
-     * at the appropriate per-minute rate. Returns a rounded total (SAR).
+     * day_hour_price / night_hour_price are the price PER BLOCK, where a
+     * block is min_booking_minutes long (defaulting to 60 — a plain,
+     * unconfigured venue therefore behaves exactly like the old per-hour
+     * model, since a 60-minute block priced per block is identical to
+     * being priced per hour). Each block is charged in full at whichever
+     * rate applies to the block's START time — a block isn't split or
+     * prorated even if it happens to straddle the day/night boundary.
      *
-     * Example: 15:00 – 21:00 with day_end=18:00
-     *   3 h × day_rate  +  3 h × night_rate
+     * Example: 15:00 – 18:00 with day_end=18:00, min_booking_minutes=60
+     *   3 blocks, all starting before 18:00 -> 3 × day_rate
      *
      * @param  string  $fromTime  H:i  (e.g. "14:00")
      * @param  string  $toTime  H:i  (e.g. "20:30")
@@ -97,35 +102,41 @@ class UnitePrice extends Model
         $dayEnd = Carbon::createFromFormat('H:i', substr($this->day_end ?? '18:00', 0, 5));
         $dayRate = (float) $this->day_hour_price;
         $nightRate = (float) ($this->night_hour_price ?? $this->day_hour_price);
+        $blockMinutes = max(1, (int) ($this->min_booking_minutes ?? 60));
 
         if ($to->lte($from)) {
             return 0.0; // invalid range — controller has already validated this
         }
 
         $totalMinutes = $from->diffInMinutes($to);
-        $dayCost = 0.0;
-        $nightCost = 0.0;
-
-        // Walk minute by minute through the range
-        // (efficient for ranges up to 24h which is the practical max)
-        $cursor = $from->copy();
-        while ($cursor->lt($to)) {
-            $isDay = $cursor->gte($dayStart) && $cursor->lt($dayEnd);
-            if ($isDay) {
-                $dayCost += $dayRate / 60;
-            } else {
-                $nightCost += $nightRate / 60;
-            }
-            $cursor->addMinute();
+        $blockCount = intdiv($totalMinutes, $blockMinutes);
+        if ($totalMinutes % $blockMinutes !== 0) {
+            // Should never happen — resolveTimes() rejects non-multiple
+            // durations before this is ever called — but if it somehow is,
+            // round up rather than silently dropping the partial block's
+            // charge entirely.
+            $blockCount++;
         }
 
-        return round($dayCost + $nightCost, 2);
+        $total = 0.0;
+        $cursor = $from->copy();
+        for ($i = 0; $i < $blockCount; $i++) {
+            $isDay = $cursor->gte($dayStart) && $cursor->lt($dayEnd);
+            $total += $isDay ? $dayRate : $nightRate;
+            $cursor->addMinutes($blockMinutes);
+        }
+
+        return round($total, 2);
     }
 
     /**
-     * Human-readable breakdown of an hourly booking for receipts / confirmations.
+     * Human-readable breakdown of an hourly booking for receipts /
+     * confirmations. Block-based, matching calculateHourlyPrice() exactly
+     * — has no callers anywhere in the codebase currently (confirmed
+     * before changing its return shape), so this rebuild is not a
+     * breaking change for anything actually using it today.
      *
-     * @return array{day_minutes: int, night_minutes: int, day_cost: float, night_cost: float, total: float}
+     * @return array{block_minutes: int, day_blocks: int, night_blocks: int, day_cost: float, night_cost: float, total: float}
      */
     public function hourlyBreakdown(string $fromTime, string $toTime): array
     {
@@ -137,20 +148,28 @@ class UnitePrice extends Model
         $dayEnd = Carbon::createFromFormat('H:i', substr($this->day_end ?? '18:00', 0, 5));
         $dayRate = (float) $this->day_hour_price;
         $nightRate = (float) ($this->night_hour_price ?? $this->day_hour_price);
+        $blockMinutes = max(1, (int) ($this->min_booking_minutes ?? 60));
 
-        $dayMin = $nightMin = 0;
-        $cursor = $from->copy();
-        while ($cursor->lt($to)) {
-            $cursor->gte($dayStart) && $cursor->lt($dayEnd) ? $dayMin++ : $nightMin++;
-            $cursor->addMinute();
+        $totalMinutes = $from->diffInMinutes($to);
+        $blockCount = intdiv($totalMinutes, $blockMinutes);
+        if ($totalMinutes % $blockMinutes !== 0) {
+            $blockCount++;
         }
 
-        $dayCost = round($dayMin * $dayRate / 60, 2);
-        $nightCost = round($nightMin * $nightRate / 60, 2);
+        $dayBlocks = $nightBlocks = 0;
+        $cursor = $from->copy();
+        for ($i = 0; $i < $blockCount; $i++) {
+            $cursor->gte($dayStart) && $cursor->lt($dayEnd) ? $dayBlocks++ : $nightBlocks++;
+            $cursor->addMinutes($blockMinutes);
+        }
+
+        $dayCost = round($dayBlocks * $dayRate, 2);
+        $nightCost = round($nightBlocks * $nightRate, 2);
 
         return [
-            'day_minutes' => $dayMin,
-            'night_minutes' => $nightMin,
+            'block_minutes' => $blockMinutes,
+            'day_blocks' => $dayBlocks,
+            'night_blocks' => $nightBlocks,
             'day_cost' => $dayCost,
             'night_cost' => $nightCost,
             'total' => round($dayCost + $nightCost, 2),

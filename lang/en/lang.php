@@ -254,7 +254,7 @@ return [
     'hourly_booking' => 'Hourly Booking',
     'day_rate' => 'Morning Rate/hr',
     'night_rate' => 'Evening Rate/hr',
-    'min_booking' => 'Min Booking (min)',
+    'min_booking' => 'Booking Block Size (min)',
     'time_slots' => 'Time Slots',
     'pricing' => 'Pricing',
     'packages' => 'Packages',
@@ -590,7 +590,7 @@ return [
     'day_start_help' => 'Start of daytime rate',
     'day_end' => 'Nighttime Starts',
     'day_end_help' => 'End of daytime rate',
-    'min_booking_help' => 'e.g. 60 = 1 hour minimum',
+    'min_booking_help' => 'Also the pricing unit — Rate/hr above is charged per block of this size. Bookings must be an exact multiple (e.g. 45 = customer books 45, 90, 135... min, never 50 or 100).',
     'preview' => 'Preview',
 
     'updated_at' => 'Updated At',
@@ -1542,4 +1542,10 @@ return [
     'start_time' => 'Start',
     'end_time' => 'End',
     'handover_buffer_minutes' => 'Handover / Buffer (minutes)',
+
+    'min_booking_duration_multiple' => 'Booking duration must be a multiple of :min minutes (:requested min requested).',
+
+    'number' => 'Number',
+    'add_council_type' => 'Add Council Type',
+    'councils_number_auto_hint' => 'The total above is calculated automatically from the council types and counts below.',
 ];

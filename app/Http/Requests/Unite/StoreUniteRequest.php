@@ -97,6 +97,7 @@ class StoreUniteRequest extends FormRequest
         $rules['slots.*.day_end'] = 'nullable|date_format:H:i|after:slots.*.day_start';
         $rules['slots.*.buffer_minutes'] = 'nullable|integer|min:0';
         $rules['slots.*.periods'] = 'nullable|array';
+        $rules['slots.*.periods_present'] = 'nullable|boolean';
         $rules['slots.*.periods.*.start_time'] = 'required_with:slots.*.periods|date_format:H:i';
         $rules['slots.*.periods.*.end_time'] = 'required_with:slots.*.periods|date_format:H:i|after:slots.*.periods.*.start_time';
         $rules['slots.*.periods.*.status'] = 'nullable|in:available,unavailable';
@@ -301,12 +302,14 @@ class StoreUniteRequest extends FormRequest
                 'array',
                 function ($attribute, $value, $fail) {
                     $number = (int) ($this->input('lounge.council_number') ?? 0);
-                    if ($number > 0 && count($value ?? []) !== $number) {
+                    $sum = collect($value ?? [])->sum(fn ($c) => (int) ($c['number'] ?? 0));
+                    if ($number > 0 && $sum !== $number) {
                         $fail(__('lang.councils_count_must_match_council_number'));
                     }
                 },
             ],
-            'lounge.councils.*' => ['nullable', 'string'],
+            'lounge.councils.*.type' => ['nullable', 'string'],
+            'lounge.councils.*.number' => ['required', 'integer', 'min:1'],
             'lounge.morning_start_time' => ['nullable', 'date_format:H:i'],
             'lounge.morning_end_time' => ['nullable', 'date_format:H:i'],
             'lounge.evening_start_time' => ['nullable', 'date_format:H:i'],

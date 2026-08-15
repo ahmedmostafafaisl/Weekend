@@ -130,6 +130,7 @@ class SingleUniteResource extends JsonResource
                 return [
                     'id' => $council->id,
                     'type' => $council->type,
+                    'number' => $council->number,
                 ];
             })->values(),
 
