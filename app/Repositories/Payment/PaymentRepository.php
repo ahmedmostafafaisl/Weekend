@@ -4,11 +4,14 @@ namespace App\Repositories\Payment;
 
 use App\Models\Payment;
 use App\Repositories\Interfaces\PaymentRepositoryInterface;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class PaymentRepository implements PaymentRepositoryInterface
 {
+    use HasVersionedCache;
+
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $q = Payment::query()->with(['user', 'items', 'reservation', 'subscription'])->latest();
@@ -220,6 +223,8 @@ class PaymentRepository implements PaymentRepositoryInterface
             }
 
             $subscription->update($subscriptionData);
+
+            $this->bumpCacheVersion("my_subscriptions:{$subscription->user_id}");
 
             try {
                 $subscription->user?->notify(

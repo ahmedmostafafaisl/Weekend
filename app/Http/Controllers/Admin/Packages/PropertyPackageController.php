@@ -7,10 +7,14 @@ use App\Http\Requests\Packages\StorePropertyPackageRequest;
 use App\Http\Resources\Packages\PackageResource;
 use App\Http\Resources\Packages\PropertyPackageResource;
 use App\Repositories\Interfaces\PropertyPackageInterface;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class PropertyPackageController extends Controller
 {
+    use HasVersionedCache;
+
     protected PropertyPackageInterface $repo;
 
     public function __construct(PropertyPackageInterface $repo)
@@ -37,11 +41,17 @@ class PropertyPackageController extends Controller
     {
         $search = $request->get('search');
 
-        $propertyPackages = $this->repo->all();
-
         if ($request->wantsJson()) {
-            return PropertyPackageResource::collection($propertyPackages);
+            $cacheKey = $this->versionedCacheKey('property_packages_index');
+
+            $payload = Cache::remember($cacheKey, now()->addHours(24), function () {
+                return PropertyPackageResource::collection($this->repo->all())->resolve();
+            });
+
+            return response()->json(['data' => $payload]);
         }
+
+        $propertyPackages = $this->repo->all();
 
         $propertyPackages = collect($propertyPackages)
             ->filter(function ($package) use ($search) {
@@ -90,6 +100,9 @@ class PropertyPackageController extends Controller
 
         $package = $this->repo->create($data);
 
+        $this->bumpCacheVersion('property_packages_index');
+        $this->bumpCacheVersion('property_packages_all');
+
         return $request->wantsJson()
             ? new PropertyPackageResource($package)
             : back()->with('success', __('lang.package_created_successfully_msg'));
@@ -108,6 +121,9 @@ class PropertyPackageController extends Controller
 
         $propertyPackage = $this->repo->update($id, $data);
 
+        $this->bumpCacheVersion('property_packages_index');
+        $this->bumpCacheVersion('property_packages_all');
+
         return $request->wantsJson()
             ? new PropertyPackageResource($propertyPackage)
             : back()->with('success', __('lang.package_updated_successfully_msg'));
@@ -116,6 +132,9 @@ class PropertyPackageController extends Controller
     public function destroy(Request $request, $id)
     {
         $this->repo->delete($id);
+
+        $this->bumpCacheVersion('property_packages_index');
+        $this->bumpCacheVersion('property_packages_all');
 
         return $request->wantsJson()
             ? response()->json(['message' => __('lang.deleted_successfully')])
@@ -133,13 +152,17 @@ class PropertyPackageController extends Controller
 
     public function getAllPackages(Request $request)
     {
-        $packages = $this->repo->getAllPackages();
-
         if ($request->wantsJson()) {
-            return response()->json([
-                'data' => new PackageResource($packages),
-            ], 200);
+            $cacheKey = $this->versionedCacheKey('property_packages_all');
+
+            $payload = Cache::remember($cacheKey, now()->addHours(24), function () {
+                return (new PackageResource($this->repo->getAllPackages()))->resolve();
+            });
+
+            return response()->json(['data' => $payload], 200);
         }
+
+        $packages = $this->repo->getAllPackages();
 
         return view('dashboard.admin.property-packages.index', [
             'packages' => $packages,

@@ -6,10 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Packages\StoreAdPackageRequest;
 use App\Http\Resources\Packages\AdPackageResource;
 use App\Repositories\Interfaces\AdPackageInterface;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class AdPackageController extends Controller
 {
+    use HasVersionedCache;
+
     public function __construct(private AdPackageInterface $repository)
     {
         // ad_packages.view intentionally NOT gated behind the permission
@@ -30,11 +34,17 @@ class AdPackageController extends Controller
     {
         $search = $request->get('search');
 
-        $adPackages = $this->repository->all();
-
         if ($request->wantsJson()) {
-            return AdPackageResource::collection($adPackages);
+            $cacheKey = $this->versionedCacheKey('ad_packages_index');
+
+            $payload = Cache::remember($cacheKey, now()->addHours(24), function () {
+                return AdPackageResource::collection($this->repository->all())->resolve();
+            });
+
+            return response()->json(['data' => $payload]);
         }
+
+        $adPackages = $this->repository->all();
 
         $adPackages = collect($adPackages)
             ->filter(function ($package) use ($search) {
@@ -81,6 +91,9 @@ class AdPackageController extends Controller
     {
         $adPackage = $this->repository->create($request->validated());
 
+        $this->bumpCacheVersion('ad_packages_index');
+        $this->bumpCacheVersion('property_packages_all');
+
         return $request->wantsJson()
             ? new AdPackageResource($adPackage)
             : back()->with('success', __('lang.package_created_successfully_msg'));
@@ -106,6 +119,9 @@ class AdPackageController extends Controller
     {
         $adPackage = $this->repository->update($id, $request->validated());
 
+        $this->bumpCacheVersion('ad_packages_index');
+        $this->bumpCacheVersion('property_packages_all');
+
         return $request->wantsJson()
             ? new AdPackageResource($adPackage)
             : back()->with('success', __('lang.package_updated_successfully_msg'));
@@ -114,6 +130,9 @@ class AdPackageController extends Controller
     public function destroy($id, Request $request)
     {
         $this->repository->delete($id);
+
+        $this->bumpCacheVersion('ad_packages_index');
+        $this->bumpCacheVersion('property_packages_all');
 
         return $request->wantsJson()
             ? response()->json(['message' => __('lang.deleted_successfully')])

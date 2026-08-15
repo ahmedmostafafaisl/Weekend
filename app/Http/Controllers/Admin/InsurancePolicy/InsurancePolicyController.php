@@ -7,10 +7,14 @@ use App\Http\Requests\InsurancePolicy\StoreInsurancePolicyRequest;
 use App\Http\Requests\InsurancePolicy\UpdateInsurancePolicyRequest;
 use App\Http\Resources\InsurancePolicy\InsurancePolicyResource;
 use App\Repositories\Interfaces\InsurancePolicyRepositoryInterface;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class InsurancePolicyController extends Controller
 {
+    use HasVersionedCache;
+
     protected $repo;
 
     public function __construct(InsurancePolicyRepositoryInterface $repo)
@@ -20,16 +24,19 @@ class InsurancePolicyController extends Controller
 
     public function index(Request $request)
     {
-
-        $data = $this->repo->all();
         if ($request->wantsJson()) {
-            return response()->json([
-                'data' => InsurancePolicyResource::collection($data),
-            ]);
+            $cacheKey = $this->versionedCacheKey('insurance_policies_index');
+
+            $payload = Cache::remember($cacheKey, now()->addHours(24), function () {
+                return InsurancePolicyResource::collection($this->repo->all())->resolve();
+            });
+
+            return response()->json(['data' => $payload]);
         }
 
-        return view('dashboard.admin.insurance_policies.index', ['insurancePolicies' => $data]);
+        $data = $this->repo->all();
 
+        return view('dashboard.admin.insurance_policies.index', ['insurancePolicies' => $data]);
     }
 
     public function store(StoreInsurancePolicyRequest $request)
@@ -37,6 +44,8 @@ class InsurancePolicyController extends Controller
         $data = $request->validated();
 
         $item = $this->repo->create($data);
+
+        $this->bumpCacheVersion('insurance_policies_index');
 
         return $request->wantsJson()
             ? new InsurancePolicyResource($item)
@@ -57,6 +66,8 @@ class InsurancePolicyController extends Controller
 
         $this->repo->update($id, $data);
 
+        $this->bumpCacheVersion('insurance_policies_index');
+
         return $request->wantsJson()
                     ? new InsurancePolicyResource($this->repo->find($id))
                     : redirect()->route('admin.insurance_policies.index')->with('success', __('lang.insurance_policy_updated_successfully_msg'));
@@ -66,6 +77,8 @@ class InsurancePolicyController extends Controller
     public function destroy(Request $request, $id)
     {
         $this->repo->delete($id);
+
+        $this->bumpCacheVersion('insurance_policies_index');
 
         return $request->wantsJson()
                     ? response()->json(['message' => __('lang.deleted_successfully')])

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Unite;
 use App\Models\UniteReservation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ProviderStatisticsController extends Controller
@@ -25,16 +26,28 @@ class ProviderStatisticsController extends Controller
         $year = (int) ($request->input('year', now()->year));
         $month = (int) ($request->input('month', now()->month));
 
+        $cacheKey = "provider_statistics:{$user->id}:{$year}:{$month}";
+
+        $statistics = Cache::remember($cacheKey, now()->addHour(), function () use ($user, $year, $month) {
+            return $this->computeStatistics($user, $year, $month);
+        });
+
+        return response()->json([
+            'success' => true,
+            'statistics' => $statistics,
+        ]);
+    }
+
+    private function computeStatistics($user, int $year, int $month): array
+    {
+
         // All unite IDs belonging to this provider
         $uniteIds = Unite::whereHas('department', fn ($q) => $q->where('user_id', $user->id))
             ->pluck('id')
             ->toArray();
 
         if (empty($uniteIds)) {
-            return response()->json([
-                'success' => true,
-                'statistics' => $this->emptyStatistics($year, $month),
-            ]);
+            return $this->emptyStatistics($year, $month);
         }
 
         // ── Summary cards ──────────────────────────────────────────────────────
@@ -128,44 +141,41 @@ class ProviderStatisticsController extends Controller
             'profit_percentage' => round($p->earnings / $maxEarnings, 2),
         ])->values()->all();
 
-        return response()->json([
-            'success' => true,
-            'statistics' => [
-                'summary_cards' => [
-                    'sales' => [
-                        'value' => $sales,
-                        'currency' => 'SAR',
-                        'label_ar' => 'المبيعات',
-                    ],
-                    'bookings' => [
-                        'value' => $bookings,
-                        'label_ar' => 'الحجوزات',
-                    ],
-                    'units' => [
-                        'occupied' => $occupiedUnits,
-                        'total' => $totalUnits,
-                        'label_ar' => 'الوحدات',
-                    ],
+        return [
+            'summary_cards' => [
+                'sales' => [
+                    'value' => $sales,
+                    'currency' => 'SAR',
+                    'label_ar' => 'المبيعات',
                 ],
-                'earnings_summary' => [
-                    'total_earnings_percentage' => $totalEarningsPercentage,
-                    'best_month' => [
-                        'name_ar' => $arMonths[$highestMonth] ?? $arMonths[$month],
-                        'month_number' => $highestMonth,
-                        'increase_percentage' => max(0, $increasePercentage),
-                    ],
+                'bookings' => [
+                    'value' => $bookings,
+                    'label_ar' => 'الحجوزات',
                 ],
-                'monthly_earnings' => [
-                    'selected_month' => $month,
-                    'chart_data' => $chartData,
-                    'highest_value_month' => $highestMonth,
-                ],
-                'most_profitable_places' => [
-                    'selected_month' => $month,
-                    'places' => $places,
+                'units' => [
+                    'occupied' => $occupiedUnits,
+                    'total' => $totalUnits,
+                    'label_ar' => 'الوحدات',
                 ],
             ],
-        ]);
+            'earnings_summary' => [
+                'total_earnings_percentage' => $totalEarningsPercentage,
+                'best_month' => [
+                    'name_ar' => $arMonths[$highestMonth] ?? $arMonths[$month],
+                    'month_number' => $highestMonth,
+                    'increase_percentage' => max(0, $increasePercentage),
+                ],
+            ],
+            'monthly_earnings' => [
+                'selected_month' => $month,
+                'chart_data' => $chartData,
+                'highest_value_month' => $highestMonth,
+            ],
+            'most_profitable_places' => [
+                'selected_month' => $month,
+                'places' => $places,
+            ],
+        ];
     }
 
     private function emptyStatistics(int $year, int $month): array

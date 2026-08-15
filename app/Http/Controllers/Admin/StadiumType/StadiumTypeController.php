@@ -9,10 +9,14 @@ use App\Http\Requests\StadiumType\StoreStadiumTypeRequest;
 use App\Http\Requests\StadiumType\UpdateStadiumTypeRequest;
 use App\Http\Resources\StadiumType\StadiumTypeResource;
 use App\Repositories\Interfaces\StadiumTypeRepositoryInterface;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class StadiumTypeController extends Controller
 {
+    use HasVersionedCache;
+
     protected $repo;
 
     public function __construct(StadiumTypeRepositoryInterface $repo)
@@ -22,17 +26,19 @@ class StadiumTypeController extends Controller
 
     public function index(Request $request)
     {
-
-        $data = $this->repo->all();
         if ($request->wantsJson()) {
+            $cacheKey = $this->versionedCacheKey('stadium_types_index');
 
-            return response()->json([
-                'data' => StadiumTypeResource::collection($data),
-            ]);
+            $payload = Cache::remember($cacheKey, now()->addHours(24), function () {
+                return StadiumTypeResource::collection($this->repo->all())->resolve();
+            });
+
+            return response()->json(['data' => $payload]);
         }
 
-        return view('dashboard.admin.stadium_types.index', ['stadiumTypes' => $data]);
+        $data = $this->repo->all();
 
+        return view('dashboard.admin.stadium_types.index', ['stadiumTypes' => $data]);
     }
 
     public function store(StoreStadiumTypeRequest $request)
@@ -43,10 +49,12 @@ class StadiumTypeController extends Controller
             $data['image'] = $request->file('image')->store('stadium_types', 'public');
         }
 
-        $this->repo->create($data);
+        $stadiumType = $this->repo->create($data);
+
+        $this->bumpCacheVersion('stadium_types_index');
 
         return $request->wantsJson()
-           ? new StadiumTypeResource($this->repo->create($data))
+           ? new StadiumTypeResource($stadiumType)
            : redirect()->route('admin.stadium_types.index')->with('success', __('lang.stadium_type_created_successfully_msg'));
 
     }
@@ -69,6 +77,8 @@ class StadiumTypeController extends Controller
         }
         $this->repo->update($id, $data);
 
+        $this->bumpCacheVersion('stadium_types_index');
+
         return $request->wantsJson()
             ? new StadiumTypeResource($this->repo->find($id))
             : redirect()->route('admin.stadium_types.index')->with('success', __('lang.stadium_type_updated_successfully_msg'));
@@ -77,6 +87,8 @@ class StadiumTypeController extends Controller
     public function destroy(Request $request, $id)
     {
         $this->repo->delete($id);
+
+        $this->bumpCacheVersion('stadium_types_index');
 
         return $request->wantsJson()
                   ? response()->json(['message' => __('lang.stadium_type_deleted_successfully_msg')])

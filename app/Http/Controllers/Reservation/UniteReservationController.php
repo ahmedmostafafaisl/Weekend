@@ -10,11 +10,15 @@ use App\Http\Resources\Reservation\ReservationResource;
 use App\Models\UniteRating;
 use App\Models\UniteReservation;
 use App\Repositories\Interfaces\UniteReservationInterface;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class UniteReservationController extends Controller
 {
+    use HasVersionedCache;
+
     public function __construct(protected UniteReservationInterface $repo) {}
 
     public function index(Request $request): JsonResponse|\Illuminate\View\View
@@ -22,11 +26,13 @@ class UniteReservationController extends Controller
         $this->authorize('viewAny', UniteReservation::class);
 
         if ($request->expectsJson()) {
-            $reservations = $this->repo->allForUser(auth()->id());
+            $cacheKey = $this->versionedCacheKey("unite_reservations_index:{$request->user()->id}");
 
-            return response()->json([
-                'data' => ReservationResource::collection($reservations),
-            ]);
+            $payload = Cache::remember($cacheKey, now()->addHours(24), function () {
+                return ReservationResource::collection($this->repo->allForUser(auth()->id()))->resolve();
+            });
+
+            return response()->json(['data' => $payload]);
         }
 
         return view('dashboard.web.reservations.index', [
@@ -47,6 +53,8 @@ class UniteReservationController extends Controller
         }
 
         $isPendingApproval = ($result['status'] ?? null) === 'pending_approval';
+
+        $this->bumpCacheVersion("unite_reservations_index:{$request->user()->id}");
 
         return response()->json([
             'success' => true,
@@ -89,6 +97,8 @@ class UniteReservationController extends Controller
         $this->authorize('update', $reservation);
 
         $updated = $this->repo->update($id, $request->validated());
+
+        $this->bumpCacheVersion("unite_reservations_index:{$reservation->user_id}");
 
         return response()->json([
             'success' => true,
@@ -249,6 +259,8 @@ class UniteReservationController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        $this->bumpCacheVersion("unite_reservations_index:{$result['reservation']->user_id}");
+
         return response()->json([
             'success' => true,
             'message' => $result['message'],
@@ -273,6 +285,8 @@ class UniteReservationController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        $this->bumpCacheVersion("unite_reservations_index:{$reservation->user_id}");
+
         return response()->json([
             'success' => true,
             'message' => __('lang.reservation_rejected_customer_notified'),
@@ -287,6 +301,8 @@ class UniteReservationController extends Controller
         $this->authorize('cancel', $reservation);
 
         $result = $this->repo->cancel($id, $request->user()?->id);
+
+        $this->bumpCacheVersion("unite_reservations_index:{$result->user_id}");
 
         return response()->json([
             'success' => true,
@@ -337,6 +353,8 @@ class UniteReservationController extends Controller
             'rating' => $request->rating,
             'review' => $request->review,
         ]);
+
+        $this->bumpCacheVersion("unite_reservations_index:{$user->id}");
 
         return response()->json([
             'success' => true,

@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Admin\ServiceFee;
 
 use App\Http\Controllers\Controller;
 use App\Models\ServiceFee;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ServiceFeeController extends Controller
 {
+    use HasVersionedCache;
+
     public function index()
     {
         $fees = ServiceFee::whereIn('key', ServiceFee::KEYS)->get()->keyBy('key');
@@ -42,6 +45,8 @@ class ServiceFeeController extends Controller
 
             }
         });
+
+        $this->bumpCacheVersion('service_fees_index');
 
         return redirect()->route('admin.service-fees.index')
             ->with('success', __('lang.service_fee_updated'));

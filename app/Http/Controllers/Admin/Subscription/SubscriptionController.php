@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Repositories\Interfaces\PaymentGatewayInterface;
 use App\Repositories\Interfaces\SubscriptionInterface;
 use App\Services\Payment\PaymentMethodFactory;
+use App\Support\Cache\HasVersionedCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 
 class SubscriptionController extends Controller
 {
+    use HasVersionedCache;
+
     public function __construct(
         protected SubscriptionInterface $subscription,
         protected PaymentGatewayInterface $paymentGateway,
@@ -180,6 +183,8 @@ class SubscriptionController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        $this->bumpCacheVersion('my_subscriptions');
+
         if (! $request->wantsJson()) {
             return back()->with('success', __('lang.subscription_created_awaiting_payment_msg'));
         }
@@ -250,6 +255,8 @@ class SubscriptionController extends Controller
         $data = $this->prepareSubscriptionData($data, $package);
 
         $subscription->update($data);
+
+        $this->bumpCacheVersion("my_subscriptions:{$subscription->user_id}");
 
         return $request->wantsJson()
             ? new SubscriptionResource($subscription)

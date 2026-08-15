@@ -37,6 +37,8 @@ return new class extends Migration
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->boolean('package_booking_enabled')->default(false);
             $table->timestamps();
+            $table->index(['status', 'type'], 'unites_status_type_index');
+
         });
     }
 

@@ -36,6 +36,7 @@ return new class extends Migration
 
             $table->index(['status', 'payment_type']);
             $table->index('phone');
+            $table->index(['user_id', 'created_at'], 'payments_user_id_created_at_index');
         });
     }
 
