@@ -11,7 +11,7 @@ class PaymentMethodFactory
     {
         return match (strtolower($method)) {
             'geidea' => app(GeideaPaymentService::class),
-            'tabby', 'tap' => app(TabbyPaymentService::class),
+            'tabby', 'tap', 'tappy' => app(TabbyPaymentService::class),
             'tamara' => app(TamaraPaymentService::class),
             'maysar' => app(MoyasarPaymentService::class),
             default => throw new InvalidArgumentException("Unknown payment method: {$method}"),

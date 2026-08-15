@@ -163,7 +163,6 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
         try {
             $response = Http::withToken($this->token)->post("{$this->baseUrl}/checkout", $payload);
             $body = $response->json();
-            Log::info('Tamara checkout created', ['order_id' => $body['order_id'] ?? null, 'reference' => $reference]);
 
             if ($response->successful() && isset($body['checkout_url'])) {
                 if ($payment) {
@@ -175,7 +174,6 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
             return ['success' => false, 'message' => $body['message'] ?? 'Tamara checkout failed.'];
         } catch (\Throwable $e) {
-            Log::error('Tamara sendPayment error', ['error' => $e->getMessage()]);
 
             return ['success' => false, 'message' => $e->getMessage()];
         }

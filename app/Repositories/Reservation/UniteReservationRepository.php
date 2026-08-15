@@ -8,8 +8,8 @@ use App\Models\UniteBookingPackage;
 use App\Models\UniteReservation;
 use App\Notifications\ReservationCancelled;
 use App\Notifications\ReservationPendingApproval;
-use App\Repositories\Interfaces\PaymentGatewayInterface;
 use App\Repositories\Interfaces\UniteReservationInterface;
+use App\Services\Payment\PaymentMethodFactory;
 use App\Services\PromoCode\PromoCodeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Log;
 class UniteReservationRepository implements UniteReservationInterface
 {
     public function __construct(
-        protected PaymentGatewayInterface $paymentGateway,
         protected PromoCodeService $promoCodeService,
     ) {}
 
@@ -405,7 +404,9 @@ class UniteReservationRepository implements UniteReservationInterface
                 'policy' => $reservation->unite?->refund_policy,
             ]);
 
-            $result = $this->paymentGateway->refund(
+            $gateway = PaymentMethodFactory::make($payment->payment_type ?? 'geidea');
+
+            $result = $gateway->refund(
                 $payment->payment_id,
                 $refundAmount,
                 'Customer cancellation – reservation #'.$reservation->id
@@ -548,7 +549,9 @@ class UniteReservationRepository implements UniteReservationInterface
         $user = $reservation->user;
         $phone = $user?->phone ?? $payment->phone;
 
-        $gatewayResult = $this->paymentGateway->sendPayment([
+        $gateway = PaymentMethodFactory::make($payment->payment_type ?? 'geidea');
+
+        $gatewayResult = $gateway->sendPayment([
             'amount' => $payment->amount,
             'price' => $payment->amount,
             'quantity' => 1,
