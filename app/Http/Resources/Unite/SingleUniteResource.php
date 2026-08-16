@@ -269,6 +269,10 @@ class SingleUniteResource extends JsonResource
                     'full_start' => $slot->full_start,
                     'full_end' => $slot->full_end,
                     'status' => $slot->status,
+                    'day_start' => $slot->day_start,
+                    'day_end' => $slot->day_end,
+                    'buffer_minutes' => $slot->buffer_minutes,
+                    'periods' => $this->formatSlotPeriods($slot),
                 ];
             })->values();
         }
@@ -284,8 +288,30 @@ class SingleUniteResource extends JsonResource
                 'full_start' => $slot->full_start,
                 'full_end' => $slot->full_end,
                 'status' => $slot->status,
+                'day_start' => $slot->day_start,
+                'day_end' => $slot->day_end,
+                'buffer_minutes' => $slot->buffer_minutes,
+                'periods' => $this->formatSlotPeriods($slot),
             ];
         })->values();
+    }
+
+    /**
+     * Custom availability periods for a slot -- start_time/end_time only,
+     * per request. Relies on 'slots.periods' already being eager-loaded by
+     * UniteRepository::find() (the only place this resource is currently
+     * fed from), so this doesn't trigger a fresh query per slot.
+     */
+    protected function formatSlotPeriods($slot): array
+    {
+        if (! $slot->relationLoaded('periods') || $slot->periods->isEmpty()) {
+            return [];
+        }
+
+        return $slot->periods->map(fn ($period) => [
+            'start_time' => $period->start_time,
+            'end_time' => $period->end_time,
+        ])->values()->all();
     }
 
     protected function formatPricesByType()
