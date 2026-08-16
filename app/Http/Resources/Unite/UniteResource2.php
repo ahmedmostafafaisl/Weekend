@@ -19,6 +19,10 @@ class UniteResource2 extends JsonResource
                 ?? $firstPrice->morning_price
                 ?? $firstPrice->evening_price
                 ?? $firstPrice->full_price;
+
+            if ($price === null && $this->type === 'stadium') {
+                $price = $firstPrice->day_hour_price;
+            }
         }
 
         return [

@@ -269,8 +269,10 @@ class SingleUniteResource extends JsonResource
 
     protected function formatSlotsByType()
     {
+        $slots = $this->consolidateWeekDaySlots($this->slots);
+
         if (in_array($this->type, ['stadium', 'hall'])) {
-            return $this->slots->map(function ($slot) {
+            return $slots->map(function ($slot) {
                 return [
                     'id' => $slot->id,
                     'day_of_week' => $slot->day_of_week,
@@ -285,7 +287,7 @@ class SingleUniteResource extends JsonResource
             })->values();
         }
 
-        return $this->slots->map(function ($slot) {
+        return $slots->map(function ($slot) {
             return [
                 'id' => $slot->id,
                 'day_of_week' => $slot->day_of_week,
@@ -302,6 +304,41 @@ class SingleUniteResource extends JsonResource
                 'periods' => $this->formatSlotPeriods($slot),
             ];
         })->values();
+    }
+
+    /**
+     * Groups the 4 individually-stored days (sunday-wednesday) back into
+     * a single 'week_day' entry, matching how unite_prices already
+     * appears (one row per category, not per individual day) --
+     * unite_slots.day_of_week is a 7-value enum at the DB level, and a
+     * 'week_day' submission expands into 4 separate rows at storage time
+     * (see UniteRepository::storeSlots()), unlike unite_prices, whose day
+     * column is already a 4-value enum needing no expansion. thursday/
+     * friday/saturday are untouched, since those are already single,
+     * distinct categories.
+     */
+    protected function consolidateWeekDaySlots($slots)
+    {
+        $weekDayNames = ['sunday', 'monday', 'tuesday', 'wednesday'];
+
+        $weekDayGroup = $slots->filter(fn ($slot) => in_array($slot->day_of_week, $weekDayNames, true));
+        $others = $slots->reject(fn ($slot) => in_array($slot->day_of_week, $weekDayNames, true));
+
+        if ($weekDayGroup->isEmpty()) {
+            return $others->values();
+        }
+
+        // All 4 should carry identical configuration (storage applies the
+        // same data to every expanded day) — the first one found is a
+        // faithful representative. Cloned rather than mutated, since
+        // $this->slots may be read again elsewhere in this resource.
+        $representative = clone $weekDayGroup->first();
+        $representative->day_of_week = 'week_day';
+        if ($weekDayGroup->first()->relationLoaded('periods')) {
+            $representative->setRelation('periods', $weekDayGroup->first()->periods);
+        }
+
+        return $others->push($representative)->values();
     }
 
     /**

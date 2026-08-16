@@ -718,9 +718,13 @@ class UniteReservationRepository implements UniteReservationInterface
 
         // Hourly: enforce minimum booking duration
         if ($data['period_type'] === 'hourly') {
-            $priceRow = $unite->relationLoaded('prices')
-                ? $unite->prices->first()
-                : $unite->prices()->first();
+            $mappedDay = $this->mapToDayCategory($data['reservation_date']);
+
+            $prices = $unite->relationLoaded('prices')
+                ? $unite->prices
+                : $unite->prices()->get();
+
+            $priceRow = $prices->firstWhere('day', $mappedDay);
 
             if ($priceRow && $priceRow->hourly_enabled) {
                 $minMinutes = $priceRow->min_booking_minutes ?? 60;
@@ -1014,6 +1018,26 @@ class UniteReservationRepository implements UniteReservationInterface
     }
 
     /**
+     * Maps a calendar date to its unite_prices day category
+     * (thursday/friday/saturday/week_day) -- the single source of truth
+     * for this mapping, used by every call site that needs to resolve
+     * the correct price row for a given reservation_date. Previously
+     * duplicated inline only in resolveHourlyPrice(); a separate call
+     * site (the hourly min-duration check) had no equivalent mapping at
+     * all and used the wrong lookup entirely, which is exactly how the
+     * two call sites drifted out of sync.
+     */
+    private function mapToDayCategory(string $date): string
+    {
+        return match (strtolower(Carbon::parse($date)->englishDayOfWeek)) {
+            'thursday' => 'thursday',
+            'friday' => 'friday',
+            'saturday' => 'saturday',
+            default => 'week_day',
+        };
+    }
+
+    /**
      * Calculate the total price for an hourly booking.
      *
      * Looks up the correct price row for the day, then uses
@@ -1026,14 +1050,7 @@ class UniteReservationRepository implements UniteReservationInterface
         string $toTime,
         string $date
     ): float {
-        $reservationDate = Carbon::parse($date);
-
-        $mappedDay = match (strtolower($reservationDate->englishDayOfWeek)) {
-            'thursday' => 'thursday',
-            'friday' => 'friday',
-            'saturday' => 'saturday',
-            default => 'week_day',
-        };
+        $mappedDay = $this->mapToDayCategory($date);
 
         $prices = $unite->relationLoaded('prices')
             ? $unite->prices
