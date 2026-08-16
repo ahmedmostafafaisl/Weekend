@@ -251,11 +251,7 @@
     );
 
     function recalculateTotal() {
-        let total = 0;
-        container.querySelectorAll('.council-number-input').forEach(input => {
-            total += parseInt(input.value, 10) || 0;
-        });
-        councilNumberInput.value = total;
+        councilNumberInput.value = container.querySelectorAll('.council-row').length;
     }
 
     function renumberRows() {

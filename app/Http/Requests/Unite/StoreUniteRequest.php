@@ -302,8 +302,8 @@ class StoreUniteRequest extends FormRequest
                 'array',
                 function ($attribute, $value, $fail) {
                     $number = (int) ($this->input('lounge.council_number') ?? 0);
-                    $sum = collect($value ?? [])->sum(fn ($c) => (int) ($c['number'] ?? 0));
-                    if ($number > 0 && $sum !== $number) {
+                    $count = collect($value ?? [])->count();
+                    if ($number > 0 && $count !== $number) {
                         $fail(__('lang.councils_count_must_match_council_number'));
                     }
                 },

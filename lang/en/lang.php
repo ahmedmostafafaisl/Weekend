@@ -1547,5 +1547,5 @@ return [
 
     'number' => 'Number',
     'add_council_type' => 'Add Council Type',
-    'councils_number_auto_hint' => 'The total above is calculated automatically from the council types and counts below.',
+    'councils_number_auto_hint' => 'The number above counts the distinct council types below, not how many of each.',
 ];
