@@ -254,17 +254,21 @@ class SingleUniteResource extends JsonResource
 
     protected function getPricePerNight()
     {
-        $price = $this->prices->first();
+        $price = null;
+        $firstPrice = $this->prices->first();
 
-        if (! $price) {
-            return null;
+        if ($firstPrice) {
+            $price = $firstPrice->price
+                ?? $firstPrice->morning_price
+                ?? $firstPrice->evening_price
+                ?? $firstPrice->full_price;
+
+            if ($price === null && $this->type === 'stadium') {
+                $price = $firstPrice->day_hour_price;
+            }
         }
 
-        if ($this->type === 'stadium') {
-            return $price->price;
-        }
-
-        return $price->full_price ?? $price->evening_price ?? $price->morning_price;
+        return $price;
     }
 
     protected function formatSlotsByType()

@@ -145,7 +145,10 @@ class UniteReservationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'upcoming' => ['nullable', 'boolean'],
+            'current_page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'viewings_current_page' => ['nullable', 'integer', 'min:1'],
+            'viewings_per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
         $query = UniteReservation::with([
@@ -184,7 +187,7 @@ class UniteReservationController extends Controller
         }
 
         $perPage = min((int) ($request->per_page ?? 15), 50);
-        $paginator = $query->paginate($perPage);
+        $paginator = $query->paginate($perPage, ['*'], 'current_page');
 
         // Viewing appointments — a genuinely separate booking mechanism
         // from reservations (different model, different status enum:
@@ -211,12 +214,13 @@ class UniteReservationController extends Controller
                 ->whereIn('status', ['confirmed', 'pending']);
         }
 
-        $viewings = $viewingsQuery->limit(50)->get();
+        $viewingsPerPage = min((int) ($request->viewings_per_page ?? 15), 50);
+        $viewingsPaginator = $viewingsQuery->paginate($viewingsPerPage, ['*'], 'viewings_current_page');
 
         return response()->json([
             'success' => true,
             'data' => ReservationResource::collection($paginator->items()),
-            'viewings' => $viewings->map(fn ($v) => [
+            'viewings' => collect($viewingsPaginator->items())->map(fn ($v) => [
                 'id' => $v->id,
                 'unite_id' => $v->unite_id,
                 'unite_name' => $v->unite->name ?? null,
@@ -230,17 +234,17 @@ class UniteReservationController extends Controller
                 'deposit_refundable' => $v->deposit_refundable,
                 'payment_status' => $v->payment->status ?? null,
             ])->values(),
-            'meta' => [
+            'pagination' => [
                 'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
+                'total_pages' => $paginator->lastPage(),
                 'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
+                'total_items' => $paginator->total(),
             ],
-            'links' => [
-                'first' => $paginator->url(1),
-                'last' => $paginator->url($paginator->lastPage()),
-                'prev' => $paginator->previousPageUrl(),
-                'next' => $paginator->nextPageUrl(),
+            'viewings_pagination' => [
+                'current_page' => $viewingsPaginator->currentPage(),
+                'total_pages' => $viewingsPaginator->lastPage(),
+                'per_page' => $viewingsPaginator->perPage(),
+                'total_items' => $viewingsPaginator->total(),
             ],
         ]);
     }
