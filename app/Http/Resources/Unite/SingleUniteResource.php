@@ -216,7 +216,15 @@ class SingleUniteResource extends JsonResource
                 'snapchat' => $this->department->snapchat,
                 'tiktok' => $this->department->tiktok,
             ] : null,
-            'details' => $detail,
+            'details' => $this->type === 'lounge' && $detail
+                ? array_merge($detail->toArray(), [
+                    'councils' => $this->councils->map(fn ($council) => [
+                        'id' => $council->id,
+                        'type' => $council->type,
+                        'number' => $council->number,
+                    ])->values(),
+                ])
+                : $detail,
             'additional_unites' => $this->getAdditionalUnites(),
         ];
     }
