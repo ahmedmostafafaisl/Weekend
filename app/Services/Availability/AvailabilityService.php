@@ -210,7 +210,7 @@ class AvailabilityService
                 'reason' => $slot ? 'day_closed' : 'no_slot_config',
                 'is_past' => $isPast,
                 'working_hours' => $this->buildWorkingHours($slot),
-                'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations),
+                'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations, $price),
                 'periods' => [],
                 'available_packages' => $availablePackages,
                 'min_booking_minutes' => $this->buildMinBookingMinutes($unite, $price),
@@ -235,7 +235,7 @@ class AvailabilityService
             'display_status' => $this->mapDisplayStatus($availability),
             'is_past' => $isPast,
             'working_hours' => $this->buildWorkingHours($slot),
-            'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations),
+            'custom_periods' => $this->buildCustomPeriods($slot, $dayReservations, $price),
             'periods' => $periods,
             'available_packages' => $availablePackages,
             'min_booking_minutes' => $this->buildMinBookingMinutes($unite, $price),
@@ -290,7 +290,7 @@ class AvailabilityService
      * isWithinAvailableWindow() would actually accept a booking request
      * for that same window, buffer included.
      */
-    private function buildCustomPeriods($slot, ?Collection $dayReservations = null): array
+    private function buildCustomPeriods($slot, ?Collection $dayReservations = null, $price = null): array
     {
         if (! $slot) {
             return [];
@@ -298,17 +298,113 @@ class AvailabilityService
 
         $periods = $slot->relationLoaded('periods') ? $slot->periods : $slot->periods()->get();
         $bufferMinutes = (int) ($slot->buffer_minutes ?? 0);
+        $minBookingMinutes = (int) ($price?->min_booking_minutes ?? 60);
 
-        return $periods->map(function ($period) use ($dayReservations, $bufferMinutes) {
-            $available = $period->status === 'available'
-                && ($dayReservations === null || ! $this->isPeriodBooked('custom', $period->start_time, $period->end_time, $dayReservations, $bufferMinutes));
+        $result = [];
 
-            return [
-                'start' => $period->start_time,
-                'end' => $period->end_time,
-                'available' => $available,
+        foreach ($periods as $period) {
+            if ($period->status !== 'available') {
+                $result[] = ['start' => $period->start_time, 'end' => $period->end_time, 'available' => false];
+
+                continue;
+            }
+
+            if ($dayReservations === null) {
+                $result[] = ['start' => $period->start_time, 'end' => $period->end_time, 'available' => true];
+
+                continue;
+            }
+
+            foreach ($this->splitPeriodAroundReservations(
+                $period->start_time,
+                $period->end_time,
+                $dayReservations,
+                $bufferMinutes,
+                $minBookingMinutes
+            ) as $gap) {
+                $result[] = $gap;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Splits [$periodStart, $periodEnd] around any reservation overlapping
+     * it, expanded by buffer on both sides — the exact same merge-booked-
+     * ranges-then-emit-free-gaps approach already used in
+     * buildStadiumPeriods() for the main hourly periods array, applied
+     * here to a single custom period's own bounds instead of the whole
+     * day's operating window. Any resulting gap shorter than
+     * $minBookingMinutes is dropped, since it wouldn't actually be
+     * bookable regardless of showing as "available". If nothing is left
+     * at all (booked solid, or the sole gap was too short), and the
+     * period had at least one genuine overlap, returns the original
+     * range marked unavailable rather than silently disappearing —
+     * matching how a fully-booked stadium window still reports as
+     * 'booked' rather than vanishing from the response entirely.
+     *
+     * @return array<int, array{start: string, end: string, available: bool}>
+     */
+    private function splitPeriodAroundReservations(
+        string $periodStart,
+        string $periodEnd,
+        Collection $dayReservations,
+        int $bufferMinutes,
+        int $minBookingMinutes
+    ): array {
+        $overlapping = $dayReservations->filter(function ($r) use ($periodStart, $periodEnd, $bufferMinutes) {
+            $from = $this->subtractMinutes($r->from_time, $bufferMinutes);
+            $to = $this->addMinutes($r->to_time, $bufferMinutes);
+
+            return $from < $periodEnd && $to > $periodStart;
+        });
+
+        if ($overlapping->isEmpty()) {
+            return [['start' => $periodStart, 'end' => $periodEnd, 'available' => true]];
+        }
+
+        $merged = [];
+        foreach ($overlapping->sortBy('from_time') as $r) {
+            $range = [
+                'from' => $this->subtractMinutes($r->from_time, $bufferMinutes),
+                'to' => $this->addMinutes($r->to_time, $bufferMinutes),
             ];
-        })->values()->all();
+
+            if ($merged && $range['from'] <= end($merged)['to']) {
+                $merged[array_key_last($merged)]['to'] = max(end($merged)['to'], $range['to']);
+            } else {
+                $merged[] = $range;
+            }
+        }
+
+        $gaps = [];
+        $cursor = $periodStart;
+
+        foreach ($merged as $range) {
+            if ($range['from'] > $cursor) {
+                $gaps[] = ['from' => $cursor, 'to' => min($range['from'], $periodEnd)];
+            }
+            $cursor = max($cursor, $range['to']);
+        }
+
+        if ($cursor < $periodEnd) {
+            $gaps[] = ['from' => $cursor, 'to' => $periodEnd];
+        }
+
+        $bookable = [];
+        foreach ($gaps as $gap) {
+            $durationMinutes = Carbon::parse($gap['to'])->diffInMinutes(Carbon::parse($gap['from']));
+            if ($durationMinutes >= $minBookingMinutes) {
+                $bookable[] = ['start' => $gap['from'], 'end' => $gap['to'], 'available' => true];
+            }
+        }
+
+        if (empty($bookable)) {
+            return [['start' => $periodStart, 'end' => $periodEnd, 'available' => false]];
+        }
+
+        return $bookable;
     }
 
     // -------------------------------------------------------------------------

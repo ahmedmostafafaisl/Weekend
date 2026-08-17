@@ -116,10 +116,13 @@ class UniteSlot extends Model
             return true;
         }
 
+        $from = substr($from, 0, 5);
+        $to = substr($to, 0, 5);
+
         $windows = $this->availabilityWindows();
 
         foreach ($windows as [$windowStart, $windowEnd]) {
-            if ($from >= $windowStart && $to <= $windowEnd) {
+            if ($from >= substr($windowStart, 0, 5) && $to <= substr($windowEnd, 0, 5)) {
                 return true;
             }
         }
