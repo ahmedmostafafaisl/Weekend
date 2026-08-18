@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\Suggestion\SuggestionController;
 use App\Http\Controllers\Admin\Unite\UniteFeatureController;
 use App\Http\Controllers\Admin\Unite\UniteOfferController;
 use App\Http\Controllers\Admin\Unite\UnitePackageController;
+use App\Http\Controllers\Admin\Unite\UnitePriceController;
 use App\Http\Controllers\Admin\Unite\UniteSlotController;
 use App\Http\Controllers\AdminAuth\AuthenticatedSessionController;
 use App\Http\Controllers\AdminHomeController;
@@ -415,6 +416,37 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard']
 
     Route::delete('/unites/{unite}/offers/{offer}', [UniteOfferController::class, 'destroy'])
         ->name('unite-offers.destroy')
+        ->middleware('permission:unites.delete');
+});
+
+// unite prices routes
+Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
+    Route::get('/unites/{unite}/prices', [UnitePriceController::class, 'index'])
+        ->name('unite-prices.index')
+        ->middleware('permission:unites.view');
+
+    Route::get('/unites/{unite}/prices/create', [UnitePriceController::class, 'create'])
+        ->name('unite-prices.create')
+        ->middleware('permission:unites.create');
+
+    Route::post('/unites/{unite}/prices', [UnitePriceController::class, 'store'])
+        ->name('unite-prices.store')
+        ->middleware('permission:unites.create');
+
+    Route::get('/unites/{unite}/prices/{price}', [UnitePriceController::class, 'show'])
+        ->name('unite-prices.show')
+        ->middleware('permission:unites.view');
+
+    Route::get('/unites/{unite}/prices/{price}/edit', [UnitePriceController::class, 'edit'])
+        ->name('unite-prices.edit')
+        ->middleware('permission:unites.update');
+
+    Route::put('/unites/{unite}/prices/{price}', [UnitePriceController::class, 'update'])
+        ->name('unite-prices.update')
+        ->middleware('permission:unites.update');
+
+    Route::delete('/unites/{unite}/prices/{price}', [UnitePriceController::class, 'destroy'])
+        ->name('unite-prices.destroy')
         ->middleware('permission:unites.delete');
 });
 

@@ -2,7 +2,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The Laravel Framework.",
-    "keywords": ["framework", "laravel"],
+    "keywords": [
+        "framework",
+        "laravel"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.1",
@@ -64,5 +67,26 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "symfony/css-selector",
+                "version": "6.4.13",
+                "dist": {
+                    "url": "https://codeload.github.com/symfony/css-selector/zip/refs/tags/v6.4.13",
+                    "type": "zip"
+                },
+                "autoload": {
+                    "psr-4": {
+                        "Symfony\\Component\\CssSelector\\": ""
+                    }
+                },
+                "require": {
+                    "php": ">=8.1"
+                }
+            }
+        }
+    ]
 }

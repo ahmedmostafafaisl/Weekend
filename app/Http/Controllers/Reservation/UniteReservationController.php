@@ -158,7 +158,7 @@ class UniteReservationController extends Controller
             'payment.promoCode',
         ])
             ->where('user_id', $user->id)
-            ->latest('reservation_date');
+            ->orderByDesc('id');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -199,7 +199,7 @@ class UniteReservationController extends Controller
         // values differ and most viewings have no payment at all.
         $viewingsQuery = \App\Models\UniteViewing::with(['unite', 'viewingTime', 'payment'])
             ->where('user_id', $user->id)
-            ->latest('viewing_date');
+            ->orderByDesc('id');
 
         if ($request->filled('date_from')) {
             $viewingsQuery->whereDate('viewing_date', '>=', $request->date_from);
