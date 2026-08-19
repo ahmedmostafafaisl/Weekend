@@ -31,6 +31,31 @@ class FcmChannel
 
         $payload = $notification->toFcm($notifiable);
 
+        $this->sendToToken($token, $payload, $notifiable);
+    }
+
+    /**
+     * Send an arbitrary title/body/data payload directly to a device
+     * token, with no Notification class, no Notifiable model, and no
+     * database notification record involved at all.
+     *
+     * This is the same underlying send path used by send() above (OAuth2
+     * token fetch/cache, the FCM v1 HTTP call, stale-token detection) --
+     * extracted so a manual test tool can reuse it exactly rather than
+     * duplicating this logic a second time. $notifiable is optional and
+     * only used for the stale-token cleanup step (clearing fcm_token on
+     * a real model) and for log correlation; passing null (the expected
+     * case for an ad-hoc test token with no backing user) simply skips
+     * that cleanup, since there's no column to clear on nothing.
+     *
+     * Unlike send(), this does not swallow exceptions silently -- it
+     * returns a structured result so a caller (the test endpoint) can
+     * report back whether the send actually succeeded.
+     *
+     * @return array{success: bool, message: string, http_status: int|null, fcm_message_name: string|null}
+     */
+    public function sendToToken(string $token, array $payload, mixed $notifiable = null): array
+    {
         try {
             $accessToken = $this->getAccessToken();
             $projectId = config('services.fcm.project_id');
@@ -38,15 +63,26 @@ class FcmChannel
             if (empty($projectId)) {
                 Log::warning('FCM v1: FCM_PROJECT_ID not set in .env');
 
-                return;
+                return [
+                    'success' => false,
+                    'message' => 'FCM_PROJECT_ID is not configured.',
+                    'http_status' => null,
+                    'fcm_message_name' => null,
+                ];
             }
 
-            $this->dispatch($accessToken, $projectId, $token, $payload, $notifiable);
-
+            return $this->dispatch($accessToken, $projectId, $token, $payload, $notifiable);
         } catch (\Throwable $e) {
             Log::error('FCM v1 channel error: '.$e->getMessage(), [
                 'user_id' => $notifiable->id ?? null,
             ]);
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'http_status' => null,
+                'fcm_message_name' => null,
+            ];
         }
     }
 
@@ -165,8 +201,8 @@ class FcmChannel
         string $projectId,
         string $deviceToken,
         array $payload,
-        mixed $notifiable
-    ): void {
+        mixed $notifiable = null
+    ): array {
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
 
         // FCM v1 requires all data values to be strings
@@ -213,12 +249,19 @@ class FcmChannel
         ])->post($url, $body);
 
         if ($response->successful()) {
+            $messageName = $response->json('name');  // projects/{id}/messages/{msg_id}
+
             Log::info('FCM v1: message sent', [
-                'name' => $response->json('name'),  // projects/{id}/messages/{msg_id}
+                'name' => $messageName,
                 'user_id' => $notifiable->id ?? null,
             ]);
 
-            return;
+            return [
+                'success' => true,
+                'message' => 'Message sent.',
+                'http_status' => $response->status(),
+                'fcm_message_name' => $messageName,
+            ];
         }
 
         $error = $response->json('error') ?? [];
@@ -247,9 +290,20 @@ class FcmChannel
                 'error_code' => $errorCode,
                 'user_id' => $notifiable->id ?? null,
             ]);
-            optional($notifiable)->forceFill(['fcm_token' => null])->save();
 
-            return;
+            // Only a real, persisted model has a column to clear — an
+            // ad-hoc test token (no $notifiable at all) has nothing to
+            // clean up here.
+            if ($notifiable) {
+                optional($notifiable)->forceFill(['fcm_token' => null])->save();
+            }
+
+            return [
+                'success' => false,
+                'message' => "Token is stale/invalid ({$errorCode}: {$status}) and has been cleared.",
+                'http_status' => $httpStatus,
+                'fcm_message_name' => null,
+            ];
         }
 
         // Quota / server error — don't clear the token, just log
@@ -263,6 +317,13 @@ class FcmChannel
         if ($httpStatus === 401) {
             Cache::forget(self::CACHE_KEY);
         }
+
+        return [
+            'success' => false,
+            'message' => $error['message'] ?? "FCM request failed with HTTP {$httpStatus}.",
+            'http_status' => $httpStatus,
+            'fcm_message_name' => null,
+        ];
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -610,6 +610,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:admin', 'admin.guard']
     Route::get('/broadcast', [BroadcastNotificationController::class, 'index'])->name('broadcast.index')->middleware('permission:notifications.view');
     Route::post('/broadcast', [BroadcastNotificationController::class, 'send'])->name('broadcast.send')->middleware('permission:notifications.create');
     Route::post('/notifications/test', [BroadcastNotificationController::class, 'test'])->name('broadcast.test')->middleware('permission:notifications.create');
+    Route::post('/notifications/test-token', [BroadcastNotificationController::class, 'testToken'])->name('broadcast.test-token')->middleware('permission:notifications.create');
     Route::get('/users/search', [BroadcastNotificationController::class, 'searchUsers'])->name('broadcast.users.search')->middleware('permission:notifications.view');
 });
 

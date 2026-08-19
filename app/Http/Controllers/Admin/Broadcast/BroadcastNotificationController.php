@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin\Broadcast;
 
+use App\Channels\FcmChannel;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Notifications\PromotionNotification;
@@ -251,6 +252,72 @@ class BroadcastNotificationController extends Controller
                 'action_url' => $data['action_url'] ?? null,
             ],
         ]);
+    }
+
+    // ── API test endpoint: arbitrary device token + arbitrary data ────────────
+
+    /**
+     * Send a real FCM push directly to an ad-hoc device token, with a
+     * fully arbitrary data payload -- for testing a token that isn't
+     * (or isn't yet) saved against any User record, and for verifying
+     * how a client actually handles specific data keys before wiring a
+     * real notification class to send them.
+     *
+     * Deliberately does not go through the Notification/Notifiable
+     * system: no database notification row is created, no User/Admin
+     * model is touched or required. This is a pure, stateless send.
+     */
+    public function testToken(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'device_token' => ['required', 'string', 'max:4096'],
+            'title' => ['required', 'string', 'max:100'],
+            'body' => ['required', 'string', 'max:500'],
+            'data' => ['nullable', 'array', 'max:20'],
+            'data.*' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    if (! is_scalar($value)) {
+                        $fail("The {$attribute} must be a string, number, or boolean — not a nested array or object.");
+                    }
+                },
+            ],
+        ]);
+
+        // FCM v1 requires every data value to be a string -- validated as
+        // scalar above (rejecting nested arrays/objects, which would
+        // otherwise silently stringify into a confusing "Array" literal
+        // instead of a clear validation error), cast to string here to
+        // match exactly what FcmChannel::dispatch() will send.
+        $payload = [
+            'title' => $data['title'],
+            'body' => $data['body'],
+            'data' => collect($data['data'] ?? [])
+                ->map(fn ($v) => (string) $v)
+                ->all(),
+        ];
+
+        Log::info('[FCM test-token] sending', [
+            'admin_id' => auth('admin')->id(),
+            'title' => $payload['title'],
+            'data_keys' => array_keys($payload['data']),
+        ]);
+
+        $result = (new FcmChannel)->sendToToken($data['device_token'], $payload);
+
+        Log::info('[FCM test-token] result', [
+            'admin_id' => auth('admin')->id(),
+            'success' => $result['success'],
+            'http_status' => $result['http_status'],
+        ]);
+
+        return response()->json([
+            'success' => $result['success'],
+            'message' => $result['message'],
+            'http_status' => $result['http_status'],
+            'fcm_message_name' => $result['fcm_message_name'],
+            'sent_payload' => $payload,
+        ], $result['success'] ? 200 : 422);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

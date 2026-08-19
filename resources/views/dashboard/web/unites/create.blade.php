@@ -159,6 +159,26 @@
         </div>
     </div>
 
+    {{-- ── New Features (UniteNewFeature) — a separate, simpler highlights
+         list from the 'features' card above; see UniteNewFeature's own doc
+         comment for why both remain in active use side by side. --}}
+    <div class="card card-soft shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0">{{ __('lang.new_features') }}</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow('new-features-body','new-feature-tpl')">{{ __('lang.add_feature') }}</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>{{ __('lang.title') }}</th><th>{{ __('lang.description') }}</th><th></th></tr>
+                    </thead>
+                    <tbody id="new-features-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     {{-- ── Offers ── --}}
     <div class="card card-soft shadow-sm mb-4">
         <div class="card-body">
@@ -258,6 +278,14 @@
     </tr>
 </template>
 
+<template id="new-feature-tpl">
+    <tr>
+        <td><input class="form-control form-control-sm" name="new_features[__I__][title]" placeholder="{{ __('lang.title') }}" required></td>
+        <td><input class="form-control form-control-sm new-feature-description-input" name="new_features[__I__][description]" placeholder="{{ __('lang.description') }}"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">✕</button></td>
+    </tr>
+</template>
+
 <template id="res-tpl">
     <tr>
         <td><input class="form-control form-control-sm" name="reservations[__I__][reservation_date]" type="date" required></td>
@@ -346,6 +374,17 @@ function addOfferRow() {
 // Type → show correct detail fields via form submit
 document.getElementById('unite-type').addEventListener('change', function () {
     document.getElementById('uniteForm').submit();
+});
+
+// new_features[].description is JSON-cast on the backend -- wrap each
+// value in JSON.stringify() right before the real submit, so the admin
+// only ever types plain text and never sees JSON syntax.
+document.getElementById('uniteForm').addEventListener('submit', function () {
+    document.querySelectorAll('.new-feature-description-input').forEach(function (input) {
+        if (input.value !== '') {
+            input.value = JSON.stringify(input.value);
+        }
+    });
 });
 </script>
 @endpush

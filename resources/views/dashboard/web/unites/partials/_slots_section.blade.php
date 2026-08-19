@@ -37,7 +37,9 @@
                             <th>{{ __('lang.evening_start') }}</th><th>{{ __('lang.evening_end') }}</th>
                             <th>{{ __('lang.full_start') }}</th><th>{{ __('lang.full_end') }}</th>
                         @endif
+                        <th>{{ __('lang.availability_window_start') }}</th><th>{{ __('lang.availability_window_end') }}</th><th>{{ __('lang.buffer_minutes') }}</th>
                         <th>{{ __('lang.status') }}</th>
+                        <th>{{ __('lang.custom_availability_periods') }}</th>
                         @unless(($uniteType ?? ($unite->type ?? '')) === 'stadium' || $unite)
                             <th></th>
                         @endunless
@@ -69,6 +71,9 @@
                                     <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_start]" value="{{ $sl->full_start ?? '' }}"></td>
                                     <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_end]"   value="{{ $sl->full_end ?? '' }}"></td>
                                 @endif
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][day_start]" value="{{ $sl->day_start ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][day_end]" value="{{ $sl->day_end ?? '' }}"></td>
+                                <td><input class="form-control form-control-sm" type="number" min="0" name="slots[{{ $i }}][buffer_minutes]" value="{{ $sl->buffer_minutes ?? 0 }}"></td>
                                 <td>
                                     <select class="form-select form-select-sm" name="slots[{{ $i }}][status]">
                                         @foreach(['available','booked','unavailable'] as $s)
@@ -76,17 +81,14 @@
                                         @endforeach
                                     </select>
                                 </td>
-                                @if($type === 'stadium')
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="togglePeriods({{ $i }})">
-                                            {{ __('lang.custom_availability_periods') }} (<span id="periods-count-{{ $i }}">{{ $sl?->periods->count() ?? 0 }}</span>)
-                                        </button>
-                                    </td>
-                                @endif
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="togglePeriods({{ $i }})">
+                                        {{ __('lang.custom_availability_periods') }} (<span id="periods-count-{{ $i }}">{{ $sl?->periods->count() ?? 0 }}</span>)
+                                    </button>
+                                </td>
                             </tr>
-                            @if($type === 'stadium')
-                                <tr id="periods-row-{{ $i }}" style="display:none">
-                                    <td colspan="3" class="bg-light">
+                            <tr id="periods-row-{{ $i }}" style="display:none">
+                                    <td colspan="9" class="bg-light">
                                         <input type="hidden" name="slots[{{ $i }}][periods_present]" value="1">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <div class="small fw-semibold text-muted">{{ __('lang.custom_availability_periods') }} — {{ __('lang.'.$d) }}</div>
@@ -119,7 +121,6 @@
                                         </table>
                                     </td>
                                 </tr>
-                            @endif
                         @endforeach
                     @elseif($unite)
                         @foreach(['week_day','thursday','friday','saturday'] as $i => $d)
@@ -141,12 +142,54 @@
                                 <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_start]"    value="{{ $sl->full_start ?? '' }}"></td>
                                 <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][full_end]"      value="{{ $sl->full_end ?? '' }}"></td>
                             @endif
+                            <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][day_start]" value="{{ $sl->day_start ?? '' }}"></td>
+                            <td><input class="form-control form-control-sm" type="time" name="slots[{{ $i }}][day_end]" value="{{ $sl->day_end ?? '' }}"></td>
+                            <td><input class="form-control form-control-sm" type="number" min="0" name="slots[{{ $i }}][buffer_minutes]" value="{{ $sl->buffer_minutes ?? 0 }}"></td>
                             <td>
                                 <select class="form-select form-select-sm" name="slots[{{ $i }}][status]">
                                     @foreach(['available','booked','unavailable'] as $s)
                                         <option value="{{ $s }}" {{ ($sl->status ?? 'available') === $s ? 'selected' : '' }}>{{ __('lang.'.$s) }}</option>
                                     @endforeach
                                 </select>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="togglePeriods({{ $i }})">
+                                    {{ __('lang.custom_availability_periods') }} (<span id="periods-count-{{ $i }}">{{ $sl?->periods->count() ?? 0 }}</span>)
+                                </button>
+                            </td>
+                        </tr>
+                        <tr id="periods-row-{{ $i }}" style="display:none">
+                            <td colspan="9" class="bg-light">
+                                <input type="hidden" name="slots[{{ $i }}][periods_present]" value="1">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="small fw-semibold text-muted">{{ __('lang.custom_availability_periods') }} — {{ __('lang.'.$d) }}</div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addPeriodRow({{ $i }})">+ {{ __('lang.add_period') }}</button>
+                                </div>
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:35%">{{ __('lang.start_time') }}</th>
+                                            <th style="width:35%">{{ __('lang.end_time') }}</th>
+                                            <th>{{ __('lang.th_status') }}</th>
+                                            <th class="text-end">{{ __('lang.th_actions') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="periods-body-{{ $i }}">
+                                        @foreach($sl?->periods ?? [] as $j => $period)
+                                            <tr>
+                                                <td><input type="time" name="slots[{{ $i }}][periods][{{ $j }}][start_time]" class="form-control form-control-sm" value="{{ $period->start_time }}"></td>
+                                                <td><input type="time" name="slots[{{ $i }}][periods][{{ $j }}][end_time]" class="form-control form-control-sm" value="{{ $period->end_time }}"></td>
+                                                <td>
+                                                    <select name="slots[{{ $i }}][periods][{{ $j }}][status]" class="form-select form-select-sm">
+                                                        <option value="available" {{ $period->status === 'available' ? 'selected' : '' }}>{{ __('lang.available') }}</option>
+                                                        <option value="unavailable" {{ $period->status === 'unavailable' ? 'selected' : '' }}>{{ __('lang.unavailable') }}</option>
+                                                    </select>
+                                                </td>
+                                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removePeriodRow(this, {{ $i }})">{{ __('lang.delete') }}</button></td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
                             </td>
                         </tr>
                         @endforeach
@@ -178,6 +221,9 @@
             <td><input class="form-control form-control-sm" type="time" name="slots[__I__][full_start]"></td>
             <td><input class="form-control form-control-sm" type="time" name="slots[__I__][full_end]"></td>
         @endif
+        <td><input class="form-control form-control-sm" type="time" name="slots[__I__][day_start]"></td>
+        <td><input class="form-control form-control-sm" type="time" name="slots[__I__][day_end]"></td>
+        <td><input class="form-control form-control-sm" type="number" min="0" name="slots[__I__][buffer_minutes]" value="0"></td>
         <td>
             <select class="form-select form-select-sm" name="slots[__I__][status]">
                 <option value="available">{{ __('lang.available') }}</option>
@@ -185,6 +231,7 @@
                 <option value="unavailable">{{ __('lang.unavailable') }}</option>
             </select>
         </td>
+        <td class="text-muted small">{{ __('lang.save_to_add_periods') }}</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()">✕</button></td>
     </tr>
 </template>

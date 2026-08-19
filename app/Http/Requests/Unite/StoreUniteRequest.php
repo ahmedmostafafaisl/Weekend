@@ -58,6 +58,8 @@ class StoreUniteRequest extends FormRequest
             'offers.*.morning_price' => 'nullable|numeric',
             'offers.*.evening_price' => 'nullable|numeric',
             'offers.*.full_day_price' => 'nullable|numeric',
+            'offers.*.day_hour_price' => 'nullable|numeric|min:0',
+            'offers.*.night_hour_price' => 'nullable|numeric|min:0',
             'offers.*.status' => 'nullable|in:active,inactive',
 
             'reservations' => 'nullable|array',
@@ -252,9 +254,6 @@ class StoreUniteRequest extends FormRequest
             'hall.max_chairs' => ['nullable', 'integer'],
             'hall.max_tables' => ['nullable', 'integer'],
 
-            'hall.all_women_count' => ['nullable', 'integer'],
-            'hall.all_men_count' => ['nullable', 'integer'],
-
             'hall.max_capacity' => ['nullable', 'integer'],
             'hall.women_tables_count' => ['nullable', 'integer'],
             'hall.women_chairs_count' => ['nullable', 'integer'],
@@ -273,6 +272,8 @@ class StoreUniteRequest extends FormRequest
             'hall.women_seating_capacity' => ['nullable', 'integer'],
             'hall.buffet' => ['boolean'],
             'hall.buffet_details' => ['nullable', 'string'],
+            'hall.bathroom' => ['boolean'],
+            'hall.bathroom_number' => ['nullable', 'integer'],
             'hall.morning_start_time' => ['nullable', 'date_format:H:i'],
             'hall.morning_end_time' => ['nullable', 'date_format:H:i'],
             'hall.evening_start_time' => ['nullable', 'date_format:H:i'],

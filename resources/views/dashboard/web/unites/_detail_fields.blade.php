@@ -50,6 +50,25 @@
                 <input class="form-control" name="hall[max_capacity]" type="number" value="{{ old('hall.max_capacity', $detail->max_capacity ?? '') }}">
             </div>
             <div class="col-md-3">
+                <label class="form-label">{{ __('lang.max_chairs') }}</label>
+                <input class="form-control" name="hall[max_chairs]" type="number" value="{{ old('hall.max_chairs', $detail->max_chairs ?? '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ __('lang.max_tables') }}</label>
+                <input class="form-control" name="hall[max_tables]" type="number" value="{{ old('hall.max_tables', $detail->max_tables ?? '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ __('lang.bathrooms') }}</label>
+                <input class="form-control" name="hall[bathroom_number]" type="number" value="{{ old('hall.bathroom_number', $detail->bathroom_number ?? '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ __('lang.bathroom') }}</label>
+                <select class="form-select" name="hall[bathroom]">
+                    <option value="0" {{ old('hall.bathroom', $detail->bathroom ?? 0) == 0 ? 'selected' : '' }}>{{ __('lang.no') }}</option>
+                    <option value="1" {{ old('hall.bathroom', $detail->bathroom ?? 0) == 1 ? 'selected' : '' }}>{{ __('lang.yes') }}</option>
+                </select>
+            </div>
+            <div class="col-md-3">
                 <label class="form-label">{{ __('lang.kusha') }}</label>
                 <select class="form-select" name="hall[kusha]">
                     <option value="0" {{ old('hall.kusha', $detail->kusha ?? 0) == 0 ? 'selected' : '' }}>{{ __('lang.no') }}</option>
@@ -206,7 +225,7 @@
             <div class="col-md-3"><label class="form-label">{{ __('lang.single_beds') }}</label><input class="form-control" name="lounge[single_bed]" type="number" value="{{ old('lounge.single_bed', $detail->single_bed ?? '') }}"></div>
             <div class="col-md-3"><label class="form-label">{{ __('lang.double_beds') }}</label><input class="form-control" name="lounge[big_bed]" type="number" value="{{ old('lounge.big_bed', $detail->big_bed ?? '') }}"></div>
             <div class="col-md-3"><label class="form-label">{{ __('lang.bathrooms') }}</label><input class="form-control" name="lounge[bathroom_number]" type="number" value="{{ old('lounge.bathroom_number', $detail->bathroom_number ?? '') }}"></div>
-            <div class="col-md-3"><label class="form-label">{{ __('lang.council_number') }}</label><input class="form-control" id="councilNumberInput" name="lounge[council_number]" type="number" min="0" readonly value="{{ old('lounge.council_number', $unite?->councils->sum('number') ?? 0) }}"></div>
+            <div class="col-md-3"><label class="form-label">{{ __('lang.council_number') }}</label><input class="form-control" id="councilNumberInput" name="lounge[council_number]" type="number" min="0" readonly value="{{ old('lounge.council_number', $unite?->councils->count() ?? 0) }}"></div>
             <div class="col-md-9">
                 <div class="d-flex justify-content-between align-items-center">
                     <label class="form-label mb-0">{{ __('lang.councils') }}</label>

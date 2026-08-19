@@ -729,6 +729,8 @@ class UniteRepository implements UniteRepositoryInterface
                 'morning_price' => $offer['morning_price'] ?? null,
                 'evening_price' => $offer['evening_price'] ?? null,
                 'full_day_price' => $offer['full_day_price'] ?? null,
+                'day_hour_price' => $offer['day_hour_price'] ?? null,
+                'night_hour_price' => $offer['night_hour_price'] ?? null,
                 'status' => $offer['status'] ?? 'active',
             ]);
         }
@@ -949,10 +951,19 @@ class UniteRepository implements UniteRepositoryInterface
     protected function storeNewFeatures(Unite $unite, array $newFeatures): void
     {
         foreach ($newFeatures as $feature) {
+            // description is validated as 'nullable|json' -- a JSON-syntax
+            // string at this point, not yet decoded. The model casts this
+            // column as 'json' too, which re-encodes whatever's assigned
+            // to it on save -- so the raw validated string must be decoded
+            // first, or the value gets encoded twice.
+            $description = isset($feature['description'])
+                ? json_decode($feature['description'], true)
+                : null;
+
             UniteNewFeature::create([
                 'unite_id' => $unite->id,
                 'title' => $feature['title'] ?? '',
-                'description' => $feature['description'] ?? null,
+                'description' => $description,
             ]);
         }
     }

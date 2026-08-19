@@ -242,7 +242,16 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:admin')->group(function () {
     // POST /api/admin/notifications/test  { email/user_id, title, body, ... }
     Route::post('/admin/notifications/test', [\App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'test'])
-        ->name('admin.notifications.test');
+        ->name('admin.notifications.test')
+        ->middleware('permission:notifications.create');
+
+    // POST /api/admin/notifications/test-token  { device_token, title, body, data: {...} }
+    // Sends directly to an arbitrary device token with an arbitrary data
+    // payload -- does not require a saved User/fcm_token, unlike the
+    // route above.
+    Route::post('/admin/notifications/test-token', [\App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'testToken'])
+        ->name('admin.notifications.test-token')
+        ->middleware('permission:notifications.create');
 
     // GET /api/admin/users/search?q=ahmed&type=customer  — for specific-user picker
     Route::get('/admin/users/search', [\App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'searchUsers'])
