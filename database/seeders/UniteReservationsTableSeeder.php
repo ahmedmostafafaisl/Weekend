@@ -221,10 +221,11 @@ class UniteReservationsTableSeeder extends Seeder
             // spans both rate windows — the same case
             // UnitePrice::calculateHourlyPrice() exists to price correctly
             // as a blend rather than a single flat rate.
-            return match ($idx % 3) {
+            return match ($idx % 4) {
                 0 => ['hourly', '10:00:00', '12:00:00'], // pure morning-rate window
                 1 => ['hourly', '19:00:00', '21:00:00'], // pure evening-rate window
-                default => ['hourly', '17:00:00', '20:00:00'], // spans both — priced as a blend
+                2 => ['hourly', '17:00:00', '20:00:00'], // spans both — priced as a blend
+                default => ['hourly', '23:00:00', '01:00:00'], // genuinely overnight — new this session
             };
         }
 

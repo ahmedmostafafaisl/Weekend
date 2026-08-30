@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Unite;
 use App\Models\UniteSlot;
+use App\Models\UniteSlotPeriod;
 use Illuminate\Database\Seeder;
 
 class UniteSlotsTableSeeder extends Seeder
@@ -17,31 +18,34 @@ class UniteSlotsTableSeeder extends Seeder
                 $isClosed = ($day === 'sunday' && $unite->type === 'hall'); // halls closed Sundays
 
                 if ($unite->type === 'stadium') {
-                    // BUG FIX: stadiums are now available 24 hours a day —
-                    // this used to seed a limited evening-only window
-                    // (16:00/17:00-23:00), which no longer matches the
-                    // hourly-only, 24hr booking model. full_start/full_end
-                    // are fixed at 00:00/23:59 for every day, matching what
-                    // the admin dashboard now sends as hidden inputs (no
-                    // manual time entry exists for this type anymore).
+                    // BUG FIX (earlier): stadiums are hourly-only, so this
+                    // used to seed a limited evening-only window
+                    // (16:00/17:00-23:00), which didn't match the actual
+                    // hourly booking model at all.
                     //
-                    // day_start/day_end/buffer_minutes added here for the
-                    // availability feature (previously absent — nullable,
-                    // so their absence never broke anything, but seed data
-                    // never actually exercised the new operating-window
-                    // configuration at all). Matches full_start/full_end,
-                    // the window already established as this type's
-                    // intended operating hours in this seeder.
+                    // UPDATE (this session): now genuinely overnight (08:00
+                    // to 02:00 the following morning) instead of a same-day
+                    // 24hr window (00:00-23:59) -- demonstrates the
+                    // overnight-booking feature directly in seed data,
+                    // rather than a window that never actually exercised
+                    // it. Chosen to still fully contain every existing
+                    // reservation example below (10:00-12:00, 19:00-21:00,
+                    // 17:00-20:00), while also making room for the new
+                    // overnight example (23:00-01:00) added alongside it.
+                    //
+                    // day_start/day_end/buffer_minutes added for the
+                    // availability feature, matching full_start/full_end,
+                    // this type's intended operating hours in this seeder.
                     UniteSlot::updateOrCreate(
                         ['unite_id' => $unite->id, 'day_of_week' => $day],
                         [
                             'morning_start' => null, 'morning_end' => null,
                             'evening_start' => null, 'evening_end' => null,
-                            'full_start' => '00:00:00',
-                            'full_end' => '23:59:00',
+                            'full_start' => '08:00:00',
+                            'full_end' => '02:00:00',
                             'status' => 'available',
-                            'day_start' => '00:00:00',
-                            'day_end' => '23:59:00',
+                            'day_start' => '08:00:00',
+                            'day_end' => '02:00:00',
                             'buffer_minutes' => 15,
                         ]
                     );
@@ -89,6 +93,34 @@ class UniteSlotsTableSeeder extends Seeder
                             'day_end' => '23:00:00',
                             'buffer_minutes' => 15,
                         ]
+                    );
+                }
+            }
+
+            // Custom periods (UniteSlotPeriod) -- new this session, no seed
+            // data existed for this at all before. Seeded on 'friday' only
+            // per unite (illustrative examples, not a full weekly
+            // schedule) to keep this seeder's output reviewable.
+            if ($unite->type === 'stadium') {
+                $fridaySlot = UniteSlot::where('unite_id', $unite->id)->where('day_of_week', 'friday')->first();
+                if ($fridaySlot) {
+                    // Genuinely overnight (23:00 to 01:00 the following
+                    // morning), within the stadium's own 08:00-02:00
+                    // operating window -- a "prime night" premium slot.
+                    UniteSlotPeriod::updateOrCreate(
+                        ['unite_slot_id' => $fridaySlot->id, 'start_time' => '23:00:00', 'end_time' => '01:00:00'],
+                        ['status' => 'available']
+                    );
+                }
+            } elseif ($unite->type === 'lounge') {
+                $fridaySlot = UniteSlot::where('unite_id', $unite->id)->where('day_of_week', 'friday')->first();
+                if ($fridaySlot) {
+                    // Same-day example (14:00-16:00) -- confirms custom
+                    // periods work identically for a normal, non-overnight
+                    // case, not just the stadium's overnight one above.
+                    UniteSlotPeriod::updateOrCreate(
+                        ['unite_slot_id' => $fridaySlot->id, 'start_time' => '14:00:00', 'end_time' => '16:00:00'],
+                        ['status' => 'available']
                     );
                 }
             }

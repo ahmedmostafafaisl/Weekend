@@ -26,7 +26,7 @@ class StoreReservationRequest extends FormRequest
             'end_date' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:reservation_date'],
             'period_type' => ['required', 'in:morning,evening,full_day,custom,hourly,package'],
             'from_time' => ['nullable', 'required_if:period_type,custom', 'required_if:period_type,hourly', 'date_format:H:i'],
-            'to_time' => ['nullable', 'required_if:period_type,custom', 'required_if:period_type,hourly', 'date_format:H:i', 'after:from_time'],
+            'to_time' => ['nullable', 'required_if:period_type,custom', 'required_if:period_type,hourly', 'date_format:H:i'],
             'booking_package_id' => ['nullable', 'required_if:period_type,package', 'integer', 'exists:unite_booking_packages,id'],
             'phone' => ['nullable', 'string', 'max:20'],
             'promo_code' => ['nullable', 'string', 'max:50'],

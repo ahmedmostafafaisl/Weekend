@@ -45,23 +45,23 @@ class StoreUniteSlotRequest extends FormRequest
 
         if ($unite && $unite->type === 'stadium') {
             $rules['full_start'] = ['required', 'date_format:H:i'];
-            $rules['full_end'] = ['required', 'date_format:H:i', 'after:full_start'];
+            $rules['full_end'] = ['required', 'date_format:H:i'];
         } else {
             $rules['morning_start'] = ['nullable', 'date_format:H:i'];
-            $rules['morning_end'] = ['nullable', 'date_format:H:i', 'after:morning_start'];
+            $rules['morning_end'] = ['nullable', 'date_format:H:i'];
             $rules['evening_start'] = ['nullable', 'date_format:H:i'];
-            $rules['evening_end'] = ['nullable', 'date_format:H:i', 'after:evening_start'];
+            $rules['evening_end'] = ['nullable', 'date_format:H:i'];
             $rules['full_start'] = ['nullable', 'date_format:H:i'];
-            $rules['full_end'] = ['nullable', 'date_format:H:i', 'after:full_start'];
+            $rules['full_end'] = ['nullable', 'date_format:H:i'];
         }
 
         $rules['day_start'] = ['nullable', 'date_format:H:i'];
-        $rules['day_end'] = ['nullable', 'date_format:H:i', 'after:day_start'];
+        $rules['day_end'] = ['nullable', 'date_format:H:i'];
         $rules['buffer_minutes'] = ['nullable', 'integer', 'min:0'];
 
         $rules['periods'] = ['nullable', 'array'];
         $rules['periods.*.start_time'] = ['required_with:periods', 'date_format:H:i'];
-        $rules['periods.*.end_time'] = ['required_with:periods', 'date_format:H:i', 'after:periods.*.start_time'];
+        $rules['periods.*.end_time'] = ['required_with:periods', 'date_format:H:i'];
         $rules['periods.*.status'] = ['nullable', 'in:available,unavailable'];
 
         return $rules;

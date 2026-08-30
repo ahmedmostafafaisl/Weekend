@@ -35,7 +35,7 @@ class StoreUniteRequest extends FormRequest
             'add_to_story' => 'nullable|boolean',
 
             'images' => 'array',
-            'images.*.image' => 'file|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'images.*.image' => 'file|mimes:jpeg,png,jpg,gif,webp|max:20048',
 
             // BUG FIX: UniteRepository::update() deletes any existing image
             // whose ID isn't in keep_image_ids — but that field was never
@@ -96,12 +96,12 @@ class StoreUniteRequest extends FormRequest
         // StoreUniteSlotRequest already validates on the standalone
         // /unites/{id}/slots endpoint.
         $rules['slots.*.day_start'] = 'nullable|date_format:H:i';
-        $rules['slots.*.day_end'] = 'nullable|date_format:H:i|after:slots.*.day_start';
+        $rules['slots.*.day_end'] = 'nullable|date_format:H:i';
         $rules['slots.*.buffer_minutes'] = 'nullable|integer|min:0';
         $rules['slots.*.periods'] = 'nullable|array';
         $rules['slots.*.periods_present'] = 'nullable|boolean';
         $rules['slots.*.periods.*.start_time'] = 'required_with:slots.*.periods|date_format:H:i';
-        $rules['slots.*.periods.*.end_time'] = 'required_with:slots.*.periods|date_format:H:i|after:slots.*.periods.*.start_time';
+        $rules['slots.*.periods.*.end_time'] = 'required_with:slots.*.periods|date_format:H:i';
         $rules['slots.*.periods.*.status'] = 'nullable|in:available,unavailable';
 
         $type = $this->input('type');
@@ -111,21 +111,21 @@ class StoreUniteRequest extends FormRequest
             // stadium's operating window (the hours within which an hourly
             // booking can be made), not a whole-day reservation type.
             $rules['slots.*.full_start'] = 'required|date_format:H:i';
-            $rules['slots.*.full_end'] = 'required|date_format:H:i|after:slots.*.full_start';
+            $rules['slots.*.full_end'] = 'required|date_format:H:i';
         } elseif ($type === 'hall') {
             // BUG FIX: halls are full-day only — morning/evening are no
             // longer accepted at all, matching the reservation flow which
             // should only ever offer 'full_day' for this type.
             $rules['slots.*.full_start'] = 'required|date_format:H:i';
-            $rules['slots.*.full_end'] = 'required|date_format:H:i|after:slots.*.full_start';
+            $rules['slots.*.full_end'] = 'required|date_format:H:i';
         } else {
             // lounge, camp — unchanged, still support all 3 periods.
             $rules['slots.*.morning_start'] = 'required|date_format:H:i';
-            $rules['slots.*.morning_end'] = 'required|date_format:H:i|after:slots.*.morning_start';
+            $rules['slots.*.morning_end'] = 'required|date_format:H:i';
             $rules['slots.*.evening_start'] = 'required|date_format:H:i';
-            $rules['slots.*.evening_end'] = 'required|date_format:H:i|after:slots.*.evening_start';
+            $rules['slots.*.evening_end'] = 'required|date_format:H:i';
             $rules['slots.*.full_start'] = 'required|date_format:H:i';
-            $rules['slots.*.full_end'] = 'required|date_format:H:i|after:slots.*.full_start';
+            $rules['slots.*.full_end'] = 'required|date_format:H:i';
         }
 
         if ($type === 'stadium') {
@@ -383,10 +383,17 @@ class StoreUniteRequest extends FormRequest
         }
         unset($res);
 
-        $this->merge([
-            'hall' => $hall,
-            'slots' => $slots,
-            'reservations' => $reservations,
-        ]);
+        $merge = [];
+        if (array_key_exists('hall', $data)) {
+            $merge['hall'] = $hall;
+        }
+        if (array_key_exists('slots', $data)) {
+            $merge['slots'] = $slots;
+        }
+        if (array_key_exists('reservations', $data)) {
+            $merge['reservations'] = $reservations;
+        }
+
+        $this->merge($merge);
     }
 }
