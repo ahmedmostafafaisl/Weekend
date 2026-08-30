@@ -105,7 +105,11 @@ class UnitePrice extends Model
         $blockMinutes = max(1, (int) ($this->min_booking_minutes ?? 60));
 
         if ($to->lte($from)) {
-            return 0.0; // invalid range — controller has already validated this
+            // An overnight range (e.g. from=22:00, to=02:00 the next day) --
+            // not invalid, just wraps past midnight. Bump $to forward a day
+            // rather than rejecting it outright and silently pricing the
+            // booking at 0.0.
+            $to = \App\Support\OvernightRange::normalizeEnd($from, $to);
         }
 
         $totalMinutes = $from->diffInMinutes($to);
@@ -121,7 +125,16 @@ class UnitePrice extends Model
         $total = 0.0;
         $cursor = $from->copy();
         for ($i = 0; $i < $blockCount; $i++) {
-            $isDay = $cursor->gte($dayStart) && $cursor->lt($dayEnd);
+            // $dayStart/$dayEnd describe a boundary that recurs every
+            // calendar day (e.g. "day rate applies 06:00-18:00"), not a
+            // single fixed date -- re-anchor both to $cursor's own date
+            // before comparing, so a block that has advanced past midnight
+            // is still correctly checked against that same recurring
+            // boundary, not one still anchored to the original day.
+            $todayDayStart = $cursor->copy()->setTimeFrom($dayStart);
+            $todayDayEnd = $cursor->copy()->setTimeFrom($dayEnd);
+
+            $isDay = $cursor->gte($todayDayStart) && $cursor->lt($todayDayEnd);
             $total += $isDay ? $dayRate : $nightRate;
             $cursor->addMinutes($blockMinutes);
         }

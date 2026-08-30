@@ -99,23 +99,55 @@ class UniteReservation extends Model
     {
         $endDate = $endDate ?? $startDate;
         $isMultiDayRequest = $endDate !== $startDate;
+        $isTimeCheck = ! $isMultiDayRequest && $fromTime && $toTime;
+
+        // Widen the candidate date range by a day on each side for a
+        // time-based check specifically -- either the new request or an
+        // existing candidate reservation could itself be overnight and
+        // spill across the date boundary, so a candidate reservation
+        // dated the day before/after startDate/endDate must still be
+        // considered, not excluded before the time comparison even runs.
+        $candidateStart = $isTimeCheck ? date('Y-m-d', strtotime($startDate.' -1 day')) : $startDate;
+        $candidateEnd = $isTimeCheck ? date('Y-m-d', strtotime($endDate.' +1 day')) : $endDate;
 
         $query->where('unite_id', $uniteId)
             ->whereIn('status', ['pending', 'confirmed'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->where('reservation_date', '<=', $endDate)
-                    ->where(function ($q2) use ($startDate) {
-                        $q2->whereRaw('COALESCE(end_date, reservation_date) >= ?', [$startDate]);
+            ->where(function ($q) use ($candidateStart, $candidateEnd) {
+                $q->where('reservation_date', '<=', $candidateEnd)
+                    ->where(function ($q2) use ($candidateStart) {
+                        $q2->whereRaw('COALESCE(end_date, reservation_date) >= ?', [$candidateStart]);
                     });
             });
 
-        if (! $isMultiDayRequest && $fromTime && $toTime) {
-            $query->where(function ($q) use ($fromTime, $toTime, $bufferMinutes) {
+        if ($isTimeCheck) {
+            $query->where(function ($q) use ($startDate, $fromTime, $toTime, $bufferMinutes) {
                 $q->whereNotNull('end_date')
-                    ->orWhere(function ($q2) use ($fromTime, $toTime, $bufferMinutes) {
+                    ->orWhere(function ($q2) use ($startDate, $fromTime, $toTime, $bufferMinutes) {
+                        // Existing reservation's real start/end datetimes --
+                        // end bumped a day forward whenever to_time isn't
+                        // strictly after from_time (an overnight row).
+                        $existingStart = 'TIMESTAMP(reservation_date, from_time)';
+                        $existingEnd = 'IF(to_time > from_time,
+                                TIMESTAMP(reservation_date, to_time),
+                                DATE_ADD(TIMESTAMP(reservation_date, to_time), INTERVAL 1 DAY)
+                            )';
+
+                        // The requested range's own start/end datetimes,
+                        // anchored on startDate -- same overnight bump.
+                        $requestedStart = 'TIMESTAMP(?, ?)';
+                        $requestedEnd = $toTime > $fromTime
+                            ? 'TIMESTAMP(?, ?)'
+                            : 'DATE_ADD(TIMESTAMP(?, ?), INTERVAL 1 DAY)';
+
                         $q2->whereNull('end_date')
-                            ->whereRaw('SUBTIME(from_time, SEC_TO_TIME(? * 60)) < ?', [$bufferMinutes, $toTime])
-                            ->whereRaw('ADDTIME(to_time, SEC_TO_TIME(? * 60)) > ?', [$bufferMinutes, $fromTime]);
+                            ->whereRaw(
+                                "DATE_SUB({$existingStart}, INTERVAL ? MINUTE) < {$requestedEnd}",
+                                [$bufferMinutes, $startDate, $toTime]
+                            )
+                            ->whereRaw(
+                                "DATE_ADD({$existingEnd}, INTERVAL ? MINUTE) > {$requestedStart}",
+                                [$bufferMinutes, $startDate, $fromTime]
+                            );
                     });
             });
         }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -121,9 +122,42 @@ class UniteSlot extends Model
 
         $windows = $this->availabilityWindows();
 
+        // Fixed, arbitrary reference day -- only used to give every time a
+        // real datetime to compare against; the actual calendar date never
+        // matters here, only the relative day-offsets between the window's
+        // start/end and the request's start/end.
+        $anchor = '2000-01-01';
+
         foreach ($windows as [$windowStart, $windowEnd]) {
-            if ($from >= substr($windowStart, 0, 5) && $to <= substr($windowEnd, 0, 5)) {
-                return true;
+            $windowStart = substr($windowStart, 0, 5);
+            $windowEnd = substr($windowEnd, 0, 5);
+
+            $windowStartDt = Carbon::parse("{$anchor} {$windowStart}");
+            $windowEndDt = Carbon::parse("{$anchor} {$windowEnd}");
+            // An end time that isn't strictly after its own start means
+            // the window wraps past midnight (e.g. 17:00-05:00) -- push it
+            // to the next calendar day so the comparison below is a
+            // normal, correctly-ordered datetime range.
+            if ($windowEndDt->lte($windowStartDt)) {
+                $windowEndDt->addDay();
+            }
+
+            // Try the request anchored on the window's own start day first
+            // (covers a request entirely within the "evening part", or one
+            // that spans the midnight boundary itself), then retry one day
+            // later (covers a request entirely within the "morning part"
+            // of an overnight window -- genuinely the next calendar day
+            // relative to the window's own start).
+            foreach ([0, 1] as $dayOffset) {
+                $fromDt = Carbon::parse("{$anchor} {$from}")->addDays($dayOffset);
+                $toDt = Carbon::parse("{$anchor} {$to}")->addDays($dayOffset);
+                if ($toDt->lte($fromDt)) {
+                    $toDt->addDay();
+                }
+
+                if ($fromDt->gte($windowStartDt) && $toDt->lte($windowEndDt)) {
+                    return true;
+                }
             }
         }
 

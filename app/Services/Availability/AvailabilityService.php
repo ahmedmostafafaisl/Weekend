@@ -35,8 +35,11 @@ class AvailabilityService
             : collect();
 
         // Existing reservations for the whole month (pending + confirmed only)
+        // -- widened one day earlier than $start, since an overnight
+        // reservation dated the day before could spill into $start itself
+        // (see reservationsForDate()).
         $reservations = UniteReservation::where('unite_id', $unite->id)
-            ->whereBetween('reservation_date', [$start->toDateString(), $end->toDateString()])
+            ->whereBetween('reservation_date', [$start->copy()->subDay()->toDateString(), $end->toDateString()])
             ->whereIn('status', ['pending', 'confirmed'])
             ->get()
             ->groupBy(fn ($r) => $r->reservation_date->format('Y-m-d'));
@@ -50,7 +53,7 @@ class AvailabilityService
                 $slots,
                 $prices,
                 $activeOffers,
-                $reservations->get($date->format('Y-m-d'), collect()),
+                $this->reservationsForDate($reservations, $date),
                 $bookingPackages
             );
         }
@@ -109,7 +112,7 @@ class AvailabilityService
             : collect();
 
         $reservations = UniteReservation::where('unite_id', $unite->id)
-            ->whereBetween('reservation_date', [$start->toDateString(), $end->toDateString()])
+            ->whereBetween('reservation_date', [$start->copy()->subDay()->toDateString(), $end->toDateString()])
             ->whereIn('status', ['pending', 'confirmed'])
             ->get()
             ->groupBy(fn ($r) => $r->reservation_date->format('Y-m-d'));
@@ -127,7 +130,7 @@ class AvailabilityService
                 $slots,
                 $prices,
                 $activeOffers,
-                $reservations->get($date->format('Y-m-d'), collect()),
+                $this->reservationsForDate($reservations, $date),
                 $bookingPackages
             );
             $dates[] = $entry;
@@ -167,6 +170,42 @@ class AvailabilityService
             'total_price' => $totalPrice,
             'dates' => $dates,
         ];
+    }
+
+    /**
+     * Reservations relevant to $date's availability: its own reservations,
+     * plus a synthetic spillover entry for any reservation dated the day
+     * BEFORE $date whose own to_time isn't strictly after its from_time --
+     * the same signal used throughout this feature to mean "this
+     * reservation wraps past midnight". Such a reservation's from_time
+     * (e.g. 22:00 yesterday) already happened and has no bearing on
+     * today; only the portion from the start of today through its
+     * to_time (e.g. 02:00) is relevant here, so the spillover entry is
+     * represented as 00:00-to_time, not the original range.
+     *
+     * A genuine clone of the reservation model (replicate()) rather than
+     * a plain array, so every existing consumer (isPeriodBooked(),
+     * splitPeriodAroundReservations(), buildStadiumPeriods()) keeps
+     * working unmodified -- they only ever read ->from_time/->to_time,
+     * which the clone provides identically to an actual same-day
+     * reservation.
+     */
+    private function reservationsForDate(Collection $reservationsByDate, Carbon $date): Collection
+    {
+        $today = $reservationsByDate->get($date->format('Y-m-d'), collect());
+
+        $yesterday = $reservationsByDate->get($date->copy()->subDay()->format('Y-m-d'), collect());
+
+        $spillover = $yesterday
+            ->filter(fn ($r) => $r->to_time <= $r->from_time)
+            ->map(function ($r) {
+                $clone = $r->replicate();
+                $clone->from_time = strlen($r->from_time) > 5 ? '00:00:00' : '00:00';
+
+                return $clone;
+            });
+
+        return $today->concat($spillover);
     }
 
     // -------------------------------------------------------------------------
@@ -353,11 +392,17 @@ class AvailabilityService
         int $bufferMinutes,
         int $minBookingMinutes
     ): array {
-        $overlapping = $dayReservations->filter(function ($r) use ($periodStart, $periodEnd, $bufferMinutes) {
-            $from = $this->subtractMinutes($r->from_time, $bufferMinutes);
-            $to = $this->addMinutes($r->to_time, $bufferMinutes);
+        $anchor = '2000-01-01';
+        $format = strlen($periodStart) > 5 || strlen($periodEnd) > 5 ? 'H:i:s' : 'H:i';
 
-            return $from < $periodEnd && $to > $periodStart;
+        [$periodStartDt, $periodEndDt] = $this->normalizeRangeToDatetimes($anchor, $periodStart, $periodEnd);
+
+        $overlapping = $dayReservations->filter(function ($r) use ($anchor, $periodStartDt, $periodEndDt, $bufferMinutes) {
+            [$resStart, $resEnd] = $this->normalizeRangeToDatetimes($anchor, $r->from_time, $r->to_time);
+            $from = $resStart->copy()->subMinutes($bufferMinutes);
+            $to = $resEnd->copy()->addMinutes($bufferMinutes);
+
+            return $from->lt($periodEndDt) && $to->gt($periodStartDt);
         });
 
         if ($overlapping->isEmpty()) {
@@ -366,37 +411,38 @@ class AvailabilityService
 
         $merged = [];
         foreach ($overlapping->sortBy('from_time') as $r) {
+            [$resStart, $resEnd] = $this->normalizeRangeToDatetimes($anchor, $r->from_time, $r->to_time);
             $range = [
-                'from' => $this->subtractMinutes($r->from_time, $bufferMinutes),
-                'to' => $this->addMinutes($r->to_time, $bufferMinutes),
+                'from' => $resStart->copy()->subMinutes($bufferMinutes),
+                'to' => $resEnd->copy()->addMinutes($bufferMinutes),
             ];
 
-            if ($merged && $range['from'] <= end($merged)['to']) {
-                $merged[array_key_last($merged)]['to'] = max(end($merged)['to'], $range['to']);
+            if ($merged && $range['from']->lte(end($merged)['to'])) {
+                $merged[array_key_last($merged)]['to'] = $range['to']->gt(end($merged)['to']) ? $range['to'] : end($merged)['to'];
             } else {
                 $merged[] = $range;
             }
         }
 
         $gaps = [];
-        $cursor = $periodStart;
+        $cursor = $periodStartDt;
 
         foreach ($merged as $range) {
-            if ($range['from'] > $cursor) {
-                $gaps[] = ['from' => $cursor, 'to' => min($range['from'], $periodEnd)];
+            if ($range['from']->gt($cursor)) {
+                $gaps[] = ['from' => $cursor, 'to' => $range['from']->lt($periodEndDt) ? $range['from'] : $periodEndDt];
             }
-            $cursor = max($cursor, $range['to']);
+            $cursor = $range['to']->gt($cursor) ? $range['to'] : $cursor;
         }
 
-        if ($cursor < $periodEnd) {
-            $gaps[] = ['from' => $cursor, 'to' => $periodEnd];
+        if ($cursor->lt($periodEndDt)) {
+            $gaps[] = ['from' => $cursor, 'to' => $periodEndDt];
         }
 
         $bookable = [];
         foreach ($gaps as $gap) {
-            $durationMinutes = Carbon::parse($gap['to'])->diffInMinutes(Carbon::parse($gap['from']));
+            $durationMinutes = $gap['from']->diffInMinutes($gap['to']);
             if ($durationMinutes >= $minBookingMinutes) {
-                $bookable[] = ['start' => $gap['from'], 'end' => $gap['to'], 'available' => true];
+                $bookable[] = ['start' => $gap['from']->format($format), 'end' => $gap['to']->format($format), 'available' => true];
             }
         }
 
@@ -552,6 +598,10 @@ class AvailabilityService
         $nightHourPrice = $offer?->night_hour_price ?? $price?->night_hour_price ?? 0;
         $isPastDate = $date->isPast() && ! $date->isToday();
 
+        $anchor = '2000-01-01';
+        $format = strlen($windowStart) > 5 || strlen($windowEnd) > 5 ? 'H:i:s' : 'H:i';
+        [$windowStartDt, $windowEndDt] = $this->normalizeRangeToDatetimes($anchor, $windowStart, $windowEnd);
+
         // Merge overlapping/adjacent booked ranges first (ensureNoConflict
         // should prevent genuine overlaps from ever being created, but
         // merging defensively means this still produces a clean gap list
@@ -562,17 +612,21 @@ class AvailabilityService
         // actually reject once buffer is accounted for.
         $bufferMinutes = (int) ($slot->buffer_minutes ?? 0);
         $booked = $dayReservations
-            ->map(fn ($r) => [
-                'from' => $this->subtractMinutes($r->from_time, $bufferMinutes),
-                'to' => $this->addMinutes($r->to_time, $bufferMinutes),
-            ])
-            ->sortBy('from')
+            ->map(function ($r) use ($anchor, $bufferMinutes) {
+                [$resStart, $resEnd] = $this->normalizeRangeToDatetimes($anchor, $r->from_time, $r->to_time);
+
+                return [
+                    'from' => $resStart->copy()->subMinutes($bufferMinutes),
+                    'to' => $resEnd->copy()->addMinutes($bufferMinutes),
+                ];
+            })
+            ->sortBy(fn ($r) => $r['from']->timestamp)
             ->values();
 
         $merged = [];
         foreach ($booked as $range) {
-            if ($merged && $range['from'] <= end($merged)['to']) {
-                $merged[array_key_last($merged)]['to'] = max(end($merged)['to'], $range['to']);
+            if ($merged && $range['from']->lte(end($merged)['to'])) {
+                $merged[array_key_last($merged)]['to'] = $range['to']->gt(end($merged)['to']) ? $range['to'] : end($merged)['to'];
             } else {
                 $merged[] = $range;
             }
@@ -581,17 +635,17 @@ class AvailabilityService
         // Walk the operating window, emitting a free slot for every gap
         // before/between/after the merged booked ranges.
         $slots = [];
-        $cursor = $windowStart;
+        $cursor = $windowStartDt;
 
         foreach ($merged as $range) {
-            if ($range['from'] > $cursor) {
-                $slots[] = $this->makeStadiumSlot($cursor, $range['from'], $dayHourPrice, $nightHourPrice, $isPastDate);
+            if ($range['from']->gt($cursor)) {
+                $slots[] = $this->makeStadiumSlot($cursor->format($format), $range['from']->format($format), $dayHourPrice, $nightHourPrice, $isPastDate);
             }
-            $cursor = max($cursor, $range['to']);
+            $cursor = $range['to']->gt($cursor) ? $range['to'] : $cursor;
         }
 
-        if ($cursor < $windowEnd) {
-            $slots[] = $this->makeStadiumSlot($cursor, $windowEnd, $dayHourPrice, $nightHourPrice, $isPastDate);
+        if ($cursor->lt($windowEndDt)) {
+            $slots[] = $this->makeStadiumSlot($cursor->format($format), $windowEndDt->format($format), $dayHourPrice, $nightHourPrice, $isPastDate);
         }
 
         // The whole window was booked solid, no gaps at all — return it as
@@ -672,41 +726,53 @@ class AvailabilityService
             return $dayReservations->isNotEmpty();
         }
 
-        // morning / evening: check time overlap, symmetrically expanding
-        // each existing reservation's window by the buffer on both sides
-        // first — matching UniteReservation::scopeConflicting() exactly,
-        // so this preview can't show a period as available that actual
-        // reservation creation would then reject.
-        return $dayReservations->contains(function ($res) use ($fromTime, $toTime, $bufferMinutes) {
-            $effectiveFrom = $this->subtractMinutes($res->from_time, $bufferMinutes);
-            $effectiveTo = $this->addMinutes($res->to_time, $bufferMinutes);
+        // morning / evening / stadium's hourly window: check real datetime
+        // overlap (not plain time-string comparison, which cannot
+        // correctly represent an overnight period or reservation),
+        // symmetrically expanding each existing reservation's window by
+        // the buffer on both sides first — matching
+        // UniteReservation::scopeConflicting() exactly, so this preview
+        // can't show a period as available that actual reservation
+        // creation would then reject, or vice versa.
+        $anchor = '2000-01-01';
+        [$periodStart, $periodEnd] = $this->normalizeRangeToDatetimes($anchor, $fromTime, $toTime);
 
-            return $effectiveFrom < $toTime && $effectiveTo > $fromTime;
+        return $dayReservations->contains(function ($res) use ($anchor, $periodStart, $periodEnd, $bufferMinutes) {
+            [$resStart, $resEnd] = $this->normalizeRangeToDatetimes($anchor, $res->from_time, $res->to_time);
+
+            $effectiveFrom = $resStart->copy()->subMinutes($bufferMinutes);
+            $effectiveTo = $resEnd->copy()->addMinutes($bufferMinutes);
+
+            return $effectiveFrom->lt($periodEnd) && $effectiveTo->gt($periodStart);
         });
     }
 
     /**
-     * Plain string time arithmetic ("H:i" or "H:i:s" in, same format out)
-     * for the buffer expansion above — avoids a Carbon round-trip per
-     * reservation per period just to add/subtract a handful of minutes.
+     * Anchors a [from, to] time-only range to real Carbon datetimes on a
+     * fixed reference day, bumping the end forward a day whenever it
+     * isn't strictly after its own start -- the same "wraps past
+     * midnight" signal used throughout the rest of the overnight-booking
+     * support (see App\Support\OvernightRange, used identically for
+     * UnitePrice/reservation duration; kept as a private method here
+     * rather than routed through that same helper since this one needs
+     * to build both ends from bare time strings in one step, and is used
+     * only by isPeriodBooked() above).
      *
-     * KNOWN LIMITATION (pre-existing, not introduced by buffer): from_time/
-     * to_time are time-only columns with no date component, so a result
-     * that crosses midnight wraps around (e.g. 23:50 + 15min -> "00:05",
-     * not "next day 00:05") rather than genuinely rolling over. This
-     * mirrors an existing constraint already present throughout the
-     * reservation system — a reservation itself can't span midnight in
-     * this schema today, buffer just inherits the same limitation rather
-     * than introducing a new one.
+     * @return array{0: Carbon, 1: Carbon}
      */
-    private function addMinutes(string $time, int $minutes): string
+    private function normalizeRangeToDatetimes(string $anchor, string $from, string $to): array
     {
-        return $minutes === 0 ? $time : Carbon::parse($time)->addMinutes($minutes)->format(strlen($time) > 5 ? 'H:i:s' : 'H:i');
-    }
+        $from = substr($from, 0, 5);
+        $to = substr($to, 0, 5);
 
-    private function subtractMinutes(string $time, int $minutes): string
-    {
-        return $minutes === 0 ? $time : Carbon::parse($time)->subMinutes($minutes)->format(strlen($time) > 5 ? 'H:i:s' : 'H:i');
+        $fromDt = Carbon::parse("{$anchor} {$from}");
+        $toDt = Carbon::parse("{$anchor} {$to}");
+
+        if ($toDt->lte($fromDt)) {
+            $toDt->addDay();
+        }
+
+        return [$fromDt, $toDt];
     }
 
     /**
