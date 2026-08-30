@@ -39,7 +39,7 @@ class StoreUniteSlotRequest extends FormRequest
         $unite = $this->route('unite');
 
         $rules = [
-            'day_of_week' => ['required', 'in:week_day,thursday,friday,saturday'],
+            'day_of_week' => ['required', 'in:week_day,friday'],
             'status' => ['required', 'in:available,booked,unavailable'],
         ];
 

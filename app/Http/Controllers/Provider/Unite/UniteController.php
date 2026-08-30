@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Unite\RateUniteRequest;
 use App\Http\Requests\Unite\RateVendorRequest;
 use App\Http\Requests\Unite\StoreUniteRequest;
+use App\Http\Requests\Unite\UpdateUniteRequest;
 use App\Http\Resources\Unite\FavoriteUniteResource;
 use App\Http\Resources\Unite\SingleUniteResource;
 use App\Http\Resources\Unite\UniteResource;
@@ -241,7 +242,7 @@ class UniteController extends Controller
         return view('dashboard.web.unites.edit', compact('unite', 'departments', 'insurancePolicies', 'services'));
     }
 
-    public function update(StoreUniteRequest $request, Unite $unite)
+    public function update(UpdateUniteRequest $request, Unite $unite)
     {
         $this->authorize('update', $unite);
 

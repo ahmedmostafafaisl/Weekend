@@ -87,7 +87,7 @@ class StoreUniteRequest extends FormRequest
 
         // slots by weekday
         $rules['slots'] = 'nullable|array|min:1';
-        $rules['slots.*.day_of_week'] = 'required|in:week_day,thursday,friday,saturday';
+        $rules['slots.*.day_of_week'] = 'required|in:week_day,friday';
         $rules['slots.*.status'] = 'nullable|in:available,booked,unavailable';
 
         // Availability feature fields — validated here too so they aren't

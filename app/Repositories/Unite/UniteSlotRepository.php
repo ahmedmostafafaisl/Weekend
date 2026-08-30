@@ -23,10 +23,12 @@ class UniteSlotRepository implements UniteSlotInterface
     }
 
     /**
-     * Sunday through Wednesday — the 4 individual days that 'week_day'
-     * expands into. Matches UnitePrice's own day-category grouping exactly.
+     * Every day except Friday -- the 6 individual days that 'week_day'
+     * expands into. Deliberately does NOT match UnitePrice's own day
+     * grouping (thursday/friday/saturday/week_day=sun-wed) -- this is
+     * scoped to unite_slots.day_of_week specifically, per request.
      */
-    private const WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday'];
+    private const WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'saturday'];
 
     public function createForUnite(Unite $unite, array $data): Collection
     {

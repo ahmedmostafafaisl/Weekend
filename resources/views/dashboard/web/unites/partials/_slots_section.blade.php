@@ -55,7 +55,7 @@
                              provider-specific, unlike stadium's fixed 24hr
                              window. Hall on CREATE still uses the dynamic
                              dropdown-based rows below, unchanged. --}}
-                        @foreach(['week_day','thursday','friday','saturday'] as $i => $d)
+                        @foreach(['week_day','friday'] as $i => $d)
                             @php($lookupDay = $d === 'week_day' ? 'sunday' : $d)
                             @php($sl = $unite ? $unite->slots->firstWhere('day_of_week', $lookupDay) : null)
                             <tr>
@@ -123,7 +123,7 @@
                                 </tr>
                         @endforeach
                     @elseif($unite)
-                        @foreach(['week_day','thursday','friday','saturday'] as $i => $d)
+                        @foreach(['week_day','friday'] as $i => $d)
                             @php($lookupDay = $d === 'week_day' ? 'sunday' : $d)
                             @php($sl = $unite->slots->firstWhere('day_of_week', $lookupDay))
                         <tr>
@@ -205,7 +205,7 @@
     <tr>
         <td>
             <select class="form-select form-select-sm" name="slots[__I__][day_of_week]">
-                @foreach(['week_day','thursday','friday','saturday'] as $d)
+                @foreach(['week_day','friday'] as $d)
                     <option value="{{ $d }}">{{ __('lang.'.$d) }}</option>
                 @endforeach
             </select>

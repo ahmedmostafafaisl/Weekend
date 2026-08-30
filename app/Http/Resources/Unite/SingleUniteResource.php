@@ -311,19 +311,21 @@ class SingleUniteResource extends JsonResource
     }
 
     /**
-     * Groups the 4 individually-stored days (sunday-wednesday) back into
-     * a single 'week_day' entry, matching how unite_prices already
-     * appears (one row per category, not per individual day) --
+     * Groups the 6 individually-stored days (every day except Friday)
+     * back into a single 'week_day' entry, matching how unite_prices
+     * already appears (one row per category, not per individual day) --
      * unite_slots.day_of_week is a 7-value enum at the DB level, and a
-     * 'week_day' submission expands into 4 separate rows at storage time
-     * (see UniteRepository::storeSlots()), unlike unite_prices, whose day
-     * column is already a 4-value enum needing no expansion. thursday/
-     * friday/saturday are untouched, since those are already single,
-     * distinct categories.
+     * 'week_day' submission expands into 6 separate rows at storage time
+     * (see UniteRepository::storeSlots()/UniteSlotRepository). Friday is
+     * untouched, since it's the one remaining single, distinct category.
+     *
+     * Deliberately does not match unite_prices' own day grouping
+     * (thursday/friday/saturday/week_day=sun-wed) -- this consolidation
+     * is scoped to unite_slots.day_of_week specifically, per request.
      */
     protected function consolidateWeekDaySlots($slots)
     {
-        $weekDayNames = ['sunday', 'monday', 'tuesday', 'wednesday'];
+        $weekDayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'saturday'];
 
         $weekDayGroup = $slots->filter(fn ($slot) => in_array($slot->day_of_week, $weekDayNames, true));
         $others = $slots->reject(fn ($slot) => in_array($slot->day_of_week, $weekDayNames, true));

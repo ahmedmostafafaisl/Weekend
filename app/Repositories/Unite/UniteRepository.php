@@ -546,33 +546,58 @@ class UniteRepository implements UniteRepositoryInterface
     public function update(Unite $unite, array $data): Unite
     {
         return DB::transaction(function () use ($unite, $data) {
-            $detail = $data[$data['type']] ?? [];
+            // 'type' is immutable once set (changing it would orphan the
+            // existing type-specific detail/pricing/availability data) --
+            // a genuine partial update may omit it entirely, so fall back
+            // to the unite's own existing type rather than crashing on
+            // $data['type'] not being present at all.
+            $type = $data['type'] ?? $unite->type;
+
+            $detailProvided = array_key_exists($type, $data);
+            $detail = $data[$type] ?? [];
             unset($data['stadium'], $data['hall'], $data['lounge'], $data['camp']);
 
             $unite->update($data);
 
-            $this->storeDetails($unite, $data['type'], $detail, true);
+            if ($detailProvided) {
+                $this->storeDetails($unite, $type, $detail, true);
+            }
 
-            $unite->features()->delete();
-            $unite->offers()->delete();
-            $unite->reservations()->delete();
-            $unite->slots()->delete();
-            $unite->prices()->delete();
-            $unite->packages()->delete();
-            $unite->bookingPackages()->delete();
-            $unite->viewingTimes()->delete();
-            $unite->newFeatures()->delete();
+            // Each nested section is all-or-nothing per section, not
+            // partial within a section: present (even as an empty array,
+            // meaning "clear this section") replaces it entirely; absent
+            // entirely leaves the existing rows completely untouched.
+            $sections = [
+                'features' => fn ($v) => $this->storeFeatures($unite, $v),
+                'offers' => fn ($v) => $this->storeOffers($unite, $v),
+                'reservations' => fn ($v) => $this->storeReservations($unite, $v),
+                'slots' => fn ($v) => $this->storeSlots($unite, $v, $type),
+                'prices' => fn ($v) => $this->storePrices($unite, $v, $type),
+                'packages' => fn ($v) => $this->storePackages($unite, $v),
+                'booking_packages' => fn ($v) => $this->storeBookingPackages($unite, $v),
+                'viewing_times' => fn ($v) => $this->storeViewingTimes($unite, $v),
+                'new_features' => fn ($v) => $this->storeNewFeatures($unite, $v),
+            ];
 
-            $this->storeFeatures($unite, $data['features'] ?? []);
-            $this->storeOffers($unite, $data['offers'] ?? []);
-            $this->storeReservations($unite, $data['reservations'] ?? []);
-            $this->storeSlots($unite, $data['slots'] ?? [], $data['type'] ?? 'stadium');
-            $this->storePrices($unite, $data['prices'] ?? [], $data['type'] ?? 'stadium');
-            $this->storePackages($unite, $data['packages'] ?? []);
-            $this->storeBookingPackages($unite, $data['booking_packages'] ?? []);
-            $this->storeViewingTimes($unite, $data['viewing_times'] ?? []);
-            $this->storeNewFeatures($unite, $data['new_features'] ?? []);
-            $this->syncServices($unite, $data['service_ids'] ?? []);
+            $relationForKey = [
+                'features' => 'features', 'offers' => 'offers', 'reservations' => 'reservations',
+                'slots' => 'slots', 'prices' => 'prices', 'packages' => 'packages',
+                'booking_packages' => 'bookingPackages', 'viewing_times' => 'viewingTimes',
+                'new_features' => 'newFeatures',
+            ];
+
+            foreach ($sections as $key => $store) {
+                if (! array_key_exists($key, $data)) {
+                    continue;
+                }
+
+                $unite->{$relationForKey[$key]}()->delete();
+                $store($data[$key] ?? []);
+            }
+
+            if (array_key_exists('service_ids', $data)) {
+                $this->syncServices($unite, $data['service_ids'] ?? []);
+            }
 
             // Image management: delete images not in keep_image_ids, then add new uploads
             $keepIds = $data['keep_image_ids'] ?? null;
@@ -592,6 +617,15 @@ class UniteRepository implements UniteRepositoryInterface
 
             if (! empty($data['images'])) {
                 $this->storeImages($unite, $data['images']);
+            }
+
+            // Replace a single, specific existing image in place (by its
+            // own id) with a newly uploaded file -- distinct from the
+            // add-new/keep-list mechanism above, which can't target one
+            // specific existing image without resubmitting the entire
+            // keep list.
+            if (! empty($data['replace_images']) && is_array($data['replace_images'])) {
+                $this->replaceImages($unite, $data['replace_images']);
             }
 
             $unite = $unite->fresh([
@@ -616,6 +650,41 @@ class UniteRepository implements UniteRepositoryInterface
 
             return $unite;
         });
+    }
+
+    /**
+     * Replaces one specific existing image (matched by its own id, not
+     * position) with a newly uploaded file, leaving every other image on
+     * this unite completely untouched. $replacements is keyed by image
+     * id => UploadedFile, e.g. replace_images[12] = <file>.
+     *
+     * Only ever touches images that both exist and genuinely belong to
+     * this unite -- an id for a different unite's image, or one that
+     * doesn't exist at all, is silently skipped rather than erroring,
+     * since this is intended to be forgiving of a stale id a client might
+     * still be holding (e.g. an image already removed by someone else).
+     */
+    protected function replaceImages(Unite $unite, array $replacements): void
+    {
+        foreach ($replacements as $imageId => $file) {
+            if (! $file || ! is_numeric($imageId)) {
+                continue;
+            }
+
+            $image = $unite->images()->find((int) $imageId);
+
+            if (! $image) {
+                continue;
+            }
+
+            $oldPath = public_path($image->image);
+            if (file_exists($oldPath)) {
+                @unlink($oldPath);
+            }
+
+            $path = $file->store('unites/images', 'public');
+            $image->update(['image' => 'storage/'.$path]);
+        }
     }
 
     protected function storeDetails(Unite $unite, string $type, array $detail, bool $updating = false): void
@@ -753,14 +822,21 @@ class UniteRepository implements UniteRepositoryInterface
     }
 
     /**
-     * Sunday through Wednesday — the 4 individual days that 'week_day'
-     * expands into. Matches UnitePrice's day-category grouping, and the
-     * identical expansion already implemented in UniteSlotRepository for
-     * the dedicated admin/unites/{unite}/slots CRUD endpoints — this is a
-     * separate code path (the inline bulk slots section on the unite
-     * create/edit form) that needed the same fix independently.
+     * Every day except Friday -- the 6 individual days that 'week_day'
+     * expands into for unite_slots.day_of_week specifically. Friday
+     * remains its own, separate category. Matches the identical
+     * expansion in UniteSlotRepository for the dedicated
+     * admin/unites/{unite}/slots CRUD endpoints -- this is a separate
+     * code path (the inline bulk slots section on the unite create/edit
+     * form) that needs the same set kept in sync independently.
+     *
+     * Deliberately does NOT match UnitePrice's own day grouping
+     * (thursday/friday/saturday/week_day=sun-wed) -- this change is
+     * scoped to slots only, per request. Price resolution is
+     * unaffected, since it looks up its own day category independently
+     * of how a slot's day_of_week is grouped.
      */
-    private const SLOT_WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday'];
+    private const SLOT_WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'saturday'];
 
     protected function storeSlots(Unite $unite, array $slots, string $type): void
     {
