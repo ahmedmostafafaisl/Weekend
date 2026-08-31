@@ -50,7 +50,7 @@ class SingleUniteResource extends JsonResource
             'insurance_policy_id' => $this->insurance_policy_id,
             'insurance_policy' => $this->insurancePolicy?->name,
 
-            'images' => $this->images->map(fn ($img) => asset($img->image))->values(),
+            'images' => $this->images->map(fn ($img) => ['id' => $img->id, 'image' => asset($img->image)])->values(),
             'rating' => round((float) ($this->ratings_avg_rating ?? 0), 1),
             'total_rating_count' => $this->ratings_count ?? 0,
             'unit_area' => $this->getUnitArea($detail),
