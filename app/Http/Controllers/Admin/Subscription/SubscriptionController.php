@@ -302,6 +302,8 @@ class SubscriptionController extends Controller
             } elseif ($package->type === 'time') {
                 $data['start_date'] = now()->toDateString();
                 $data['end_date'] = now()->addDays($package->duration)->toDateString();
+            } elseif ($package->type === 'count') {
+                $data['count'] = $package->count;
             }
         } elseif ($data['type'] === 'ad') {
             if ($package->type === 'duration') {

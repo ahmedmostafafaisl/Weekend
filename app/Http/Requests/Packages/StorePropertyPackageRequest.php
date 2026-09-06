@@ -16,9 +16,10 @@ class StorePropertyPackageRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'type' => 'required|in:time,percentage',
+            'type' => 'required|in:time,percentage,count',
             'duration' => 'nullable|integer|required_if:type,time',
             'percentage' => 'nullable|integer|required_if:type,percentage',
+            'count' => 'nullable|integer|required_if:type,count',
             'price' => 'nullable|numeric',
             'image' => 'nullable|image|max:4096',
             'status' => 'required|in:active,inactive',

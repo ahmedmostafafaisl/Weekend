@@ -433,6 +433,9 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
             if ($package?->type === 'percentage') {
                 $updates['percentage'] = $package->percentage;
             }
+            if ($package?->type === 'count') {
+                $updates['count'] = $package->count;
+            }
         } elseif ($subscription->type === 'ad') {
             $package = $subscription->adPackage;
             if ($package?->type === 'duration') {

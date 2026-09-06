@@ -57,8 +57,10 @@
                             <div class="small text-muted mt-1">
                                 @if($p->type === 'time')
                                     Duration: {{ $p->duration ?: '—' }} days
-                                @else
+                                @elseif($p->type === 'percentage')
                                     Percentage: {{ $p->percentage ?: '—' }}%
+                                @elseif($p->type === 'count')
+                                    Count: {{ $p->count ?: '—' }} unites
                                 @endif
                             </div>
                         </td>
@@ -85,6 +87,7 @@
                                         data-type="{{ $p->type }}"
                                         data-duration="{{ $p->duration }}"
                                         data-percentage="{{ $p->percentage }}"
+                                        data-count="{{ $p->count }}"
                                         data-price="{{ $p->price }}"
                                         data-status="{{ $p->status }}"
                                         data-image="{{ $p->image }}">
@@ -154,6 +157,11 @@
                     <div class="col-md-6">
                         <label class="form-label">{{ __('lang.percentage') }}</label>
                         <input class="form-control" name="percentage" id="createPackagePercentage" type="number" min="1">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('lang.count') }}</label>
+                        <input class="form-control" name="count" id="createPackageCount" type="number" min="1">
                     </div>
 
                     <div class="col-md-6">
@@ -228,6 +236,11 @@
                     </div>
 
                     <div class="col-md-6">
+                        <label class="form-label">{{ __('lang.count') }}</label>
+                        <input class="form-control" name="count" id="editPackageCount" type="number" min="1">
+                    </div>
+
+                    <div class="col-md-6">
                         <label class="form-label">{{ __('lang.price') }}</label>
                         <input class="form-control" name="price" id="editPackagePrice" type="number" step="0.01" min="0">
                     </div>
@@ -260,21 +273,30 @@
 
 @push('js')
 <script>
-function togglePackageTypeFields(typeId, durationId, percentageId) {
+function togglePackageTypeFields(typeId, durationId, percentageId, countId) {
     const typeEl = document.getElementById(typeId);
     const durationEl = document.getElementById(durationId);
     const percentageEl = document.getElementById(percentageId);
+    const countEl = document.getElementById(countId);
 
-    if (!typeEl || !durationEl || !percentageEl) return;
+    if (!typeEl || !durationEl || !percentageEl || !countEl) return;
+
+    durationEl.disabled = true;
+    percentageEl.disabled = true;
+    countEl.disabled = true;
 
     if (typeEl.value === 'time') {
         durationEl.disabled = false;
-        percentageEl.disabled = true;
         percentageEl.value = '';
-    } else {
-        durationEl.disabled = true;
-        durationEl.value = '';
+        countEl.value = '';
+    } else if (typeEl.value === 'percentage') {
         percentageEl.disabled = false;
+        durationEl.value = '';
+        countEl.value = '';
+    } else if (typeEl.value === 'count') {
+        countEl.disabled = false;
+        durationEl.value = '';
+        percentageEl.value = '';
     }
 }
 
@@ -286,12 +308,12 @@ function setPackageImageLink(path) {
 }
 
 document.getElementById('createPackageType')?.addEventListener('change', function () {
-    togglePackageTypeFields('createPackageType', 'createPackageDuration', 'createPackagePercentage');
+    togglePackageTypeFields('createPackageType', 'createPackageDuration', 'createPackagePercentage', 'createPackageCount');
 });
-togglePackageTypeFields('createPackageType', 'createPackageDuration', 'createPackagePercentage');
+togglePackageTypeFields('createPackageType', 'createPackageDuration', 'createPackagePercentage', 'createPackageCount');
 
 document.getElementById('editPackageType')?.addEventListener('change', function () {
-    togglePackageTypeFields('editPackageType', 'editPackageDuration', 'editPackagePercentage');
+    togglePackageTypeFields('editPackageType', 'editPackageDuration', 'editPackagePercentage', 'editPackageCount');
 });
 
 document.getElementById('editPackageModal')?.addEventListener('show.bs.modal', function (event) {
@@ -304,11 +326,12 @@ document.getElementById('editPackageModal')?.addEventListener('show.bs.modal', f
     document.getElementById('editPackageType').value = btn.getAttribute('data-type') || 'time';
     document.getElementById('editPackageDuration').value = btn.getAttribute('data-duration') || '';
     document.getElementById('editPackagePercentage').value = btn.getAttribute('data-percentage') || '';
+    document.getElementById('editPackageCount').value = btn.getAttribute('data-count') || '';
     document.getElementById('editPackagePrice').value = btn.getAttribute('data-price') || '';
     document.getElementById('editPackageStatus').value = btn.getAttribute('data-status') || 'active';
 
     setPackageImageLink(btn.getAttribute('data-image'));
-    togglePackageTypeFields('editPackageType', 'editPackageDuration', 'editPackagePercentage');
+    togglePackageTypeFields('editPackageType', 'editPackageDuration', 'editPackagePercentage', 'editPackageCount');
 });
 </script>
 

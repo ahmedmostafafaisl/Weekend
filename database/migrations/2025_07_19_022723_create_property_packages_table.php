@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
             $table->enum('type', ['time', 'percentage']);
+            $table->integer('count')->nullable();
             $table->integer('duration')->nullable();
             $table->integer('percentage')->nullable();
             $table->decimal('price', 10, 2)->nullable();

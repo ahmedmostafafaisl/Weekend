@@ -14,6 +14,7 @@ use App\Http\Resources\Unite\UniteResource2;
 use App\Models\Ad;
 use App\Models\Department;
 use App\Models\FavoriteUnite;
+use App\Models\Subscription;
 use App\Models\Unite;
 use App\Models\UniteRating;
 use App\Models\UniteView;
@@ -204,8 +205,40 @@ class UniteController extends Controller
             abort(403, __('lang.venue_not_owned'));
         }
 
+        // A provider needs an active, non-exhausted property subscription
+        // to add a new unite. isExpiredByRules() already correctly treats
+        // a null count (time/percentage-type packages, which don't limit
+        // by unite count at all) as unlimited, and count<=0 as exhausted
+        // -- reused here rather than re-implementing the same check.
+        // Gated by wantsJson(), matching the ownership check above: the
+        // admin dashboard is trusted to create a unite for any department
+        // regardless of subscription status, same as it already bypasses
+        // the ownership check.
+        $subscription = null;
+        if ($request->wantsJson()) {
+            $subscription = Subscription::where('user_id', $department->user_id)
+                ->where('type', 'property')
+                ->where('status', 'active')
+                ->orderBy('id') // oldest first -- use up the oldest quota before a newer one
+                ->get()
+                ->first(fn ($s) => ! $s->isExpiredByRules());
+
+            if (! $subscription) {
+                abort(403, __('lang.no_active_property_subscription'));
+            }
+        }
+
         $data = $request->validated();
         $unite = $this->repo->create($data);
+
+        // Only a count-type subscription actually tracks a remaining
+        // quota to decrement -- time/percentage-type ones have
+        // count=null and are correctly left untouched, since they don't
+        // limit by unite count at all.
+        if ($subscription && ! is_null($subscription->count)) {
+            $subscription->decrement('count');
+            $subscription->refresh()->expireIfDue();
+        }
 
         if ($request->boolean('add_to_story')) {
             $firstImage = $unite->images()->first();

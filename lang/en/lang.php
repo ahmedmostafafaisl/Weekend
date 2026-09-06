@@ -1170,6 +1170,7 @@ return [
     'sign_in_to_admin_dashboard' => 'Sign in to admin dashboard',
 
     'venue_not_owned' => 'You do not own this department.',
+    'no_active_property_subscription' => 'You need an active property subscription with available unite quota to add a new venue.',
     'venue_no_price_configured' => 'This venue has no price configured for the selected period. Please contact the provider.',
     'cancelled_reservation_cannot_update' => 'Cancelled reservation cannot be updated.',
     'unauthorized_action' => 'Unauthorized',

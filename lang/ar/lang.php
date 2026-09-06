@@ -1164,6 +1164,7 @@ return [
     'sign_in_to_admin_dashboard' => 'تسجيل الدخول إلى لوحة إدارة المدير',
 
     'venue_not_owned' => 'أنت لا تملك هذا القسم.',
+    'no_active_property_subscription' => 'تحتاج إلى اشتراك عقاري نشط برصيد وحدات متاح لإضافة مكان جديد.',
     'venue_no_price_configured' => 'لا يوجد سعر محدد لهذه الوحدة للفترة المختارة. يرجى التواصل مع المزود.',
     'cancelled_reservation_cannot_update' => 'لا يمكن تعديل حجز ملغى.',
     'unauthorized_action' => 'غير مصرح',

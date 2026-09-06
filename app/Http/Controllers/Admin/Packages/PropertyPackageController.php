@@ -84,7 +84,7 @@ class PropertyPackageController extends Controller
         return view('dashboard.admin.property-packages.index', [
             'packages' => $paginated,
             'search' => $search,
-            'types' => ['time', 'percentage'],
+            'types' => ['time', 'percentage', 'count'],
             'statuses' => ['active', 'inactive'],
         ]);
     }
@@ -167,7 +167,7 @@ class PropertyPackageController extends Controller
         return view('dashboard.admin.property-packages.index', [
             'packages' => $packages,
             'search' => null,
-            'types' => ['time', 'percentage'],
+            'types' => ['time', 'percentage', 'count'],
             'statuses' => ['active', 'inactive'],
         ]);
     }

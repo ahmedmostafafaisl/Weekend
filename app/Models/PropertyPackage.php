@@ -8,12 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 class PropertyPackage extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'name',
         'description',
         'type',
         'duration',
         'percentage',
+        'count',
         'price',
         'image',
         'status',
@@ -22,6 +24,7 @@ class PropertyPackage extends Model
     protected $casts = [
         'price' => 'decimal:2',
     ];
+
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class, 'package_id');
