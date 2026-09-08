@@ -134,7 +134,7 @@ class ParseMultipartFormData
 
     /**
      * Supports PHP-style bracket field names from multipart bodies, e.g.
-     * "images[]", "keep_image_ids[]", "hall[max_capacity]", "slots[0][day]" —
+     * "images[]", "deleted_image_ids[]", "hall[max_capacity]", "slots[0][day]" —
      * mirrors how PHP itself parses these for a normal POST request.
      */
     protected function setNested(array &$target, string $name, mixed $value): void

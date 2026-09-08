@@ -2,38 +2,8 @@
 
 namespace App\Http\Requests\Unite;
 
-/**
- * Update variant of StoreUniteRequest -- "update any single value on the
- * unite; send it to change it, omit it to leave the existing value alone."
- *
- * Reuses StoreUniteRequest's rules() almost entirely unchanged: nearly
- * every top-level field is already 'nullable' there (not 'required'), and
- * every nested section's *.field rules (offers.*.start, packages.*.price,
- * etc.) only ever apply to an array that was actually submitted in the
- * first place -- Laravel never evaluates offers.*.start at all if
- * 'offers' itself is absent from the request. So most of the "only
- * validate/update what's sent" behavior already exists in the parent
- * class; the only genuine required-at-the-top-level fields are
- * department_id, type, and status, made optional here specifically.
- *
- * Nested sections (slots, prices, offers, features, packages,
- * booking_packages, viewing_times, new_features) are all-or-nothing per
- * section, not partial within a section: send the section to fully
- * replace it, omit the section entirely to leave the existing rows
- * untouched. See UniteRepository::update() for where that omit-vs-empty
- * distinction is actually enforced.
- */
 class UpdateUniteRequest extends StoreUniteRequest
 {
-    /**
-     * The type-specific slot/price rule branches in the parent (stadium
-     * vs hall vs lounge/camp) key off $this->input('type') directly --
-     * on a genuine partial update that omits 'type' entirely (now valid,
-     * since it's 'sometimes' below), that would silently fall into the
-     * lounge/camp branch regardless of the unit's actual type. Merging
-     * in the route-bound unit's own type here, before rules() runs,
-     * fixes that without needing to touch the parent class at all.
-     */
     protected function prepareForValidation(): void
     {
         if (! $this->has('type')) {
@@ -68,12 +38,6 @@ class UpdateUniteRequest extends StoreUniteRequest
                 }
             }
         }
-
-        // Replace one specific existing image by its own id -- e.g.
-        // replace_images[12] = <file> -- update-only, since create() has
-        // no existing images to replace yet.
-        $rules['replace_images'] = ['nullable', 'array'];
-        $rules['replace_images.*'] = ['nullable', 'file', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'];
 
         return $rules;
     }

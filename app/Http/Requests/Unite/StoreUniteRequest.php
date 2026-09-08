@@ -37,15 +37,14 @@ class StoreUniteRequest extends FormRequest
             'images' => 'array',
             'images.*.image' => 'file|mimes:jpeg,png,jpg,gif,webp|max:20048',
 
-            // BUG FIX: UniteRepository::update() deletes any existing image
-            // whose ID isn't in keep_image_ids — but that field was never
-            // validated here, so $request->validated() silently dropped it
-            // from every request regardless of what the client sent. That
-            // made the deletion branch's precondition ($keepIds !== null)
-            // permanently false, so old images were never removed — only
-            // ever added to. This validates it through so deletion works.
-            'keep_image_ids' => 'nullable|array',
-            'keep_image_ids.*' => 'integer',
+            // BUG FIX: UniteRepository::update() deletes the images listed
+            // in deleted_image_ids -- but that field was never validated
+            // here, so $request->validated() would silently drop it from
+            // every request regardless of what the client sent, making
+            // deletion permanently a no-op. This validates it through so
+            // deletion actually works.
+            'deleted_image_ids' => 'nullable|array',
+            'deleted_image_ids.*' => 'integer',
 
             'features' => 'nullable|array',
             'features.*.name' => 'required|string',

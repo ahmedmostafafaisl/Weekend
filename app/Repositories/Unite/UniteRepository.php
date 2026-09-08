@@ -599,12 +599,17 @@ class UniteRepository implements UniteRepositoryInterface
                 $this->syncServices($unite, $data['service_ids'] ?? []);
             }
 
-            // Image management: delete images not in keep_image_ids, then add new uploads
-            $keepIds = $data['keep_image_ids'] ?? null;
-            if ($keepIds !== null) {
-                // Delete images that were removed (not in keep list)
+            // Image management: delete the specific images listed in
+            // deleted_image_ids, then add any new uploads. Only ever
+            // deletes images that both exist and genuinely belong to this
+            // unite -- an id for a different unite's image, or one that
+            // doesn't exist at all, is silently ignored rather than
+            // erroring, since a client might reasonably still hold a
+            // stale id for an image already removed by someone else.
+            $deletedIds = $data['deleted_image_ids'] ?? null;
+            if (! empty($deletedIds)) {
                 $unite->images()
-                    ->whereNotIn('id', array_map('intval', (array) $keepIds))
+                    ->whereIn('id', array_map('intval', (array) $deletedIds))
                     ->each(function ($img) {
                         // Remove file from disk if it exists in public/
                         $fullPath = public_path($img->image);
@@ -617,15 +622,6 @@ class UniteRepository implements UniteRepositoryInterface
 
             if (! empty($data['images'])) {
                 $this->storeImages($unite, $data['images']);
-            }
-
-            // Replace a single, specific existing image in place (by its
-            // own id) with a newly uploaded file -- distinct from the
-            // add-new/keep-list mechanism above, which can't target one
-            // specific existing image without resubmitting the entire
-            // keep list.
-            if (! empty($data['replace_images']) && is_array($data['replace_images'])) {
-                $this->replaceImages($unite, $data['replace_images']);
             }
 
             $unite = $unite->fresh([
@@ -650,41 +646,6 @@ class UniteRepository implements UniteRepositoryInterface
 
             return $unite;
         });
-    }
-
-    /**
-     * Replaces one specific existing image (matched by its own id, not
-     * position) with a newly uploaded file, leaving every other image on
-     * this unite completely untouched. $replacements is keyed by image
-     * id => UploadedFile, e.g. replace_images[12] = <file>.
-     *
-     * Only ever touches images that both exist and genuinely belong to
-     * this unite -- an id for a different unite's image, or one that
-     * doesn't exist at all, is silently skipped rather than erroring,
-     * since this is intended to be forgiving of a stale id a client might
-     * still be holding (e.g. an image already removed by someone else).
-     */
-    protected function replaceImages(Unite $unite, array $replacements): void
-    {
-        foreach ($replacements as $imageId => $file) {
-            if (! $file || ! is_numeric($imageId)) {
-                continue;
-            }
-
-            $image = $unite->images()->find((int) $imageId);
-
-            if (! $image) {
-                continue;
-            }
-
-            $oldPath = public_path($image->image);
-            if (file_exists($oldPath)) {
-                @unlink($oldPath);
-            }
-
-            $path = $file->store('unites/images', 'public');
-            $image->update(['image' => 'storage/'.$path]);
-        }
     }
 
     protected function storeDetails(Unite $unite, string $type, array $detail, bool $updating = false): void
