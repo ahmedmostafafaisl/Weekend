@@ -175,4 +175,32 @@ class User extends Authenticatable
     {
         return $this->hasMany(Suggestion::class);
     }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * The oldest active property subscription that isExpiredByRules()
+     * doesn't consider expired yet -- oldest first, so a provider with
+     * multiple stacked subscriptions uses up the oldest one's quota
+     * before a newer one. Returns null if none qualify (no active
+     * property subscription at all, or every one is exhausted/expired).
+     *
+     * Centralizes what was originally written inline in
+     * UniteController::store() for its unite-creation gate, so that
+     * gate and anything else needing "does this provider currently have
+     * property-subscription quota" (e.g. DepartmentResource's max_count)
+     * can never silently drift apart on what "currently qualifies" means.
+     */
+    public function activePropertySubscription(): ?Subscription
+    {
+        return $this->subscriptions()
+            ->where('type', 'property')
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->get()
+            ->first(fn ($s) => ! $s->isExpiredByRules());
+    }
 }

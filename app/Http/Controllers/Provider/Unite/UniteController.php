@@ -14,7 +14,6 @@ use App\Http\Resources\Unite\UniteResource2;
 use App\Models\Ad;
 use App\Models\Department;
 use App\Models\FavoriteUnite;
-use App\Models\Subscription;
 use App\Models\Unite;
 use App\Models\UniteRating;
 use App\Models\UniteView;
@@ -206,22 +205,18 @@ class UniteController extends Controller
         }
 
         // A provider needs an active, non-exhausted property subscription
-        // to add a new unite. isExpiredByRules() already correctly treats
-        // a null count (time/percentage-type packages, which don't limit
-        // by unite count at all) as unlimited, and count<=0 as exhausted
-        // -- reused here rather than re-implementing the same check.
+        // to add a new unite. activePropertySubscription() already
+        // correctly treats a null count (time/percentage-type packages,
+        // which don't limit by unite count at all) as unlimited, and
+        // count<=0 as exhausted -- reused here (and by DepartmentResource's
+        // max_count) rather than re-implementing the same check twice.
         // Gated by wantsJson(), matching the ownership check above: the
         // admin dashboard is trusted to create a unite for any department
         // regardless of subscription status, same as it already bypasses
         // the ownership check.
         $subscription = null;
         if ($request->wantsJson()) {
-            $subscription = Subscription::where('user_id', $department->user_id)
-                ->where('type', 'property')
-                ->where('status', 'active')
-                ->orderBy('id') // oldest first -- use up the oldest quota before a newer one
-                ->get()
-                ->first(fn ($s) => ! $s->isExpiredByRules());
+            $subscription = $department->user->activePropertySubscription();
 
             if (! $subscription) {
                 abort(403, __('lang.no_active_property_subscription'));

@@ -24,11 +24,31 @@ class DepartmentController extends Controller
         if ($request->wantsJson()) {
             $user = auth()->user();
 
-            $departments = ($user && $user->type === 'provider')
+            $isProvider = $user && $user->type === 'provider';
+            $departments = $isProvider
                 ? $this->departmentRepo->getByUserId($user->id)
                 : $this->departmentRepo->all();
 
-            return DepartmentResource::collection($departments);
+            // The provider's current, non-exhausted property subscription's
+            // remaining count -- returned once, at the top level only, as
+            // a sibling to 'data' (not repeated inside every department
+            // or unite entry, since they all belong to the same provider
+            // and would all show the exact same number). Uses the same
+            // shared method UniteController::store()'s unite-creation
+            // gate itself relies on, so this always agrees with what that
+            // gate would actually enforce. Only meaningful for the
+            // authenticated-provider branch above, since all of that
+            // provider's own departments genuinely share one subscription;
+            // not meaningful when listing across multiple providers (the
+            // admin/non-provider branch), since each could have a
+            // different subscription -- explicitly null there rather than
+            // a misleading single number.
+            $maxCount = $isProvider ? $user->activePropertySubscription()?->count : null;
+
+            return response()->json([
+                'data' => DepartmentResource::collection($departments),
+                'max_count' => $maxCount,
+            ]);
         }
 
         $search = $request->get('search');
