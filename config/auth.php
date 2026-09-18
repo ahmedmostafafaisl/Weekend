@@ -97,7 +97,7 @@ return [
         'users' => [
             'provider' => 'users',
             'table' => 'password_reset_tokens',
-            'expire' => 60,
+            'expire' => 1440, // 24 hours -- 60 was too short for email delivery delays
             'throttle' => 60,
         ],
         'admins' => [
