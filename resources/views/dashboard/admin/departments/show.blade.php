@@ -72,6 +72,16 @@
                     </div>
 
                     <div class="d-flex justify-content-between mt-2">
+                        <span class="text-muted">{{ __('lang.ownership') }}</span>
+                        <span class="fw-semibold">
+                            @if($department->ownership == 1) {{ __('lang.owner') }}
+                            @elseif($department->ownership == 2) {{ __('lang.delegate') }}
+                            @else —
+                            @endif
+                        </span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-2">
                         <span class="text-muted">{{ __('lang.created_at') }}</span>
                         <span class="fw-semibold">{{ optional($department->created_at)->format('Y-m-d') }}</span>
                     </div>
@@ -81,6 +91,20 @@
                         <span class="fw-semibold">{{ optional($department->updated_at)->format('Y-m-d') }}</span>
                     </div>
                 </div>
+
+                @if($department->sak_image)
+                <hr>
+                <div class="text-muted small mb-1">{{ __('lang.sak_image') }}</div>
+                @php $ext = strtolower(pathinfo($department->sak_image, PATHINFO_EXTENSION)); @endphp
+                @if(in_array($ext, ['jpg','jpeg','png','gif','webp','svg']))
+                    <img src="{{ asset($department->sak_image) }}" class="img-fluid rounded" style="max-height:180px" alt="sak">
+                @else
+                    <a href="{{ asset($department->sak_image) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                        {{ __('lang.view_file') }}
+                    </a>
+                @endif
+                @endif
+                        </div>
             </div>
         </div>
     </div>

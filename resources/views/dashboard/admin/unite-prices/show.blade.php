@@ -48,6 +48,46 @@
                 <div class="text-muted small">{{ __('lang.full_price') }}</div>
                 <div class="fw-semibold">{{ $price->full_price ?? '—' }}</div>
             </div>
+
+            <div class="col-12"><hr class="my-1"><div class="fw-semibold small text-muted">{{ __('lang.hourly_booking') }}</div></div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">{{ __('lang.hourly_booking') }}</div>
+                <div class="fw-semibold">
+                    @if($price->hourly_enabled)
+                        <span class="badge bg-success">{{ __('lang.enabled') }}</span>
+                    @else
+                        <span class="badge bg-secondary">{{ __('lang.disabled') }}</span>
+                    @endif
+                </div>
+            </div>
+
+            @if($price->hourly_enabled)
+            <div class="col-md-4">
+                <div class="text-muted small">{{ __('lang.day_hour_price') }}</div>
+                <div class="fw-semibold">{{ $price->day_hour_price ?? '—' }} SAR</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">{{ __('lang.night_hour_price') }}</div>
+                <div class="fw-semibold">{{ $price->night_hour_price ?? '—' }} SAR</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">{{ __('lang.day_start') }}</div>
+                <div class="fw-semibold">{{ $price->day_start ?? '—' }}</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">{{ __('lang.day_end') }}</div>
+                <div class="fw-semibold">{{ $price->day_end ?? '—' }}</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">{{ __('lang.min_booking') }}</div>
+                <div class="fw-semibold">{{ $price->min_booking_minutes ?? '—' }} {{ __('lang.minutes') }}</div>
+            </div>
+            @endif
         </div>
     </div>
 </div>

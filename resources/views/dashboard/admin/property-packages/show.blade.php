@@ -78,6 +78,11 @@
                     </div>
 
                     <div class="col-md-6">
+                        <div class="text-muted small">{{ __('lang.count') }}</div>
+                        <div class="fw-semibold">{{ $package->count ?? '—' }}</div>
+                    </div>
+
+                    <div class="col-md-6">
                         <div class="text-muted small">{{ __('lang.duration') }}</div>
                         <div class="fw-semibold">{{ $package->duration ?: '—' }}</div>
                     </div>

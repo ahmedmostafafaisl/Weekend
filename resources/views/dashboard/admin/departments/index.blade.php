@@ -96,6 +96,8 @@
                                         data-whatsapp="{{ $d->whatsapp }}"
                                         data-snapchat="{{ $d->snapchat }}"
                                         data-tiktok="{{ $d->tiktok }}"
+                                        data-ownership="{{ $d->ownership }}"
+                                        data-sak-image="{{ $d->sak_image }}"
                                 >
                                     {{ __('lang.edit') }}
                                 </button>
@@ -128,7 +130,7 @@
 @if($me && $me->can('departments.create'))
 <div class="modal fade" id="createDepartmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <form class="modal-content" method="POST" action="{{ route('admin.departments.store') }}">
+        <form class="modal-content" method="POST" action="{{ route('admin.departments.store') }}" enctype="multipart/form-data">
             @csrf
             <div class="modal-header">
                 <h5 class="modal-title">{{ __('lang.create_department') }}</h5>
@@ -200,6 +202,22 @@
                     <div class="col-md-6"><label class="form-label">{{ __('lang.whatsapp') }}</label><input class="form-control" name="whatsapp"></div>
                     <div class="col-md-6"><label class="form-label">{{ __('lang.snapchat') }}</label><input class="form-control" name="snapchat"></div>
                     <div class="col-md-6"><label class="form-label">{{ __('lang.tiktok') }}</label><input class="form-control" name="tiktok"></div>
+
+                    <div class="col-12"><hr class="my-1"><div class="fw-semibold">{{ __('lang.ownership_and_documents') }}</div></div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('lang.ownership') }}</label>
+                        <select class="form-select" name="ownership">
+                            <option value="">—</option>
+                            <option value="1">{{ __('lang.owner') }}</option>
+                            <option value="2">{{ __('lang.delegate') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('lang.sak_image') }}</label>
+                        <input class="form-control" type="file" name="sak_image" accept="image/*">
+                    </div>
                 </div>
             </div>
 
@@ -215,7 +233,7 @@
 @if($me && $me->can('departments.update'))
 <div class="modal fade" id="editDepartmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <form class="modal-content" method="POST" id="editDepartmentForm">
+        <form class="modal-content" method="POST" id="editDepartmentForm" enctype="multipart/form-data">
             @csrf @method('PUT')
             <div class="modal-header">
                 <h5 class="modal-title">{{ __('lang.edit_department') }}</h5>
@@ -287,6 +305,23 @@
                     <div class="col-md-6"><label class="form-label">{{ __('lang.whatsapp') }}</label><input class="form-control" name="whatsapp" id="editDepartmentWhatsapp"></div>
                     <div class="col-md-6"><label class="form-label">{{ __('lang.snapchat') }}</label><input class="form-control" name="snapchat" id="editDepartmentSnapchat"></div>
                     <div class="col-md-6"><label class="form-label">{{ __('lang.tiktok') }}</label><input class="form-control" name="tiktok" id="editDepartmentTiktok"></div>
+
+                    <div class="col-12"><hr class="my-1"><div class="fw-semibold">{{ __('lang.ownership_and_documents') }}</div></div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('lang.ownership') }}</label>
+                        <select class="form-select" name="ownership" id="editDepartmentOwnership">
+                            <option value="">—</option>
+                            <option value="1">{{ __('lang.owner') }}</option>
+                            <option value="2">{{ __('lang.delegate') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('lang.sak_image') }}</label>
+                        <input class="form-control" type="file" name="sak_image" accept="image/*">
+                        <div class="form-text" id="currentSakImage"></div>
+                    </div>
                 </div>
             </div>
 
@@ -322,6 +357,15 @@ document.getElementById('editDepartmentModal')?.addEventListener('show.bs.modal'
     document.getElementById('editDepartmentWhatsapp').value = btn.getAttribute('data-whatsapp') || '';
     document.getElementById('editDepartmentSnapchat').value = btn.getAttribute('data-snapchat') || '';
     document.getElementById('editDepartmentTiktok').value = btn.getAttribute('data-tiktok') || '';
+
+    // Ownership
+    const ownershipSel = document.getElementById('editDepartmentOwnership');
+    if (ownershipSel) ownershipSel.value = btn.getAttribute('data-ownership') || '';
+
+    // Show current sak_image filename if set
+    const sakHint = document.getElementById('currentSakImage');
+    const sakPath = btn.getAttribute('data-sak-image') || '';
+    if (sakHint) sakHint.textContent = sakPath ? '{{ __("lang.current_file") }}: ' + sakPath.split('/').pop() : '';
 });
 </script>
 @endpush

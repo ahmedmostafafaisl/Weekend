@@ -33,6 +33,7 @@
                 <tr>
                     <th>{{ __('lang.th_hash') }}</th>
                     <th>{{ __('lang.th_date') }}</th>
+                    <th>{{ __('lang.availability_window') }}</th>
                     <th>{{ __('lang.th_morning') }}</th>
                     <th>{{ __('lang.th_evening') }}</th>
                     <th>{{ __('lang.th_full') }}</th>
@@ -45,6 +46,15 @@
                     <tr>
                         <td>{{ $slot->id }}</td>
                         <td>{{ $slot->day_of_week ? __('lang.'.$slot->day_of_week) : '—' }}</td>
+                        <td class="small">
+                            @if($slot->day_start && $slot->day_end)
+                                <span class="badge bg-light text-dark border">
+                                    {{ $slot->day_start }} – {{ $slot->day_end }}
+                                </span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         <td>
                             {{ $slot->morning_start && $slot->morning_end ? $slot->morning_start . ' - ' . $slot->morning_end : '—' }}
                         </td>
@@ -88,7 +98,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">{{ __('lang.no_slots_found') }}</td>
+                        <td colspan="8" class="text-center text-muted py-4">{{ __('lang.no_slots_found') }}</td>
                     </tr>
                 @endforelse
                 </tbody>
