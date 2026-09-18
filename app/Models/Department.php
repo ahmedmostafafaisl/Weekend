@@ -28,6 +28,8 @@ class Department extends Model
         'snapchat',
         'tiktok',
         'phone',
+        'sak_image',
+        'ownership',
     ];
 
     public function user()

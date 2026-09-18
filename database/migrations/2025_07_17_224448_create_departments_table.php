@@ -31,6 +31,9 @@ return new class extends Migration
             $table->string('whatsapp')->nullable();
             $table->string('snapchat')->nullable();
             $table->string('tiktok')->nullable();
+            $table->string('sak_image')->nullable();
+            $table->boolean('ownership')->nullable()->default(null)
+                ->comment('1=مالك, 2=موكل');
 
             $table->timestamps();
         });

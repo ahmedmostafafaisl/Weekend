@@ -29,7 +29,7 @@ class UserRepository implements UserInterface
         $user = User::create($data);
 
         // Define fields to handle
-        $imageFields = ['photo', 'front_identity', 'back_identity', 'sak_image', 'commercial_register_image'];
+        $imageFields = ['photo', 'front_identity', 'back_identity', 'commercial_register_image'];
 
         foreach ($imageFields as $field) {
             if (request()->hasFile($field)) {

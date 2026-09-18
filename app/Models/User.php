@@ -203,4 +203,19 @@ class User extends Authenticatable
             ->get()
             ->first(fn ($s) => ! $s->isExpiredByRules());
     }
+
+    /**
+     * Send the password reset notification to the frontend URL instead
+     * of the default backend route -- so the link in the email opens
+     * the mobile app or web frontend's "set new password" screen, not
+     * a Laravel blade view. The frontend then POSTs the token + new
+     * password to POST /api/reset-password.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $frontendUrl = config('app.frontend_url', config('app.url'));
+        $url = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($this->email);
+
+        $this->notify(new \App\Notifications\ResetPasswordNotification($url));
+    }
 }

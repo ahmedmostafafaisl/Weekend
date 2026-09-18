@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Provider\Department;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Department\DepartmentRequest;
+use App\Http\Requests\Department\UpdateDepartmentRequest;
 use App\Http\Resources\Department\DepartmentResource;
+use App\Http\Resources\Unite\UniteResource;
 use App\Models\Department;
 use App\Models\User;
 use App\Repositories\Interfaces\DepartmentInterface;
@@ -103,7 +105,7 @@ class DepartmentController extends Controller
             : view('dashboard.admin.departments.show', compact('department', 'unites'));
     }
 
-    public function update(DepartmentRequest $request, $id)
+    public function update(UpdateDepartmentRequest $request, $id)
     {
         $department = Department::findOrFail($id);
 
@@ -128,5 +130,121 @@ class DepartmentController extends Controller
         return $request->wantsJson()
             ? response()->json(['message' => __('lang.deleted_successfully')])
             : back()->with('success', __('lang.deleted_successfully'));
+    }
+
+    /**
+     * GET /departments/browse -- public, guest-accessible list of all
+     * active departments. Deliberately lighter than DepartmentResource
+     * (no nested unites[] per department, no social links/user info) --
+     * a guest browsing all departments doesn't need every one of their
+     * unites inlined here, since unites() below is the dedicated
+     * endpoint for that; keeping this list lightweight also avoids an
+     * N+1-prone eager load across every department just to list them.
+     */
+    public function browse(Request $request)
+    {
+        $type = $request->get('type');
+        $location = $request->get('location');
+        $search = $request->get('search');
+
+        $departments = Department::where('status', 'active')
+            ->when($type, fn ($q) => $q->where('type', $type))
+            ->when($location, fn ($q) => $q->where('location', 'like', "%{$location}%"))
+            ->when($search, fn ($q) => $q->where(fn ($q2) => $q2
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('location', 'like', "%{$search}%")
+            ))
+            ->with('images')
+            ->withCount(['unites' => fn ($q) => $q->where('status', 'active')])
+            ->latest()
+            ->paginate($request->integer('per_page', 20) ?: 20);
+
+        return response()->json([
+            'data' => collect($departments->items())->map(fn ($department) => [
+                'id' => $department->id,
+                'name' => $department->name,
+                'description' => $department->description,
+                'type' => $department->type,
+                'location' => $department->location,
+                'latitude' => $department->latitude,
+                'longitude' => $department->longitude,
+                'unites_count' => $department->unites_count,
+                'images' => $department->images->map(fn ($img) => asset($img->image))->values(),
+            ])->values(),
+            'meta' => [
+                'current_page' => $departments->currentPage(),
+                'last_page' => $departments->lastPage(),
+                'per_page' => $departments->perPage(),
+                'total' => $departments->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /departments/{department}/unites -- public, guest-accessible
+     * list of one department's active unites. Uses UniteResource (the
+     * same resource and eager-loading relationships already used by the
+     * existing /unites listing endpoint -- see UniteRepository::all()),
+     * so a guest browsing a specific department's venues sees the same
+     * level of detail (pricing, rating, slots, etc.) as the main unite
+     * listing, rather than a third, inconsistent shape for unite data.
+     *
+     * Query params:
+     *   search    — partial match on name, description, or location_name
+     *   sort_by   — price_asc | price_desc | rating (default: newest first)
+     *   per_page  — 1-50 (default 20)
+     */
+    public function unites(Department $department, Request $request)
+    {
+        $search = $request->get('search');
+        $sortBy = $request->get('sort_by');
+
+        // Price subquery: MIN across all price columns for this unite.
+        // Returns NULL (not a sentinel number) when a unite has no price
+        // rows at all -- so ORDER BY can handle the "no price" case
+        // cleanly by pushing NULLs last in both directions.
+        // Matches the type-agnostic LEAST() pattern already used by
+        // UniteRepository::search()'s sort_by=price.
+        $priceSubquery =
+            '(SELECT CASE
+                WHEN COUNT(*) = 0 THEN NULL
+                ELSE LEAST(
+                    COALESCE(MIN(price),         999999),
+                    COALESCE(MIN(morning_price), 999999),
+                    COALESCE(MIN(evening_price), 999999),
+                    COALESCE(MIN(full_price),    999999)
+                )
+            END FROM unite_prices WHERE unite_prices.unite_id = unites.id)';
+
+        $unites = $department->unites()
+            ->with([
+                'detail', 'images', 'features', 'offers', 'slots', 'prices',
+                'packages', 'bookingPackages', 'viewingTimes', 'newFeatures',
+                'councils', 'services',
+            ])
+            ->withAvg('ratings', 'rating')
+            ->withCount('ratings')
+            ->where('status', 'active')
+            ->when($search, fn ($q) => $q->where(fn ($q2) => $q2
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('location_name', 'like', "%{$search}%")
+            ))
+            ->when($sortBy === 'price_asc', fn ($q) => $q->orderByRaw("({$priceSubquery} IS NULL) ASC, {$priceSubquery} ASC"))
+            ->when($sortBy === 'price_desc', fn ($q) => $q->orderByRaw("({$priceSubquery} IS NULL) ASC, {$priceSubquery} DESC"))
+            ->when($sortBy === 'rating', fn ($q) => $q->orderByDesc('ratings_avg_rating'))
+            ->when(! in_array($sortBy, ['price_asc', 'price_desc', 'rating']), fn ($q) => $q->latest())
+            ->paginate($request->integer('per_page', 20) ?: 20);
+
+        return response()->json([
+            'data' => UniteResource::collection($unites)->resolve(),
+            'meta' => [
+                'current_page' => $unites->currentPage(),
+                'last_page' => $unites->lastPage(),
+                'per_page' => $unites->perPage(),
+                'total' => $unites->total(),
+            ],
+        ]);
     }
 }

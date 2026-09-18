@@ -102,10 +102,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
+
+// Public department browsing (guest-accessible, no auth required).
+// Registered before the auth-gated apiResource below specifically so
+// GET /departments/browse isn't shadowed by that resource's wildcard
+// GET /departments/{department} route -- Laravel matches by
+// registration order regardless of middleware grouping, and 'browse'
+// would otherwise be swallowed as a {department} id.
+Route::get('departments/browse', [DepartmentController::class, 'browse']);
+Route::get('departments/{department}/unites', [DepartmentController::class, 'unites']);
 
 // Department Routes
 Route::middleware('auth:sanctum')->group(function () {

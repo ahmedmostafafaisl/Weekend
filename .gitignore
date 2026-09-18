@@ -19,3 +19,4 @@ yarn-error.log
 /.idea
 /.vscode
 service-account.json
+/public/department
