@@ -1411,6 +1411,7 @@ return [
     'enabled' => 'Enabled',
     'disabled' => 'Disabled',
     'sidebar_service_fees' => 'Service Fees',
+    'sidebar_app_settings' => 'App Settings',
     'sidebar_pending_ads' => 'Pending Ads',
 
     'venue_closed_on_this_day' => 'This venue is closed on :day.',

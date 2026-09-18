@@ -32,6 +32,7 @@
     $showReviewers        = $me && $me->can('reviewers.view');
     $showPromoCodes       = $me && $me->can('promo_codes.view');
     $showServiceFees      = $me && $me->can('service_fees.view');
+    $showAppSettings      = (bool) $me; // route already gated by auth:admin + admin.guard
     $showServiceGroups    = $me && $me->can('service_groups.view');
     $showServices         = $me && $me->can('services.view');
     $showStadiumTypes     = $me && $me->can('stadium_types.view');
@@ -160,6 +161,12 @@
         <a class="nav-link-dark {{ str_starts_with($r,'admin.service-fees') ? 'active' : '' }}"
            href="{{ route('admin.service-fees.index') }}">
             <i class="ti ti-receipt"></i> {{ __('lang.sidebar_service_fees') }}
+        </a>
+        @endif
+        @if($showAppSettings && Route::has('admin.app-settings.index'))
+        <a class="nav-link-dark {{ str_starts_with($r,'admin.app-settings') ? 'active' : '' }}"
+           href="{{ route('admin.app-settings.index') }}">
+            <i class="ti ti-adjustments-horizontal"></i> {{ __('lang.sidebar_app_settings') }}
         </a>
         @endif
         @if($showPropertyPackages)

@@ -1405,6 +1405,7 @@ return [
     'enabled' => 'مفعّل',
     'disabled' => 'غير مفعّل',
     'sidebar_service_fees' => 'رسوم الخدمة',
+    'sidebar_app_settings' => 'إعدادات التطبيق',
     'sidebar_pending_ads' => 'الإعلانات المعلقة',
 
     'venue_closed_on_this_day' => 'هذه الوحدة مغلقة يوم :day.',
