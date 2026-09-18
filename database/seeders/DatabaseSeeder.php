@@ -66,6 +66,9 @@ class DatabaseSeeder extends Seeder
             SuggestionSeeder::class,
             // ── 9. Service fees ───────────────────────────────────────────────
             ServiceFeesTableSeeder::class,              // NEW — 4 service fees (reservation, transfer, etc.)
+            // ── 10. App settings ───────────────────────────────────────────────
+            AppSettingsSeeder::class,
+
         ]);
     }
 }

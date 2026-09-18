@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: PHP ${{ matrix.php }} — Laravel Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: weekend_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    strategy:
+      matrix:
+        php: ['8.3']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo, pdo_mysql, mbstring, openssl, tokenizer, xml, ctype, json, bcmath, gd
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('**/composer.lock') }}
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy environment file
+        run: cp .env.example .env
+
+      - name: Configure test environment
+        run: |
+          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=weekend_test/' .env
+          sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
+          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=root/' .env
+          sed -i 's/MAIL_MAILER=.*/MAIL_MAILER=log/' .env
+          echo "QUEUE_CONNECTION=sync" >> .env
+          echo "GEIDEA_API_KEY=test-dummy" >> .env
+          echo "GEIDEA_API_PASSWORD=test-dummy" >> .env
+
+      - name: Generate application key
+        run: php artisan key:generate --force
+
+      - name: ─── Migrate fresh + seed ─────────────────────────────────────
+        # This is the primary gating check: every push/PR must produce a
+        # clean database from scratch. If any migration fails (e.g. due to
+        # editing an already-run migration without creating a new one), the
+        # pipeline fails here and is visible before merge.
+        run: php artisan migrate:fresh --seed --force
+
+      - name: ─── Test suite ─────────────────────────────────────────────────
+        # All automated regression tests must pass.
+        run: php artisan test --stop-on-failure
+
+      - name: Upload test output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: storage/logs/laravel.log

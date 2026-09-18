@@ -187,6 +187,21 @@ Route::prefix('admin/service-fees')->middleware(['auth:admin', 'admin.guard'])->
         ->middleware('permission:service_fees.update')
         ->name('admin.service-fees.update');
 });
+
+// Application settings — boolean flags (free-trial toggles, subscription gates).
+// Restricted to super-admin: these flags affect ALL providers immediately.
+Route::resource('admin/app-settings', \App\Http\Controllers\Admin\Settings\AppSettingController::class)
+    ->middleware(['auth:admin', 'admin.guard'])
+    ->names([
+        'index' => 'admin.app-settings.index',
+        'create' => 'admin.app-settings.create',
+        'store' => 'admin.app-settings.store',
+        'show' => 'admin.app-settings.show',
+        'edit' => 'admin.app-settings.edit',
+        'update' => 'admin.app-settings.update',
+        'destroy' => 'admin.app-settings.destroy',
+    ])
+    ->parameters(['app-settings' => 'appSetting']);
 Route::get('/payment-failed', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'failed'])->name('payment.failed');
 Route::get('/payment-cancelled', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'cancelled'])->name('payment.cancelled');
 

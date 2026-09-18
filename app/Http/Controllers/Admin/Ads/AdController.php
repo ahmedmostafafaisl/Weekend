@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Ads;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ads\AdRequest;
 use App\Http\Resources\Ads\AdResource;
+use App\Models\AppSetting;
 use App\Models\User;
 use App\Repositories\Interfaces\AdInterface;
 use Illuminate\Http\Request;
@@ -35,6 +36,23 @@ class AdController extends Controller
 
     public function store(AdRequest $request)
     {
+        // A user needs an active ad subscription to create a new ad listing —
+        // unless the admin has enabled the free-trial flag
+        // (allow_ads_without_subscription), in which case the gate is bypassed
+        // entirely for the duration of the trial period.
+        // Gated by expectsJson() so the admin dashboard web form is always
+        // trusted (matching the pattern used by UniteController::store()).
+        if ($request->expectsJson()) {
+            $freeTrial = AppSetting::get('allow_ads_without_subscription');
+
+            if (! $freeTrial) {
+                $user = $request->user();
+                if (! $user || ! $user->activeAdSubscription()) {
+                    abort(403, __('lang.no_active_ad_subscription'));
+                }
+            }
+        }
+
         $data = $request->validated();
 
         $ad = $this->adRepo->create($data);
@@ -47,6 +65,11 @@ class AdController extends Controller
     public function show($id, Request $request)
     {
         $ad = $this->adRepo->find($id);
+        abort_unless($ad, 404);
+
+        if ($request->expectsJson()) {
+            $this->authorize('view', $ad);
+        }
 
         return $request->expectsJson()
             ? new AdResource($ad)
@@ -63,6 +86,13 @@ class AdController extends Controller
 
     public function update(AdRequest $request, $id)
     {
+        $ad = $this->adRepo->find($id);
+        abort_unless($ad, 404);
+
+        if ($request->expectsJson()) {
+            $this->authorize('update', $ad);
+        }
+
         $data = $request->validated();
         $ad = $this->adRepo->update($id, $data);
 
@@ -73,6 +103,13 @@ class AdController extends Controller
 
     public function destroy($id, Request $request)
     {
+        $ad = $this->adRepo->find($id);
+        abort_unless($ad, 404);
+
+        if ($request->expectsJson()) {
+            $this->authorize('delete', $ad);
+        }
+
         $this->adRepo->delete($id);
 
         return $request->expectsJson()
@@ -93,16 +130,24 @@ class AdController extends Controller
 
     public function markSeen($id, Request $request)
     {
+        // markSeen is intentionally open to any authenticated user —
+        // the whole point is that any viewer can register having seen an ad.
+        // No ownership check is appropriate here.
         $this->adRepo->markAsSeen($id, $request->user()->id);
 
-        return response()->json([
-            'message' => 'Ad marked as seen',
-        ]);
+        return response()->json(['message' => 'Ad marked as seen']);
     }
 
     public function activate($id, Request $request)
     {
+        $ad = $this->adRepo->find($id);
+        abort_unless($ad, 404);
+
         $userId = $request->expectsJson() ? $request->user()->id : null;
+
+        if ($request->expectsJson()) {
+            $this->authorize('activate', $ad);
+        }
 
         $ad = $this->adRepo->activate($id, $userId);
 

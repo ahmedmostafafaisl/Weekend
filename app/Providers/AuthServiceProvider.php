@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Ad;
 use App\Models\Admin;
 use App\Models\Department;
 use App\Models\Unite;
 use App\Models\UniteReservation;
+use App\Policies\AdPolicy;
 use App\Policies\DepartmentPolicy;
 use App\Policies\UnitePolicy;
 use App\Policies\UniteReservationPolicy;
@@ -15,6 +17,7 @@ use Illuminate\Support\Facades\Gate;
 class AuthServiceProvider extends ServiceProvider
 {
     protected $policies = [
+        Ad::class => AdPolicy::class,
         Department::class => DepartmentPolicy::class,
         Unite::class => UnitePolicy::class,
         UniteReservation::class => UniteReservationPolicy::class,
