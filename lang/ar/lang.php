@@ -1313,6 +1313,8 @@ return [
     'email_not_found' => 'لم يتم العثور على حساب مرتبط بهذا البريد الإلكتروني.',
     'password_reset_successfully' => 'تم إعادة تعيين كلمة المرور بنجاح.',
     'password_reset_throttled' => 'محاولات كثيرة جداً. يرجى الانتظار قليلاً قبل المحاولة مجدداً.',
+    'password_confirmation' => 'تأكيد كلمة المرور',
+    'password_confirmation_mismatch' => 'كلمتا المرور غير متطابقتين.',
     'reset_password_subject' => 'إعادة تعيين كلمة المرور',
     'reset_password_greeting' => 'مرحباً!',
     'reset_password_line_1' => 'تلقيت هذا البريد الإلكتروني لأننا تلقينا طلب إعادة تعيين كلمة المرور لحسابك.',

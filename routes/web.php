@@ -61,6 +61,13 @@ Route::get('/', function () {
     return redirect()->route('admin.login');
 });
 
+// Password reset form -- rendered when the user clicks the link in the
+// reset email. Token and email arrive as query params; the form POSTs
+// them to POST /api/reset-password via fetch() without a page reload.
+Route::get('/reset-password', function () {
+    return view('auth.api-reset-password');
+})->name('password.reset');
+
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth:admin', 'admin.guard'])->name('dashboard');

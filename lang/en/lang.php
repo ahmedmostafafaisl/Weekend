@@ -1319,6 +1319,8 @@ return [
     'email_not_found' => 'No account was found with this email address.',
     'password_reset_successfully' => 'Your password has been reset successfully.',
     'password_reset_throttled' => 'Too many reset attempts. Please wait a moment before trying again.',
+    'password_confirmation' => 'Confirm Password',
+    'password_confirmation_mismatch' => 'Passwords do not match.',
     'reset_password_subject' => 'Reset Your Password',
     'reset_password_greeting' => 'Hello!',
     'reset_password_line_1' => 'You are receiving this email because we received a password reset request for your account.',

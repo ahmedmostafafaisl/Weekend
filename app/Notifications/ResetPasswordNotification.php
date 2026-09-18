@@ -3,11 +3,11 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
-class ResetPasswordNotification extends Notification implements ShouldQueue
+class ResetPasswordNotification extends Notification
 {
     use Queueable;
 
@@ -22,6 +22,17 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        // Log the attempt so any mail config issue is visible in
+        // storage/logs/laravel.log immediately (no queue required).
+        Log::info('ResetPasswordNotification: building mail', [
+            'recipient'    => $notifiable->email,
+            'reset_url'    => $this->url,
+            'mailer'       => config('mail.default'),
+            'from_address' => config('mail.from.address'),
+            'host'         => config('mail.mailers.smtp.host'),
+            'port'         => config('mail.mailers.smtp.port'),
+        ]);
+
         return (new MailMessage)
             ->subject(__('lang.reset_password_subject'))
             ->greeting(__('lang.reset_password_greeting'))

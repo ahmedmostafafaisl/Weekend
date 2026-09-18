@@ -10,6 +10,7 @@ use App\Repositories\Interfaces\UserInterface;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
@@ -73,9 +74,25 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        try {
+            $status = Password::sendResetLink(
+                $request->only('email')
+            );
+        } catch (\Throwable $e) {
+            // Mail exception (wrong SMTP credentials, connection refused,
+            // TLS error, etc.) -- log the full detail and surface it in
+            // the response so production issues are immediately visible.
+            Log::error('ResetPasswordNotification mail failed', [
+                'email' => $request->email,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => __('lang.password_reset_link_sent'), // token was created
+                'mail_error' => $e->getMessage(),                  // but sending failed
+            ], 500);
+        }
 
         if ($status === Password::RESET_LINK_SENT) {
             return response()->json([
