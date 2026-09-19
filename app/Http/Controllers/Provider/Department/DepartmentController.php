@@ -170,7 +170,10 @@ class DepartmentController extends Controller
                 'latitude' => $department->latitude,
                 'longitude' => $department->longitude,
                 'unites_count' => $department->unites_count,
-                'images' => $department->images->map(fn ($img) => asset($img->image))->values(),
+                'images' => $department->images->map(fn ($img) => [
+                    'id' => $img->id,
+                    'url' => asset($img->image),
+                ])->values(),
             ])->values(),
             'meta' => [
                 'current_page' => $departments->currentPage(),
@@ -217,11 +220,13 @@ class DepartmentController extends Controller
                 )
             END FROM unite_prices WHERE unite_prices.unite_id = unites.id)';
 
+        $authUserId = auth('sanctum')->id(); // null for guests — favorites->contains() safely returns false
+
         $unites = $department->unites()
             ->with([
                 'detail', 'images', 'features', 'offers', 'slots', 'prices',
                 'packages', 'bookingPackages', 'viewingTimes', 'newFeatures',
-                'councils', 'services',
+                'councils', 'services', 'favorites',
             ])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
@@ -238,7 +243,13 @@ class DepartmentController extends Controller
             ->paginate($request->integer('per_page', 20) ?: 20);
 
         return response()->json([
-            'data' => UniteResource::collection($unites)->resolve(),
+            'data' => collect(UniteResource::collection($unites)->resolve())
+                ->zip($unites->items())
+                ->map(fn ($pair) => array_merge($pair[0], [
+                    'is_favorite' => $authUserId
+                        ? $pair[1]->favorites->contains('user_id', $authUserId)
+                        : false,
+                ]))->values(),
             'meta' => [
                 'current_page' => $unites->currentPage(),
                 'last_page' => $unites->lastPage(),

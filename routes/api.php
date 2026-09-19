@@ -178,6 +178,27 @@ Route::middleware('auth:sanctum')->group(function () {
 //  Package Routes
 Route::get('all-packages', [PropertyPackageController::class, 'getAllPackages'])->name('packages.all');
 
+// Home — top 5 property + ad packages, plus provider statistics when auth user is provider.
+// No auth middleware: guests get packages only; authenticated providers also get their statistics.
+Route::get('home', [\App\Http\Controllers\Api\PackageDiscoveryController::class, 'home'])
+    ->name('home');
+
+// Package activation keys — booleans indicating whether the auth user has an active subscription.
+// Provider: { property_package_activation: bool, ad_package_activation: bool }
+// Customer: { ad_package_activation: bool }
+Route::middleware('auth:sanctum')->get(
+    'package-activation-keys',
+    [\App\Http\Controllers\Api\PackageDiscoveryController::class, 'activationKeys']
+)->name('packages.activation-keys');
+
+// User subscriptions split by domain
+// Provider: { property_subscriptions, ad_subscriptions }
+// Customer: { ad_subscriptions }
+Route::middleware('auth:sanctum')->get(
+    'user-subscriptions',
+    [\App\Http\Controllers\Api\PackageDiscoveryController::class, 'userSubscriptions']
+)->name('packages.user-subscriptions');
+
 // Ads Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('ads', AdController::class);

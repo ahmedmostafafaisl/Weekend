@@ -205,6 +205,21 @@ class User extends Authenticatable
     }
 
     /**
+     * Parallel to activePropertySubscription() but for the ad domain.
+     * Returns the oldest active ad subscription that isExpiredByRules()
+     * doesn't consider expired yet.  Returns null if none qualify.
+     */
+    public function activeAdSubscription(): ?Subscription
+    {
+        return $this->subscriptions()
+            ->where('type', 'ad')
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->get()
+            ->first(fn ($s) => ! $s->isExpiredByRules());
+    }
+
+    /**
      * Send the password reset notification to the frontend URL instead
      * of the default backend route -- so the link in the email opens
      * the mobile app or web frontend's "set new password" screen, not
@@ -214,7 +229,7 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token): void
     {
         $frontendUrl = config('app.frontend_url', config('app.url'));
-        $url = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($this->email);
+        $url = $frontendUrl.'/reset-password?token='.$token.'&email='.urlencode($this->email);
 
         $this->notify(new \App\Notifications\ResetPasswordNotification($url));
     }

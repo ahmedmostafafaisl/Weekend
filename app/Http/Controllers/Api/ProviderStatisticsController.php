@@ -38,7 +38,7 @@ class ProviderStatisticsController extends Controller
         ]);
     }
 
-    private function computeStatistics($user, int $year, int $month): array
+    public function computeStatistics($user, int $year, int $month): array
     {
 
         // All unite IDs belonging to this provider
@@ -178,7 +178,7 @@ class ProviderStatisticsController extends Controller
         ];
     }
 
-    private function emptyStatistics(int $year, int $month): array
+    public function emptyStatistics(int $year, int $month): array
     {
         $arMonths = [
             1 => 'يناير', 2 => 'فبراير', 3 => 'مارس', 4 => 'ابريل',

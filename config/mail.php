@@ -43,6 +43,19 @@ return [
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
+
+            // SSL context options — controls peer certificate verification.
+            // Set MAIL_VERIFY_PEER=false in .env only when the SMTP server
+            // uses a self-signed or untrusted certificate (private/dev mail
+            // servers).  Leave unset (defaults to true) for public providers
+            // such as Gmail, Mailgun, SES, etc., which have valid certs.
+            'stream' => [
+                'ssl' => [
+                    'verify_peer' => env('MAIL_VERIFY_PEER', true),
+                    'verify_peer_name' => env('MAIL_VERIFY_PEER', true),
+                    'allow_self_signed' => ! env('MAIL_VERIFY_PEER', true),
+                ],
+            ],
         ],
 
         'ses' => [

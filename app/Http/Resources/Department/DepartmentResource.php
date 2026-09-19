@@ -29,7 +29,11 @@ class DepartmentResource extends JsonResource
             'user' => $this->user ? $this->user->only(['id', 'name', 'email']) : null,
             'sak_image' => $this->sak_image ? asset($this->sak_image) : null,
             'ownership' => $this->ownership,
-            'images' => $this->images->map(fn ($img) => asset($img->image)),
+            // return id and asset path for each image
+            'images' => $this->images->map(fn ($img) => [
+                'id' => $img->id,
+                'path' => asset($img->image),
+            ]),
             'unites_count' => $this->unites->count(),
 
             'unites' => collect($this->unites)->map(function ($unite) {
