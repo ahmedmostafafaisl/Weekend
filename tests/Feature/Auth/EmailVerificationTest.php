@@ -14,6 +14,14 @@ class EmailVerificationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Suppress Vite manifest errors — public/build/manifest.json is not
+        // built in the test environment (no npm run build in CI).
+        $this->withoutVite();
+    }
+
     public function test_email_verification_screen_can_be_rendered(): void
     {
         $user = User::factory()->create([

@@ -6,12 +6,19 @@ use App\Models\User;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
 class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Suppress Vite manifest errors — public/build/manifest.json is not
+        // built in the test environment (no npm run build in CI).
+        $this->withoutVite();
+    }
 
     public function test_reset_password_link_screen_can_be_rendered(): void
     {
@@ -65,9 +72,9 @@ class PasswordResetTest extends TestCase
             $token = $matches[1] ?? '';
 
             $response = $this->post('/reset-password', [
-                'token'                 => $token,
-                'email'                 => $user->email,
-                'password'              => 'password',
+                'token' => $token,
+                'email' => $user->email,
+                'password' => 'password',
                 'password_confirmation' => 'password',
             ]);
 

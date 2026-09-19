@@ -10,6 +10,14 @@ class ProfileTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Suppress Vite manifest errors — public/build/manifest.json is not
+        // built in the test environment (no npm run build in CI).
+        $this->withoutVite();
+    }
+
     public function test_profile_page_is_displayed(): void
     {
         $user = User::factory()->create();
