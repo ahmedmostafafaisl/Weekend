@@ -1,11 +1,12 @@
+@php $isAr = app()->getLocale() === 'ar'; @endphp
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $settings->site_name ?: 'ويكند' }} | كل لحظة تستحقها</title>
-    <meta name="description" content="اكتشف الملاعب والقاعات والاستراحات والمخيمات مع ويكند، وأكمل الحجز من التطبيق.">
+    <title>{{ $settings->site_name ?: 'Weekend' }} | {{ $isAr ? 'كل لحظة تستحقها' : 'Every moment counts' }}</title>
+    <meta name="description" content="{{ $isAr ? 'اكتشف الملاعب والقاعات والاستراحات والمخيمات مع ويكند، وأكمل الحجز من التطبيق.' : 'Discover stadiums, halls, lounges and camps with Weekend, and complete your booking on the app.' }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -27,9 +28,11 @@
 </head>
 <body>
 @php
-    $fallbackHero = optional(optional($unites->first())->images->first())->image;
+    $fallbackHero = optional(optional(optional($unites->first())->images)->first())->image;
     $slidesForHero = $slides;
-    $typeLabel = fn($type) => ['stadium'=>'ملاعب','hall'=>'قاعات','lounge'=>'استراحات','camp'=>'مخيمات'][$type] ?? $type;
+    $typeLabel = fn($type) => $isAr
+        ? ['stadium'=>'ملاعب','hall'=>'قاعات','lounge'=>'استراحات','camp'=>'مخيمات'][$type] ?? $type
+        : ['stadium'=>'Stadiums','hall'=>'Halls','lounge'=>'Lounges','camp'=>'Camps'][$type] ?? $type;
     $minPrice = function($u){
         $vals=[]; foreach($u->prices as $p){ foreach(['price','morning_price','evening_price','full_price','day_hour_price','night_hour_price'] as $c){ if(isset($p->$c) && is_numeric($p->$c) && $p->$c>0) $vals[]=(float)$p->$c; } }
         return count($vals)?min($vals):null;
@@ -44,8 +47,13 @@
                 <span class="brand-mark">W</span><span>{{ $settings->site_name ?: 'ويكند' }}</span>
             @endif
         </a>
-        <nav class="nav-links"><a href="#discover">استكشف</a><a href="#featured">الأماكن</a><a href="#why">لماذا ويكند؟</a><a href="#app">التطبيق</a></nav>
-        <div class="nav-actions"><button class="btn btn-glass" onclick="openModal('loginModal')">تسجيل الدخول</button><button class="btn btn-gold" onclick="openModal('registerModal')">إنشاء حساب</button></div>
+        <nav class="nav-links">
+            <a href="#discover">{{ $isAr ? 'استكشف' : 'Explore' }}</a>
+            <a href="#featured">{{ $isAr ? 'الأماكن' : 'Venues' }}</a>
+            <a href="#why">{{ $isAr ? 'لماذا ويكند؟' : 'Why Weekend?' }}</a>
+            <a href="#app">{{ $isAr ? 'التطبيق' : 'App' }}</a>
+        </nav>
+        <div class="nav-actions"><button class="btn btn-glass" onclick="openModal('loginModal')">{{ $isAr ? 'تسجيل الدخول' : 'Log In' }}</button><button class="btn btn-gold" onclick="openModal('registerModal')">{{ $isAr ? 'إنشاء حساب' : 'Sign Up' }}</button></div>
     </div>
 </header>
 <section class="hero">
@@ -57,73 +65,102 @@
         <div class="hero-slide active" style="background-image:url('{{ $fallbackHero ? asset($fallbackHero) : asset('unites/images/1/1788158623_wee1.png') }}')"></div>
     @endif
     <div class="container hero-content">
-        <span class="eyebrow">✦ {{ $settings->hero_badge }}</span>
-        <h1 id="heroTitle">{{ $slidesForHero->first()?->title ?: $settings->hero_title }}</h1>
-        <p id="heroSubtitle">{{ $slidesForHero->first()?->subtitle ?: $settings->hero_subtitle }}</p>
+        <span class="eyebrow">✦ {{ $settings->trans('hero_badge') }}</span>
+        <h1 id="heroTitle">{{ $slidesForHero->first()?->title ?: $settings->trans('hero_title') }}</h1>
+        <p id="heroSubtitle">{{ $slidesForHero->first()?->subtitle ?: $settings->trans('hero_subtitle') }}</p>
         @if($slidesForHero->first()?->button_text)
             <a id="heroCta" class="btn btn-gold" style="margin-top:8px" href="{{ $slidesForHero->first()?->button_url ?: '#discover' }}">{{ $slidesForHero->first()?->button_text }}</a>
         @else
             <a id="heroCta" class="btn btn-gold" style="margin-top:8px;display:none" href="#discover"></a>
         @endif
-        <div class="hero-pills"><span class="hero-pill">✓ الحجز عبر التطبيق</span><span class="hero-pill">✓ أماكن موثوقة</span><span class="hero-pill">✓ تفاصيل وأسعار واضحة</span></div>
+        <div class="hero-pills">
+            <span class="hero-pill">✓ {{ $isAr ? 'الحجز عبر التطبيق' : 'Book via App' }}</span>
+            <span class="hero-pill">✓ {{ $isAr ? 'أماكن موثوقة' : 'Verified Venues' }}</span>
+            <span class="hero-pill">✓ {{ $isAr ? 'تفاصيل وأسعار واضحة' : 'Clear Details & Pricing' }}</span>
+        </div>
     </div>
     @if($slidesForHero->count()>1)<div class="slide-dots">@foreach($slidesForHero as $i=>$slide)<span class="slide-dot {{ $i===0?'active':'' }}"></span>@endforeach</div>@endif
 </section>
 @if($settings->show_search !== false)
 <div class="search-wrap" id="discover"><div class="container"><form class="search-box" method="get" action="{{ url('/') }}#featured">
-    <div class="field"><label>ماذا تبحث عنه؟</label><input name="q" value="{{ request('q') }}" placeholder="اسم المكان أو الوحدة"></div>
-    <div class="field"><label>نوع المكان</label><select name="type"><option value="">كل الأنواع</option><option value="stadium" @selected(request('type')==='stadium')>ملعب</option><option value="hall" @selected(request('type')==='hall')>قاعة</option><option value="lounge" @selected(request('type')==='lounge')>استراحة</option><option value="camp" @selected(request('type')==='camp')>مخيم</option></select></div>
-    <div class="field"><label>المدينة / الموقع</label><input name="city" value="{{ request('city') }}" placeholder="مثال: المدينة المنورة"></div>
-    <div class="field"><label>التاريخ</label><input type="date" name="date" min="{{ now()->toDateString() }}" value="{{ request('date') }}"></div>
-    <button class="search-btn">⌕ &nbsp; بحث</button>
+    <div class="field"><label>{{ $isAr ? 'ماذا تبحث عنه؟' : 'What are you looking for?' }}</label><input name="q" value="{{ request('q') }}" placeholder="{{ $isAr ? 'اسم المكان أو الوحدة' : 'Venue or place name' }}"></div>
+    <div class="field"><label>{{ $isAr ? 'نوع المكان' : 'Venue Type' }}</label><select name="type"><option value="">{{ $isAr ? 'كل الأنواع' : 'All Types' }}</option><option value="stadium" @selected(request('type')==='stadium')>{{ $isAr ? 'ملعب' : 'Stadium' }}</option><option value="hall" @selected(request('type')==='hall')>{{ $isAr ? 'قاعة' : 'Hall' }}</option><option value="lounge" @selected(request('type')==='lounge')>{{ $isAr ? 'استراحة' : 'Lounge' }}</option><option value="camp" @selected(request('type')==='camp')>{{ $isAr ? 'مخيم' : 'Camp' }}</option></select></div>
+    <div class="field"><label>{{ $isAr ? 'المدينة / الموقع' : 'City / Location' }}</label><input name="city" value="{{ request('city') }}" placeholder="{{ $isAr ? 'مثال: المدينة المنورة' : 'e.g. Riyadh' }}"></div>
+    <div class="field"><label>{{ $isAr ? 'التاريخ' : 'Date' }}</label><input type="date" name="date" min="{{ now()->toDateString() }}" value="{{ request('date') }}"></div>
+    <button class="search-btn">⌕ &nbsp; {{ $isAr ? 'بحث' : 'Search' }}</button>
 </form></div></div>
 @endif
 
 @if($settings->show_categories)
-<section><div class="container"><div class="section-head"><div><h2>اختر تجربتك</h2><p>كل ما تحتاجه لعطلة أو مناسبة مميزة في مكان واحد.</p></div></div><div class="categories">
-    @foreach([['stadium','⚽','ملاعب','اختر ملعبك المناسب بالساعة'],['hall','♕','قاعات','لأفراحك ومناسباتك'],['lounge','⌂','استراحات','جلسات وخصوصية أكثر'],['camp','⛺','مخيمات','تجارب خارج المدينة']] as $c)
+<section><div class="container"><div class="section-head"><div><h2>{{ $isAr ? 'اختر تجربتك' : 'Choose your experience' }}</h2><p>{{ $isAr ? 'كل ما تحتاجه لعطلة أو مناسبة مميزة في مكان واحد.' : 'Everything you need for a great getaway or event, in one place.' }}</p></div></div><div class="categories">
+    @foreach($isAr
+        ? [['stadium','⚽','ملاعب','اختر ملعبك المناسب بالساعة'],['hall','♕','قاعات','لأفراحك ومناسباتك'],['lounge','⌂','استراحات','جلسات وخصوصية أكثر'],['camp','⛺','مخيمات','تجارب خارج المدينة']]
+        : [['stadium','⚽','Stadiums','Book your pitch by the hour'],['hall','♕','Halls','Perfect for weddings & events'],['lounge','⌂','Lounges','Private sessions & gatherings'],['camp','⛺','Camps','Adventures beyond the city']]
+        as $c)
         <a class="cat" href="{{ url('/?type='.$c[0]) }}#featured"><div class="cat-icon">{{ $c[1] }}</div><h3>{{ $c[2] }}</h3><p>{{ $c[3] }}</p></a>
     @endforeach
 </div></div></section>
 @endif
 
 @if($settings->show_featured)
-<section class="featured-section" id="featured"><div class="container"><div class="section-head"><div><h2>{{ $settings->featured_title }}</h2><p>{{ request()->hasAny(['q','type','city','date']) ? 'نتائج البحث حسب اختياراتك' : $settings->featured_subtitle }}</p></div>@if(request()->hasAny(['q','type','city','date']))<a href="{{ url('/') }}#featured" class="tiny-link">مسح البحث ×</a>@endif</div>
+<section class="featured-section" id="featured"><div class="container"><div class="section-head"><div><h2>{{ $settings->trans('featured_title') }}</h2><p>{{ request()->hasAny(['q','type','city','date']) ? ($isAr ? 'نتائج البحث حسب اختياراتك' : 'Search results for your criteria') : $settings->trans('featured_subtitle') }}</p></div>@if(request()->hasAny(['q','type','city','date']))<a href="{{ url('/') }}#featured" class="tiny-link">{{ $isAr ? 'مسح البحث ×' : 'Clear search ×' }}</a>@endif</div>
 <div class="cards">
 @forelse($unites as $u)
     @php $img=optional($u->images->first())->image; $price=$minPrice($u); @endphp
     <article class="card">
         <div class="card-media">@if($img)<img loading="lazy" src="{{ asset($img) }}" alt="{{ $u->name }}">@endif<span class="type-badge">{{ $typeLabel($u->type) }}</span><span class="rating">★ {{ number_format((float)($u->ratings_avg_rating ?? 0),1) }}</span></div>
-        <div class="card-body"><h3>{{ $u->name }}</h3><div class="location">⌖ {{ $u->location_name ?: $u->city ?: 'الموقع متاح في التفاصيل' }}</div><div class="card-bottom"><div class="price">يبدأ من<strong>{{ $price ? number_format($price) . ' ر.س' : 'حسب الحجز' }}</strong></div><div class="card-actions"><button class="icon-btn" title="التفاصيل" onclick="showUnit({{ $u->id }})">⌘</button><button class="book-small" onclick="requestAppBooking()">احجز عبر التطبيق</button></div></div></div>
+        <div class="card-body"><h3>{{ $u->name }}</h3><div class="location">⌖ {{ $u->location_name ?: $u->city ?: ($isAr ? 'الموقع متاح في التفاصيل' : 'Location in details') }}</div><div class="card-bottom"><div class="price">يبدأ من<strong>{{ $price ? number_format($price) . ' ر.س' : 'حسب الحجز' }}</strong></div><div class="card-actions"><button class="icon-btn" title="التفاصيل" onclick="showUnit({{ $u->id }})">⌘</button><button class="book-small" onclick="requestAppBooking()">احجز عبر التطبيق</button></div></div></div>
     </article>
 @empty
-    <div style="grid-column:1/-1;text-align:center;padding:55px;border:1px dashed #d8e2de;border-radius:22px;color:#74817e">لا توجد وحدات مطابقة حاليًا. جرّب تغيير معايير البحث.</div>
+    <div style="grid-column:1/-1;text-align:center;padding:55px;border:1px dashed #d8e2de;border-radius:22px;color:#74817e">{{ $isAr ? 'لا توجد وحدات مطابقة حاليًا. جرّب تغيير معايير البحث.' : 'No matching venues found. Try adjusting your search criteria.' }}</div>
 @endforelse
 </div></div></section>
 @endif
 
 @if($settings->show_stats)
-<section class="stats"><div class="container"><div class="stats-box"><div class="stat"><strong>{{ number_format($unitesCount) }}+</strong><span>مكان ووحدة</span></div><div class="stat"><strong>{{ number_format($departmentsCount) }}+</strong><span>مزود وموقع</span></div><div class="stat"><strong>{{ number_format($reservationsCount) }}+</strong><span>حجز مسجل</span></div><div class="stat"><strong>{{ number_format($citiesCount) }}+</strong><span>مدينة وموقع</span></div></div></div></section>
+<section class="stats"><div class="container"><div class="stats-box">
+    <div class="stat"><strong>{{ number_format($unitesCount) }}+</strong><span>{{ $isAr ? 'مكان ووحدة' : 'Venues' }}</span></div>
+    <div class="stat"><strong>{{ number_format($departmentsCount) }}+</strong><span>{{ $isAr ? 'مزود وموقع' : 'Providers' }}</span></div>
+    <div class="stat"><strong>{{ number_format($reservationsCount) }}+</strong><span>{{ $isAr ? 'حجز مسجل' : 'Bookings' }}</span></div>
+    <div class="stat"><strong>{{ number_format($citiesCount) }}+</strong><span>{{ $isAr ? 'مدينة وموقع' : 'Cities' }}</span></div>
+</div></div></section>
 @endif
 
 @if($settings->show_why_us)
-<section id="why"><div class="container"><div class="why-grid"><div class="why-copy"><span class="tiny-link">تجربة أسهل من البداية للنهاية</span><h2>لماذا تختار ويكند؟</h2><p>صممنا التجربة لتصل للمكان المناسب بسرعة: بحث واضح، صور وتفاصيل كاملة وأسعار واضحة، ثم إتمام الحجز بأمان من تطبيق ويكند.</p><div class="why-items"><div class="why-item"><b>حجز عبر التطبيق</b><span>عند اختيار المكان، انتقل إلى التطبيق لإتمام الحجز والدفع.</span></div><div class="why-item"><b>تفاصيل كاملة</b><span>الصور والمميزات والخدمات والأسعار في مكان واحد.</span></div><div class="why-item"><b>حساب واحد</b><span>سجّل الدخول وتابع حجوزاتك من التطبيق.</span></div><div class="why-item"><b>خيارات متنوعة</b><span>ملاعب وقاعات واستراحات ومخيمات.</span></div></div></div><div class="why-visual"><div class="floating one"><strong>{{ number_format($unitesCount) }}+</strong> خيار متاح</div><div class="floating two"><strong>4.8 ★</strong> تجربة سهلة وجذابة</div></div></div></div></section>
+<section id="why"><div class="container"><div class="why-grid"><div class="why-copy">
+<span class="tiny-link">{{ $isAr ? 'تجربة أسهل من البداية للنهاية' : 'Seamless from start to finish' }}</span>
+<h2>{{ $isAr ? 'لماذا تختار ويكند؟' : 'Why choose Weekend?' }}</h2>
+<p>{{ $isAr ? 'صممنا التجربة لتصل للمكان المناسب بسرعة: بحث واضح، صور وتفاصيل كاملة وأسعار واضحة، ثم إتمام الحجز بأمان من تطبيق ويكند.' : 'We built the experience so you find the right venue fast: clear search, full photos & details, transparent pricing, then complete your booking securely on the Weekend app.' }}</p>
+<div class="why-items">
+    <div class="why-item"><b>{{ $isAr ? 'حجز عبر التطبيق' : 'Book via App' }}</b><span>{{ $isAr ? 'عند اختيار المكان، انتقل إلى التطبيق لإتمام الحجز والدفع.' : 'Once you pick your venue, switch to the app to complete your booking and payment.' }}</span></div>
+    <div class="why-item"><b>{{ $isAr ? 'تفاصيل كاملة' : 'Full Details' }}</b><span>{{ $isAr ? 'الصور والمميزات والخدمات والأسعار في مكان واحد.' : 'Photos, features, services and prices all in one place.' }}</span></div>
+    <div class="why-item"><b>{{ $isAr ? 'حساب واحد' : 'One Account' }}</b><span>{{ $isAr ? 'سجّل الدخول وتابع حجوزاتك من التطبيق.' : 'Sign in and manage your bookings from the app.' }}</span></div>
+    <div class="why-item"><b>{{ $isAr ? 'خيارات متنوعة' : 'Variety' }}</b><span>{{ $isAr ? 'ملاعب وقاعات واستراحات ومخيمات.' : 'Stadiums, halls, lounges and camps.' }}</span></div>
+</div></div>
+<div class="why-visual"><div class="floating one"><strong>{{ number_format($unitesCount) }}+</strong> {{ $isAr ? 'خيار متاح' : 'venues' }}</div><div class="floating two"><strong>4.8 ★</strong> {{ $isAr ? 'تجربة سهلة وجذابة' : 'Great experience' }}</div></div></div></div></section>
 @endif
 
 @if($settings->show_app_section)
-<section class="app-section" id="app"><div class="container"><div class="app-box"><div><span class="tiny-link">حمّل تطبيق ويكند</span><h2>{{ $settings->app_title }}</h2><p>{{ $settings->app_text }}</p><div class="booking-app-note">الحجز متاح حصريًا من تطبيق ويكند.</div><div class="store-buttons">@if($settings->google_play_url)<a class="store" href="{{ $settings->google_play_url }}" target="_blank" rel="noopener">▶ <span>Google Play</span></a>@endif @if($settings->apple_store_url)<a class="store" href="{{ $settings->apple_store_url }}" target="_blank" rel="noopener">● <span>App Store</span></a>@endif @if(!$settings->google_play_url && !$settings->apple_store_url)<span style="color:#71807d">تُضاف روابط المتاجر من إعدادات الصفحة الرئيسية.</span>@endif</div></div>@if($settings->app_image_path)<div class="app-image-wrap"><img class="app-image" loading="lazy" src="{{ asset($settings->app_image_path) }}" alt="{{ $settings->app_title }}"></div>@else<div class="phone-art"><div class="phone p1"><div class="phone-screen"><b>ويكند</b><div class="mini-card"></div><div class="mini-card"></div></div></div><div class="phone p2"><div class="phone-screen"><b>حجزي</b><div class="mini-card"></div><div class="mini-card"></div></div></div></div>@endif</div></div></section>
+<section class="app-section" id="app"><div class="container"><div class="app-box"><div><span class="tiny-link">حمّل تطبيق ويكند</span><h2>{{ $settings->trans('app_title') }}</h2><p>{{ $settings->trans('app_text') }}</p><div class="booking-app-note">الحجز متاح حصريًا من تطبيق ويكند.</div><div class="store-buttons">@if($settings->google_play_url)<a class="store" href="{{ $settings->google_play_url }}" target="_blank" rel="noopener">▶ <span>Google Play</span></a>@endif @if($settings->apple_store_url)<a class="store" href="{{ $settings->apple_store_url }}" target="_blank" rel="noopener">● <span>App Store</span></a>@endif @if(!$settings->google_play_url && !$settings->apple_store_url)<span style="color:#71807d">تُضاف روابط المتاجر من إعدادات الصفحة الرئيسية.</span>@endif</div></div>@if($settings->app_image_path)<div class="app-image-wrap"><img class="app-image" loading="lazy" src="{{ asset($settings->app_image_path) }}" alt="{{ $settings->trans('app_title') }}"></div>@else<div class="phone-art"><div class="phone p1"><div class="phone-screen"><b>ويكند</b><div class="mini-card"></div><div class="mini-card"></div></div></div><div class="phone p2"><div class="phone-screen"><b>حجزي</b><div class="mini-card"></div><div class="mini-card"></div></div></div></div>@endif</div></div></section>
 @endif
 
-<footer><div class="container"><div class="footer-grid"><div><div class="brand">@if($settings->logo_light_path || $settings->logo_path)<img class="footer-brand-logo" src="{{ asset($settings->logo_light_path ?: $settings->logo_path) }}" alt="{{ $settings->site_name ?: 'ويكند' }}">@else<span class="brand-mark">W</span><span>{{ $settings->site_name ?: 'ويكند' }}</span>@endif</div><p>{{ $settings->footer_text }}</p></div><div><h4>استكشف</h4><div class="footer-links"><a href="#featured">الأماكن</a><a href="#why">لماذا ويكند؟</a><a href="#app">التطبيق</a></div></div><div><h4>الحساب</h4><div class="footer-links"><a href="javascript:void(0)" onclick="openModal('loginModal')">تسجيل الدخول</a><a href="javascript:void(0)" onclick="openModal('registerModal')">إنشاء حساب</a></div></div></div><div class="copy"><span>© {{ date('Y') }} ويكند. جميع الحقوق محفوظة.</span><span>كل لحظة تستحقها</span></div></div></footer>
+<footer><div class="container"><div class="footer-grid">
+    <div><div class="brand">@if($settings->logo_light_path || $settings->logo_path)<img class="footer-brand-logo" src="{{ asset($settings->logo_light_path ?: $settings->logo_path) }}" alt="{{ $settings->site_name ?: 'ويكند' }}">@else<span class="brand-mark">W</span><span>{{ $settings->site_name ?: 'Weekend' }}</span>@endif</div><p>{{ $settings->trans('footer_text') }}</p></div>
+    <div><h4>{{ $isAr ? 'استكشف' : 'Explore' }}</h4><div class="footer-links"><a href="#featured">{{ $isAr ? 'الأماكن' : 'Venues' }}</a><a href="#why">{{ $isAr ? 'لماذا ويكند؟' : 'Why Weekend?' }}</a><a href="#app">{{ $isAr ? 'التطبيق' : 'App' }}</a></div></div>
+    <div><h4>{{ $isAr ? 'الحساب' : 'Account' }}</h4><div class="footer-links"><a href="javascript:void(0)" onclick="openModal('loginModal')">{{ $isAr ? 'تسجيل الدخول' : 'Log In' }}</a><a href="javascript:void(0)" onclick="openModal('registerModal')">{{ $isAr ? 'إنشاء حساب' : 'Create Account' }}</a></div></div>
+</div><div class="copy"><span>© {{ date('Y') }} {{ $settings->site_name ?: 'Weekend' }}. {{ $isAr ? 'جميع الحقوق محفوظة.' : 'All rights reserved.' }}</span><span>{{ $isAr ? 'كل لحظة تستحقها' : 'Every moment counts' }}</span></div></div></footer>
 
-<div class="modal-back" id="loginModal"><div class="modal"><div class="modal-head"><h3>تسجيل الدخول</h3><button class="close" onclick="closeModal('loginModal')">×</button></div><div class="modal-body"><div id="loginMsg" class="msg"></div><form id="loginForm"><div class="form-group"><label>البريد الإلكتروني</label><input class="form-control" type="email" name="email" required></div><div class="form-group"><label>كلمة المرور</label><input class="form-control" type="password" name="password" minlength="6" required></div><button class="btn btn-green" style="width:100%">دخول</button></form><p style="text-align:center;color:#71807d">ليس لديك حساب؟ <a href="javascript:void(0)" class="tiny-link" onclick="closeModal('loginModal');openModal('registerModal')">أنشئ حسابًا</a></p></div></div></div>
-<div class="modal-back" id="registerModal"><div class="modal"><div class="modal-head"><h3>إنشاء حساب مستخدم</h3><button class="close" onclick="closeModal('registerModal')">×</button></div><div class="modal-body"><div id="registerMsg" class="msg"></div><form id="registerForm"><div class="form-grid"><div class="form-group"><label>الاسم</label><input class="form-control" name="name" required></div><div class="form-group"><label>البريد الإلكتروني</label><input class="form-control" type="email" name="email" required></div><div class="form-group"><label>رقم الجوال</label><input class="form-control" name="phone" inputmode="numeric"></div><div class="form-group"><label>الجنسية</label><select class="form-control" name="nation" required><option value="saudi">سعودي</option><option value="resident">مقيم</option></select></div><div class="form-group"><label>الجنس</label><select class="form-control" name="gender" required><option value="">اختر الجنس</option><option value="male">ذكر</option><option value="female">أنثى</option></select></div><div class="form-group"><label>كلمة المرور</label><input class="form-control" type="password" name="password" minlength="6" required></div><div class="form-group"><label>تأكيد كلمة المرور</label><input class="form-control" type="password" name="password_confirmation" minlength="6" required></div></div><input type="hidden" name="type" value="customer"><button class="btn btn-green" style="width:100%">إنشاء الحساب</button></form></div></div></div>
-<div class="modal-back" id="downloadAppModal"><div class="modal"><div class="modal-head"><h3>الحجز عبر تطبيق ويكند</h3><button class="close" onclick="closeModal('downloadAppModal')">×</button></div><div class="modal-body app-download-body"><div class="app-download-icon">W</div><h3>أكمل الحجز من التطبيق</h3><p>لضمان تجربة حجز ودفع متكاملة، الحجوزات تتم من تطبيق ويكند فقط. اختر متجر جهازك لتحميل التطبيق ثم أكمل الحجز.</p><div class="store-buttons app-download-buttons">@if($settings->google_play_url)<a class="store" href="{{ $settings->google_play_url }}" rel="noopener">▶ <span>تحميل من Google Play</span></a>@endif @if($settings->apple_store_url)<a class="store" href="{{ $settings->apple_store_url }}" rel="noopener">● <span>تحميل من App Store</span></a>@endif @if(!$settings->google_play_url && !$settings->apple_store_url)<div class="booking-links-missing">روابط التطبيق لم تُضف بعد. يمكن إضافتها من لوحة التحكم ← إعدادات الصفحة الرئيسية.</div>@endif</div></div></div></div>
-<div class="modal-back" id="detailsModal"><div class="modal large"><div class="modal-head"><h3>تفاصيل الوحدة</h3><button class="close" onclick="closeModal('detailsModal')">×</button></div><div class="modal-body" id="detailsBody"><div style="text-align:center;padding:50px">جاري تحميل التفاصيل...</div></div></div></div>
+<div class="modal-back" id="loginModal"><div class="modal"><div class="modal-head"><h3>{{ $isAr ? 'تسجيل الدخول' : 'Log In' }}</h3><button class="close" onclick="closeModal('loginModal')">×</button></div><div class="modal-body"><div id="loginMsg" class="msg"></div><form id="loginForm"><div class="form-group"><label>{{ $isAr ? 'البريد الإلكتروني' : 'Email' }}</label><input class="form-control" type="email" name="email" required></div><div class="form-group"><label>{{ $isAr ? 'كلمة المرور' : 'Password' }}</label><input class="form-control" type="password" name="password" minlength="6" required></div><button class="btn btn-green" style="width:100%">{{ $isAr ? 'دخول' : 'Log In' }}</button></form><p style="text-align:center;color:#71807d">{{ $isAr ? 'ليس لديك حساب؟' : "Don't have an account?" }} <a href="javascript:void(0)" class="tiny-link" onclick="closeModal('loginModal');openModal('registerModal')">{{ $isAr ? 'أنشئ حسابًا' : 'Sign up' }}</a></p></div></div></div>
+<div class="modal-back" id="registerModal"><div class="modal"><div class="modal-head"><h3>{{ $isAr ? 'إنشاء حساب مستخدم' : 'Create Account' }}</h3><button class="close" onclick="closeModal('registerModal')">×</button></div><div class="modal-body"><div id="registerMsg" class="msg"></div><form id="registerForm"><div class="form-grid"><div class="form-group"><label>{{ $isAr ? 'الاسم' : 'Name' }}</label><input class="form-control" name="name" required></div><div class="form-group"><label>{{ $isAr ? 'البريد الإلكتروني' : 'Email' }}</label><input class="form-control" type="email" name="email" required></div><div class="form-group"><label>{{ $isAr ? 'رقم الجوال' : 'Phone' }}</label><input class="form-control" name="phone" inputmode="numeric"></div><div class="form-group"><label>{{ $isAr ? 'الجنسية' : 'Nationality' }}</label><select class="form-control" name="nation" required><option value="saudi">{{ $isAr ? 'سعودي' : 'Saudi' }}</option><option value="resident">{{ $isAr ? 'مقيم' : 'Resident' }}</option></select></div><div class="form-group"><label>{{ $isAr ? 'الجنس' : 'Gender' }}</label><select class="form-control" name="gender" required><option value="">{{ $isAr ? 'اختر الجنس' : 'Select gender' }}</option><option value="male">{{ $isAr ? 'ذكر' : 'Male' }}</option><option value="female">{{ $isAr ? 'أنثى' : 'Female' }}</option></select></div><div class="form-group"><label>{{ $isAr ? 'كلمة المرور' : 'Password' }}</label><input class="form-control" type="password" name="password" minlength="6" required></div><div class="form-group"><label>{{ $isAr ? 'تأكيد كلمة المرور' : 'Confirm Password' }}</label><input class="form-control" type="password" name="password_confirmation" minlength="6" required></div></div><input type="hidden" name="type" value="customer"><button class="btn btn-green" style="width:100%">{{ $isAr ? 'إنشاء الحساب' : 'Create Account' }}</button></form></div></div></div>
+<div class="modal-back" id="downloadAppModal"><div class="modal"><div class="modal-head"><h3>{{ $isAr ? 'الحجز عبر تطبيق ويكند' : 'Book via Weekend App' }}</h3><button class="close" onclick="closeModal('downloadAppModal')">×</button></div><div class="modal-body app-download-body"><div class="app-download-icon">W</div><h3>{{ $isAr ? 'أكمل الحجز من التطبيق' : 'Complete your booking in the app' }}</h3><p>{{ $isAr ? 'لضمان تجربة حجز ودفع متكاملة، الحجوزات تتم من تطبيق ويكند فقط. اختر متجر جهازك لتحميل التطبيق ثم أكمل الحجز.' : 'For a complete booking and payment experience, all reservations are made through the Weekend app. Choose your store to download, then complete your booking.' }}</p><div class="store-buttons app-download-buttons">@if($settings->google_play_url)<a class="store" href="{{ $settings->google_play_url }}" rel="noopener">▶ <span>{{ $isAr ? 'تحميل من Google Play' : 'Get on Google Play' }}</span></a>@endif @if($settings->apple_store_url)<a class="store" href="{{ $settings->apple_store_url }}" rel="noopener">● <span>{{ $isAr ? 'تحميل من App Store' : 'Get on App Store' }}</span></a>@endif @if(!$settings->google_play_url && !$settings->apple_store_url)<div class="booking-links-missing">{{ $isAr ? 'روابط التطبيق لم تُضف بعد. يمكن إضافتها من لوحة التحكم ← إعدادات الصفحة الرئيسية.' : 'App store links have not been added yet. Add them from the dashboard → Homepage Settings.' }}</div>@endif</div></div></div></div>
+<div class="modal-back" id="detailsModal"><div class="modal large"><div class="modal-head"><h3>{{ $isAr ? 'تفاصيل الوحدة' : 'Venue Details' }}</h3><button class="close" onclick="closeModal('detailsModal')">×</button></div><div class="modal-body" id="detailsBody"><div style="text-align:center;padding:50px">{{ $isAr ? 'جاري تحميل التفاصيل...' : 'Loading details...' }}</div></div></div></div>
 <div class="toast" id="toast"></div>
 <script>
 const API='{{ url('/api') }}';
-const typeNames={stadium:'ملعب',hall:'قاعة',lounge:'استراحة',camp:'مخيم'};
+const typeNames = {!! $isAr
+    ? json_encode(['stadium'=>'ملعب','hall'=>'قاعة','lounge'=>'استراحة','camp'=>'مخيم'])
+    : json_encode(['stadium'=>'Stadium','hall'=>'Hall','lounge'=>'Lounge','camp'=>'Camp'])
+!!};
 const GOOGLE_PLAY_URL=@json($settings->google_play_url);
 const APPLE_STORE_URL=@json($settings->apple_store_url);
 function requestAppBooking(){const ua=navigator.userAgent||navigator.vendor||window.opera||'';if(/android/i.test(ua)&&GOOGLE_PLAY_URL){window.location.href=GOOGLE_PLAY_URL;return}if(/iPad|iPhone|iPod/.test(ua)&&APPLE_STORE_URL){window.location.href=APPLE_STORE_URL;return}openModal('downloadAppModal')}

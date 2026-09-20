@@ -1,6 +1,6 @@
 @extends('dashboard.admin.layouts.app')
 
-@section('title', 'Weekend | إعدادات الصفحة الرئيسية')
+@section('title', 'Weekend | ' . __('lang.homepage_settings'))
 
 @push('css')
 <style>
@@ -28,8 +28,8 @@
 
 <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
     <div>
-        <h4 class="fw-bold mb-1">إعدادات الصفحة الرئيسية</h4>
-        <div class="text-muted small">تحكم بالشعار، صور الواجهة، السلايدر، الأقسام، الوحدات المميزة وروابط التطبيق من مكان واحد.</div>
+        <h4 class="fw-bold mb-1">{{ __('lang.homepage_settings') }}</h4>
+        <div class="text-muted small">{{ __('lang.homepage_settings_hint') }}</div>
     </div>
     <a href="{{ url('/') }}" target="_blank" class="btn btn-accent">
         <i class="ti ti-external-link me-1"></i> معاينة الموقع
@@ -97,25 +97,116 @@
     <div class="card card-soft shadow-sm hp-card mb-4">
         <div class="card-header d-flex align-items-center gap-2">
             <span class="hp-section-icon"><i class="ti ti-layout-dashboard"></i></span>
-            <div><div class="fw-bold">المحتوى الرئيسي</div><small class="text-muted">النصوص التي تظهر أعلى الصفحة وفي قسم الوحدات.</small></div>
+            <div>
+                <div class="fw-bold">{{ __('lang.homepage_main_content') }}</div>
+                <small class="text-muted">{{ __('lang.homepage_main_content_hint') }}</small>
+            </div>
         </div>
         <div class="card-body">
+            {{-- Language tabs --}}
+            <ul class="nav nav-tabs mb-3" id="contentLangTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-ar" data-bs-toggle="tab"
+                        data-bs-target="#pane-ar" type="button" role="tab">
+                        🇸🇦 {{ __('lang.arabic') }}
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-en" data-bs-toggle="tab"
+                        data-bs-target="#pane-en" type="button" role="tab">
+                        🇬🇧 {{ __('lang.english') }}
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="contentLangTabContent">
+                {{-- Arabic --}}
+                <div class="tab-pane fade show active" id="pane-ar" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-4">
+                            <label class="form-label">{{ __('lang.hero_badge') }}</label>
+                            <input class="form-control" name="hero_badge"
+                                   value="{{ old('hero_badge', $settings->hero_badge) }}" dir="rtl">
+                        </div>
+                        <div class="col-lg-8">
+                            <label class="form-label">{{ __('lang.hero_title') }}</label>
+                            <input class="form-control" name="hero_title"
+                                   value="{{ old('hero_title', $settings->hero_title) }}" dir="rtl">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">{{ __('lang.hero_subtitle') }}</label>
+                            <textarea class="form-control" name="hero_subtitle" rows="3" dir="rtl">{{ old('hero_subtitle', $settings->hero_subtitle) }}</textarea>
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label">{{ __('lang.search_title') }}</label>
+                            <input class="form-control" name="search_title"
+                                   value="{{ old('search_title', $settings->search_title) }}" dir="rtl">
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label">{{ __('lang.featured_title') }}</label>
+                            <input class="form-control" name="featured_title"
+                                   value="{{ old('featured_title', $settings->featured_title) }}" dir="rtl">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">{{ __('lang.featured_subtitle') }}</label>
+                            <textarea class="form-control" name="featured_subtitle" rows="2" dir="rtl">{{ old('featured_subtitle', $settings->featured_subtitle) }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- English --}}
+                <div class="tab-pane fade" id="pane-en" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-4">
+                            <label class="form-label">{{ __('lang.hero_badge') }} (EN)</label>
+                            <input class="form-control" name="hero_badge_en"
+                                   value="{{ old('hero_badge_en', $settings->hero_badge_en) }}" dir="ltr">
+                        </div>
+                        <div class="col-lg-8">
+                            <label class="form-label">{{ __('lang.hero_title') }} (EN)</label>
+                            <input class="form-control" name="hero_title_en"
+                                   value="{{ old('hero_title_en', $settings->hero_title_en) }}" dir="ltr">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">{{ __('lang.hero_subtitle') }} (EN)</label>
+                            <textarea class="form-control" name="hero_subtitle_en" rows="3" dir="ltr">{{ old('hero_subtitle_en', $settings->hero_subtitle_en) }}</textarea>
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label">{{ __('lang.search_title') }} (EN)</label>
+                            <input class="form-control" name="search_title_en"
+                                   value="{{ old('search_title_en', $settings->search_title_en) }}" dir="ltr">
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label">{{ __('lang.featured_title') }} (EN)</label>
+                            <input class="form-control" name="featured_title_en"
+                                   value="{{ old('featured_title_en', $settings->featured_title_en) }}" dir="ltr">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">{{ __('lang.featured_subtitle') }} (EN)</label>
+                            <textarea class="form-control" name="featured_subtitle_en" rows="2" dir="ltr">{{ old('featured_subtitle_en', $settings->featured_subtitle_en) }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Featured count + selection — shared between both languages --}}
+            <hr class="my-3">
             <div class="row g-3">
-                <div class="col-lg-4"><label class="form-label">العبارة الصغيرة أعلى العنوان</label><input class="form-control" name="hero_badge" value="{{ old('hero_badge',$settings->hero_badge) }}"></div>
-                <div class="col-lg-8"><label class="form-label">العنوان الرئيسي</label><input class="form-control" name="hero_title" value="{{ old('hero_title',$settings->hero_title) }}"></div>
-                <div class="col-12"><label class="form-label">الوصف الرئيسي</label><textarea class="form-control" name="hero_subtitle" rows="3">{{ old('hero_subtitle',$settings->hero_subtitle) }}</textarea></div>
-                <div class="col-lg-4"><label class="form-label">عنوان البحث</label><input class="form-control" name="search_title" value="{{ old('search_title',$settings->search_title) }}"></div>
-                <div class="col-lg-4"><label class="form-label">عنوان الوحدات المميزة</label><input class="form-control" name="featured_title" value="{{ old('featured_title',$settings->featured_title) }}"></div>
-                <div class="col-lg-4"><label class="form-label">عدد الوحدات</label><input class="form-control" type="number" min="4" max="24" name="featured_limit" value="{{ old('featured_limit',$settings->featured_limit ?: 8) }}"></div>
-                <div class="col-12"><label class="form-label">وصف قسم الوحدات</label><textarea class="form-control" name="featured_subtitle" rows="2">{{ old('featured_subtitle',$settings->featured_subtitle) }}</textarea></div>
+                <div class="col-lg-3">
+                    <label class="form-label">{{ __('lang.featured_limit') }}</label>
+                    <input class="form-control" type="number" min="4" max="24" name="featured_limit"
+                           value="{{ old('featured_limit', $settings->featured_limit ?: 8) }}">
+                </div>
                 <div class="col-12">
-                    <label class="form-label">الوحدات المميزة المحددة</label>
+                    <label class="form-label">{{ __('lang.featured_unites') }}</label>
                     <select class="form-select" name="featured_unite_ids[]" multiple size="8">
                         @foreach($unites as $u)
-                            <option value="{{ $u->id }}" @selected(in_array($u->id, $selectedIds))>{{ $u->name }}{{ $u->location_name ? ' — '.$u->location_name : '' }}</option>
+                            <option value="{{ $u->id }}" @selected(in_array($u->id, $selectedIds))>
+                                {{ $u->name }}{{ $u->location_name ? ' — '.$u->location_name : '' }}
+                            </option>
                         @endforeach
                     </select>
-                    <div class="hp-help">إذا لم يتم اختيار أي وحدة، تعرض الصفحة أحدث الوحدات النشطة تلقائيًا.</div>
+                    <div class="hp-help">{{ __('lang.featured_unites_hint') }}</div>
                 </div>
             </div>
         </div>
@@ -152,21 +243,43 @@
     <div class="card card-soft shadow-sm hp-card mb-4">
         <div class="card-header d-flex align-items-center gap-2">
             <span class="hp-section-icon"><i class="ti ti-device-mobile"></i></span>
-            <div><div class="fw-bold">التطبيق والمتاجر</div><small class="text-muted">هذه الروابط تستخدم أيضًا عند ضغط الزائر على زر الحجز؛ ويتم إخفاء زر المتجر عندما يكون رابطه فارغًا.</small></div>
+            <div><div class="fw-bold">{{ __('lang.homepage_app_section') }}</div><small class="text-muted">{{ __('lang.homepage_app_section_hint') }}</small></div>
         </div>
         <div class="card-body">
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#app-ar" type="button">🇸🇦 {{ __('lang.arabic') }}</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#app-en" type="button">🇬🇧 {{ __('lang.english') }}</button>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="app-ar">
+                    <div class="row g-3">
+                        <div class="col-lg-6"><label class="form-label">{{ __('lang.app_title') }}</label><input class="form-control" name="app_title" value="{{ old('app_title',$settings->app_title) }}" dir="rtl"></div>
+                        <div class="col-lg-6"><label class="form-label">{{ __('lang.app_text') }}</label><input class="form-control" name="app_text" value="{{ old('app_text',$settings->app_text) }}" dir="rtl"></div>
+                        <div class="col-12"><label class="form-label">{{ __('lang.footer_text') }}</label><textarea class="form-control" name="footer_text" rows="3" dir="rtl">{{ old('footer_text',$settings->footer_text) }}</textarea></div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="app-en">
+                    <div class="row g-3">
+                        <div class="col-lg-6"><label class="form-label">{{ __('lang.app_title') }} (EN)</label><input class="form-control" name="app_title_en" value="{{ old('app_title_en',$settings->app_title_en) }}" dir="ltr"></div>
+                        <div class="col-lg-6"><label class="form-label">{{ __('lang.app_text') }} (EN)</label><input class="form-control" name="app_text_en" value="{{ old('app_text_en',$settings->app_text_en) }}" dir="ltr"></div>
+                        <div class="col-12"><label class="form-label">{{ __('lang.footer_text') }} (EN)</label><textarea class="form-control" name="footer_text_en" rows="3" dir="ltr">{{ old('footer_text_en',$settings->footer_text_en) }}</textarea></div>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-3">
             <div class="row g-3">
-                <div class="col-lg-6"><label class="form-label">عنوان قسم التطبيق</label><input class="form-control" name="app_title" value="{{ old('app_title',$settings->app_title) }}"></div>
-                <div class="col-lg-6"><label class="form-label">وصف التطبيق</label><input class="form-control" name="app_text" value="{{ old('app_text',$settings->app_text) }}"></div>
-                <div class="col-lg-6"><label class="form-label">رابط Google Play</label><input class="form-control" type="url" name="google_play_url" value="{{ old('google_play_url',$settings->google_play_url) }}" placeholder="https://play.google.com/..."></div>
-                <div class="col-lg-6"><label class="form-label">رابط App Store</label><input class="form-control" type="url" name="apple_store_url" value="{{ old('apple_store_url',$settings->apple_store_url) }}" placeholder="https://apps.apple.com/..."></div>
-                <div class="col-12"><label class="form-label">نص الفوتر</label><textarea class="form-control" name="footer_text" rows="3">{{ old('footer_text',$settings->footer_text) }}</textarea></div>
+                <div class="col-lg-6"><label class="form-label">Google Play</label><input class="form-control" type="url" name="google_play_url" value="{{ old('google_play_url',$settings->google_play_url) }}" placeholder="https://play.google.com/..."></div>
+                <div class="col-lg-6"><label class="form-label">App Store</label><input class="form-control" type="url" name="apple_store_url" value="{{ old('apple_store_url',$settings->apple_store_url) }}" placeholder="https://apps.apple.com/..."></div>
             </div>
         </div>
     </div>
 
     <div class="hp-sticky-save mb-4">
-        <button class="btn btn-accent px-4 py-2" type="submit"><i class="ti ti-device-floppy me-1"></i> حفظ إعدادات الصفحة الرئيسية</button>
+        <button class="btn btn-accent px-4 py-2" type="submit"><i class="ti ti-device-floppy me-1"></i> {{ __('lang.save_homepage_settings') }}</button>
     </div>
 </form>
 
