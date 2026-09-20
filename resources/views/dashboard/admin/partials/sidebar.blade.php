@@ -33,6 +33,7 @@
     $showPromoCodes       = $me && $me->can('promo_codes.view');
     $showServiceFees      = $me && $me->can('service_fees.view');
     $showAppSettings      = (bool) $me; // route already gated by auth:admin + admin.guard
+    $showHomepageSettings = (bool) $me; // homepage settings use the same authenticated admin guard
     $showServiceGroups    = $me && $me->can('service_groups.view');
     $showServices         = $me && $me->can('services.view');
     $showStadiumTypes     = $me && $me->can('stadium_types.view');
@@ -46,13 +47,15 @@
 <div class="sidebar-scroll flex-grow-1 overflow-y-auto px-3 pt-2 pb-2">
 
     {{-- Main section --}}
-    @if($showDashboard)
+    @if($showDashboard || $showHomepageSettings)
     <div class="sidebar-section-label">{{ __('lang.sidebar_dashboard') }}</div>
     <nav class="nav flex-column gap-1 mb-2">
+        @if($showDashboard)
         <a class="nav-link-dark {{ $r === 'admin.dashboard' ? 'active' : '' }}"
            href="{{ route('admin.dashboard') }}">
             <i class="ti ti-layout-dashboard"></i> {{ __('lang.sidebar_dashboard') }}
         </a>
+        @endif
         @if($showAnalytics && Route::has('admin.analytics.index'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.analytics') ? 'active' : '' }}"
            href="{{ route('admin.analytics.index') }}">
@@ -63,6 +66,12 @@
         <a class="nav-link-dark {{ str_starts_with($r,'admin.reports') ? 'active' : '' }}"
            href="{{ route('admin.reports.index') }}">
             <i class="ti ti-report-analytics"></i> {{ __('lang.sidebar_reports') }}
+        </a>
+        @endif
+        @if($showHomepageSettings && Route::has('admin.homepage.edit'))
+        <a class="nav-link-dark {{ str_starts_with($r,'admin.homepage.') ? 'active' : '' }}"
+           href="{{ route('admin.homepage.edit') }}">
+            <i class="ti ti-layout-home"></i> إعدادات الصفحة الرئيسية
         </a>
         @endif
         @if($showAdsManagement && Route::has('admin.ads.index'))

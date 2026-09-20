@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\Dashboard\PermissionPageController;
 use App\Http\Controllers\Admin\Dashboard\RolePageController;
 use App\Http\Controllers\Admin\Dashboard\UserController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\Home\HomePageSettingController;
 use App\Http\Controllers\Admin\InsurancePolicy\InsurancePolicyController;
 use App\Http\Controllers\Admin\Packages\AdPackageController;
 use App\Http\Controllers\Admin\Packages\PropertyPackageController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Admin\Unite\UniteSlotController;
 use App\Http\Controllers\AdminAuth\AuthenticatedSessionController;
 use App\Http\Controllers\AdminHomeController;
 use App\Http\Controllers\Dashboard\Admin\AdminUserController;
+use App\Http\Controllers\Home\HomeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Provider\Dashboard\ProviderDashboardController;
 use App\Http\Controllers\Provider\Department\DepartmentController;
@@ -57,9 +59,7 @@ Route::post('/locale/switch', function (\Illuminate\Http\Request $request) {
     return back();
 })->name('locale.switch');
 
-Route::get('/', function () {
-    return redirect()->route('admin.login');
-});
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // Password reset form -- rendered when the user clicks the link in the
 // reset email. Token and email arrive as query params; the form POSTs
@@ -80,6 +80,16 @@ Route::middleware('auth')->group(function () {
 Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
     ->name('logout');
 require __DIR__.'/auth.php';
+
+// Homepage settings — isolated from the rest of the dashboard functionality.
+Route::prefix('admin/homepage')->name('admin.homepage.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
+    Route::get('/', [HomePageSettingController::class, 'edit'])->name('edit');
+    Route::put('/', [HomePageSettingController::class, 'update'])->name('update');
+    Route::post('/slides', [HomePageSettingController::class, 'storeSlide'])->name('slides.store');
+    Route::put('/slides/{slide}', [HomePageSettingController::class, 'updateSlide'])->name('slides.update');
+    Route::delete('/slides/{slide}', [HomePageSettingController::class, 'destroySlide'])->name('slides.destroy');
+});
+
 Route::prefix('admin')->name('admin.')->group(function () {
 
     // Provider statistics proxy — admin views any provider's stats
