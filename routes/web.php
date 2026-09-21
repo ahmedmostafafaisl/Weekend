@@ -56,6 +56,12 @@ Route::post('/locale/switch', function (\Illuminate\Http\Request $request) {
         session(['locale' => $locale]);
     }
 
+    // Accept an explicit redirect URL (validated to same origin only)
+    $redirect = $request->input('redirect');
+    if ($redirect && str_starts_with($redirect, url('/'))) {
+        return redirect($redirect);
+    }
+
     return back();
 })->name('locale.switch');
 

@@ -71,7 +71,7 @@
         @if($showHomepageSettings && Route::has('admin.homepage.edit'))
         <a class="nav-link-dark {{ str_starts_with($r,'admin.homepage.') ? 'active' : '' }}"
            href="{{ route('admin.homepage.edit') }}">
-            <i class="ti ti-layout-home"></i> إعدادات الصفحة الرئيسية
+            <i class="ti ti-layout-home"></i> {{ __('lang.homepage_settings') }}
         </a>
         @endif
         @if($showAdsManagement && Route::has('admin.ads.index'))
