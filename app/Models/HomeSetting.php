@@ -17,6 +17,8 @@ class HomeSetting extends Model
         // English text fields
         'hero_badge_en', 'hero_title_en', 'hero_subtitle_en', 'search_title_en', 'featured_title_en', 'featured_subtitle_en',
         'featured_unite_ids', 'featured_limit',
+        'featured_department_ids',
+        'price_min', 'price_max',
         'show_search', 'show_categories', 'show_featured', 'show_stats', 'show_why_us', 'show_app_section',
         // Arabic app/footer
         'app_title', 'app_text', 'footer_text',
@@ -27,6 +29,7 @@ class HomeSetting extends Model
 
     protected $casts = [
         'featured_unite_ids' => 'array',
+        'featured_department_ids' => 'array',
         'show_search' => 'boolean',
         'show_categories' => 'boolean',
         'show_featured' => 'boolean',
@@ -55,6 +58,9 @@ class HomeSetting extends Model
             'featured_title_en' => 'Featured Venues',
             'featured_subtitle_en' => 'Handpicked selections for your next occasion',
             'featured_limit' => 8,
+            'featured_department_ids' => [],
+            'price_min' => 0,
+            'price_max' => 10000,
             'show_search' => true, 'show_categories' => true, 'show_featured' => true,
             'show_stats' => true, 'show_why_us' => true, 'show_app_section' => true,
             // Arabic app/footer

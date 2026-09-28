@@ -16,8 +16,9 @@ class HomePageSettingController extends Controller
         $settings = HomeSetting::current();
         $slides = HomeSlide::orderBy('sort_order')->orderBy('id')->get();
         $unites = Unite::where('status', 'active')->orderBy('name')->get(['id', 'name', 'type', 'location_name']);
+        $departments = \App\Models\Department::where('status', 'active')->orderBy('name')->get(['id', 'name', 'type', 'location']);
 
-        return view('dashboard.admin.homepage.edit', compact('settings', 'slides', 'unites'));
+        return view('dashboard.admin.homepage.edit', compact('settings', 'slides', 'unites', 'departments'));
     }
 
     public function update(Request $request)
@@ -51,7 +52,11 @@ class HomePageSettingController extends Controller
             // Other
             'featured_unite_ids' => ['nullable', 'array'],
             'featured_unite_ids.*' => ['integer', 'exists:unites,id'],
+            'featured_department_ids' => ['nullable', 'array'],
+            'featured_department_ids.*' => ['integer', 'exists:departments,id'],
             'featured_limit' => ['required', 'integer', 'min:4', 'max:24'],
+            'price_min' => ['nullable', 'integer', 'min:0'],
+            'price_max' => ['nullable', 'integer', 'min:0'],
             'google_play_url' => ['nullable', 'url', 'max:1000'],
             'apple_store_url' => ['nullable', 'url', 'max:1000'],
         ]);

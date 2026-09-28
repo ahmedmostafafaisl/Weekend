@@ -29,46 +29,89 @@ class PackageDiscoveryController extends Controller
 
     public function home(Request $request): JsonResponse
     {
-        $propertyPackages = PropertyPackage::where('status', 'active')
-            ->orderBy('price')
-            ->limit(5)
-            ->get();
-
-        $adPackages = AdPackage::where('status', 'active')
-            ->orderBy('price')
-            ->limit(5)
-            ->get();
-
-        $response = [
-            'property_packages' => PropertyPackageResource::collection($propertyPackages),
-            'ad_packages'       => AdPackageResource::collection($adPackages),
-        ];
-
-        // Append provider statistics when the authenticated user is a provider.
-        // auth('sanctum')->user() interrogates the Sanctum guard directly from
-        // the Bearer token — works on public routes without auth:sanctum middleware.
-        // We call computeStatistics() directly rather than invoking the full
-        // ProviderStatisticsController, which would call $request->user() and get
-        // null (no middleware has set up the guard on this unprotected route).
         $user = auth('sanctum')->user();
 
+        // ── Provider ──────────────────────────────────────────────────────
+        // Authenticated provider: return top packages + their statistics.
         if ($user && $user->type === 'provider') {
-            $year  = (int) ($request->input('year',  now()->year));
+            $propertyPackages = PropertyPackage::where('status', 'active')
+                ->orderBy('price')->limit(5)->get();
+
+            $adPackages = AdPackage::where('status', 'active')
+                ->orderBy('price')->limit(5)->get();
+
+            $year = (int) ($request->input('year', now()->year));
             $month = (int) ($request->input('month', now()->month));
 
             $statsController = app(ProviderStatisticsController::class);
             $cacheKey = "provider_statistics:{$user->id}:{$year}:{$month}";
 
-            $statistics = \Illuminate\Support\Facades\Cache::remember(
+            $statistics = Cache::remember(
                 $cacheKey,
                 now()->addHour(),
                 fn () => $statsController->computeStatistics($user, $year, $month)
             );
 
-            $response['statistics'] = $statistics;
+            return response()->json([
+                'property_packages' => PropertyPackageResource::collection($propertyPackages),
+                'ad_packages' => AdPackageResource::collection($adPackages),
+                'statistics' => $statistics,
+            ]);
         }
 
-        return response()->json($response);
+        // ── Guest or Customer ─────────────────────────────────────────────
+        // Return the 10 admin-selected featured departments and the price
+        // filter range configured in the homepage settings.
+        $settings = \App\Models\HomeSetting::current();
+        $deptIds = $settings->featured_department_ids ?? [];
+
+        $deptQuery = \App\Models\Department::with(['images', 'unites'])
+            ->where('status', 'active');
+
+        if (! empty($deptIds)) {
+            $ids = array_map('intval', array_slice($deptIds, 0, 10));
+            $deptQuery->whereIn('id', $ids)
+                ->orderByRaw('FIELD(id, '.implode(',', $ids).')');
+        } else {
+            $deptQuery->latest()->limit(10);
+        }
+
+        $departments = $deptQuery->get()->map(fn ($d) => [
+            'id' => $d->id,
+            'name' => $d->name,
+            'type' => $d->type,
+            'location' => $d->location,
+            'latitude' => $d->latitude,
+            'longitude' => $d->longitude,
+            'unites_count' => $d->unites->count(),
+            'images' => $d->images->map(fn ($img) => [
+                'id' => $img->id,
+                'url' => asset($img->image),
+            ])->values(),
+        ])->values();
+
+        // Price range — computed live from all active unite prices,
+        // identical to the meta.min_price / meta.max_price returned by
+        // GET /api/unites2. Reflects the actual price distribution of
+        // all available venues at request time.
+        $allPrices = \App\Models\UnitePrice::whereHas('unite', fn ($q) => $q->where('status', 'active'))
+            ->get(['price', 'morning_price', 'evening_price', 'full_price'])
+            ->flatMap(fn ($row) => collect([
+                $row->price,
+                $row->morning_price,
+                $row->evening_price,
+                $row->full_price,
+            ]))
+            ->filter(fn ($v) => $v !== null)
+            ->map(fn ($v) => (float) $v);
+
+        return response()->json([
+            'departments' => $departments,
+            'price_filter' => [
+                'min' => $allPrices->isNotEmpty() ? $allPrices->min() : 0,
+                'max' => $allPrices->isNotEmpty() ? $allPrices->max() : 0,
+            ],
+        ]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -110,7 +153,7 @@ class PackageDiscoveryController extends Controller
 
         return response()->json([
             'property_package_activation' => $hasPropertySub,
-            'ad_package_activation'       => $hasAdSub,
+            'ad_package_activation' => $hasAdSub,
         ]);
     }
 

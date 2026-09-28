@@ -1243,7 +1243,7 @@ return [
     'comment_deleted' => 'تم حذف التعليق.',
     'only_ad_owner_can_toggle_comments' => 'فقط صاحب الإعلان يمكنه إخفاء أو إظهار التعليقات.',
     'ad_marked_as_seen' => 'تم تحديد الإعلان كمُشاهد',
-    'provide_user_id_or_email' => 'يرجى تحديد مع��������ّف المستخدم أو البريد الإلكتروني.',
+    'provide_user_id_or_email' => 'يرجى تحديد مع��������������������������������ّف المستخدم أو البريد الإلكتروني.',
     'user_not_found' => 'المستخدم غير موجود.',
     'test_notification_dispatched' => 'تم إرسال إشعار تجريبي.',
     'no_users_matched_audience' => 'لا يوجد مستخدمون يطابقون الجمهور المحدد.',
@@ -1444,6 +1444,8 @@ return [
     'show_app_section' => 'تحميل التطبيق',
     'slider_section' => 'سلايدر الواجهة',
     'slider_section_hint' => 'يمكن إضافة الصور وتعديلها وترتيبها أو استبدال صورة أي سلايد مباشرة من هنا.',
+    'slide_add' => 'إضافة السلايد',
+
     'slide_image' => 'صورة السلايد',
     'slide_title' => 'العنوان',
     'slide_subtitle' => 'الوصف',
@@ -1656,4 +1658,10 @@ return [
     'number' => 'العدد',
     'add_council_type' => 'إضافة نوع مجلس',
     'councils_number_auto_hint' => 'يمثل الرقم أعلاه عدد أنواع المجالس المختلفة أدناه، وليس مجموع أعداد كل نوع.',
+    'provider_home_section' => 'قسم الصفحة الرئيسية لمقدم الخدمة',
+    'provider_home_section_venues_count' => 'عدد الأماكن للعرض',
+    'customer_home_section' => 'قسم الصفحة الرئيسية للعميل',
+    'customer_home_section_hint' => 'تلميح لقسم الصفحة الرئيسية للعميل.',
+    'featured_departments' => 'الأقسام المميزة',
+    'featured_departments_hint' => 'إذا لم يتم اختيار أي قسم، ستعرض الصفحة تلقائيًا أحدث الأقسام النشطة.',
 ];

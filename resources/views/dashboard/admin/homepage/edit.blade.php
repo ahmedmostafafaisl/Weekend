@@ -23,11 +23,12 @@
 
 @section('content')
 @php
-    $selectedIds = old('featured_unite_ids', $settings->featured_unite_ids ?? []);
+    $selectedIds     = old('featured_unite_ids',      $settings->featured_unite_ids ?? []);
+    $selectedDeptIds = old('featured_department_ids', $settings->featured_department_ids ?? []);
     $images = [
-        ['logo',         'logo_path',         __('lang.logo_main'),         __('lang.logo_main_hint')],
-        ['logo_light',   'logo_light_path',   __('lang.logo_dark'),         __('lang.logo_dark_hint')],
-        ['app_image',    'app_image_path',     __('lang.app_image_label'),   __('lang.app_image_hint')],
+        ['logo',         'logo_path',         __('lang.logo_main'),          __('lang.logo_main_hint')],
+        ['logo_light',   'logo_light_path',   __('lang.logo_dark'),          __('lang.logo_dark_hint')],
+        ['app_image',    'app_image_path',     __('lang.app_image_label'),    __('lang.app_image_hint')],
         ['why_us_image', 'why_us_image_path',  __('lang.why_us_image_label'), __('lang.why_us_image_hint')],
     ];
     $sectionToggles = [
@@ -213,7 +214,11 @@
                 </div>
             </div>
 
+            {{-- Provider home: featured unites ─────────────────────── --}}
             <hr class="my-3">
+            <div class="fw-semibold small text-muted mb-2 text-uppercase tracking-wide">
+                {{ __('lang.provider_home_section') }}
+            </div>
             <div class="row g-3">
                 <div class="col-lg-3">
                     <label class="form-label">{{ __('lang.featured_limit') }}</label>
@@ -232,6 +237,27 @@
                         @endforeach
                     </select>
                     <div class="hp-help">{{ __('lang.featured_unites_hint') }}</div>
+                </div>
+            </div>
+
+            {{-- Customer / Guest home: featured departments ─────────── --}}
+            <hr class="my-3">
+            <div class="fw-semibold small text-muted mb-1 text-uppercase tracking-wide">
+                {{ __('lang.customer_home_section') }}
+            </div>
+            <div class="text-muted small mb-3">{{ __('lang.customer_home_section_hint') }}</div>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">{{ __('lang.featured_departments') }}</label>
+                    <select class="form-select" name="featured_department_ids[]" multiple size="8">
+                        @foreach($departments as $d)
+                            <option value="{{ $d->id }}"
+                                    @selected(in_array($d->id, $selectedDeptIds))>
+                                {{ $d->name }} — {{ $d->type }}{{ $d->location ? ' ('.$d->location.')' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="hp-help">{{ __('lang.featured_departments_hint') }}</div>
                 </div>
             </div>
         </div>

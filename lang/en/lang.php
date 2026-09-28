@@ -1662,4 +1662,11 @@ return [
     'number' => 'Number',
     'add_council_type' => 'Add Council Type',
     'councils_number_auto_hint' => 'The number above counts the distinct council types below, not how many of each.',
+    'provider_home_section' => 'Provider Home Section',
+    'provider_home_section_venues_count' => 'Number of venues to show',
+    'customer_home_section' => 'Customer Home Section',
+    'customer_home_section_hint' => 'Hint for the customer home section.',
+    'featured_departments' => 'Featured Departments',
+    'featured_departments_hint' => 'If no department is selected, the page will automatically display the latest active departments.',
+
 ];
