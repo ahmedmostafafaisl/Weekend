@@ -347,7 +347,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::get('unites/{unite}/slots', [UniteSlotController::class, 'index']);
 Route::get('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'show']);
-Route::get('unites/{unite}/booking-availability', [UniteSlotController::class, 'availabilityAndPrices']);
+// ── Multi-unit booking ────────────────────────────────────────────────────
+// GET  /departments/{department}/available-unites  — browse conflict-free
+//      unites for a shift; public endpoint so guests can see the picker
+//      before deciding to sign in.
+// POST /multi-booking                              — create reservations for
+//      multiple unites in one department + one consolidated payment URL.
+Route::get(
+    'departments/{department}/available-unites',
+    [\App\Http\Controllers\Api\MultiBookingController::class, 'availableUnites']
+)->name('multi-booking.available');
+
+Route::middleware('auth:sanctum')->post(
+    'multi-booking',
+    [\App\Http\Controllers\Api\MultiBookingController::class, 'store']
+)->name('multi-booking.store');
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('unites/{unite}/slots', [UniteSlotController::class, 'store']);
     Route::put('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'update']);

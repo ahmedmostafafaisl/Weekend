@@ -12,6 +12,7 @@ class UniteReservation extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'multi_booking_group_id',
         'unite_id',
         'user_id',
         'reservation_date',
@@ -31,6 +32,11 @@ class UniteReservation extends Model
         'end_date' => 'date',
         'price' => 'float',
     ];
+
+    public function multiBookingGroup()
+    {
+        return $this->belongsTo(MultiBookingGroup::class);
+    }
 
     public function bookingPackage()
     {
