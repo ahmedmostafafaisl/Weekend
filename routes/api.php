@@ -18,17 +18,24 @@ use App\Http\Controllers\Admin\Unite\UniteOfferController;
 use App\Http\Controllers\Admin\Unite\UnitePackageController;
 use App\Http\Controllers\Admin\Unite\UnitePriceController;
 use App\Http\Controllers\Admin\Unite\UniteSlotController;
+use App\Http\Controllers\Api\MultiBookingController;
+use App\Http\Controllers\Api\MySubscriptionController;
 use App\Http\Controllers\Api\NearbyUniteController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\NotificationPreferenceController;
+use App\Http\Controllers\Api\PackageDiscoveryController;
 use App\Http\Controllers\Api\PromoCodeApiController;
 use App\Http\Controllers\Api\ProviderStatisticsController;
+use App\Http\Controllers\Api\SaudiCityController;
+use App\Http\Controllers\Api\ServiceFeeController;
+use App\Http\Controllers\Api\TransferApiController;
 use App\Http\Controllers\Api\UserProfileController;
 use App\Http\Controllers\Provider\AuthController;
 use App\Http\Controllers\Provider\Department\DepartmentController;
 use App\Http\Controllers\Provider\Unite\UniteController;
 use App\Http\Controllers\Reservation\UniteReservationController;
 use App\Http\Controllers\Unite\AvailabilityController;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Viewing\UniteViewingController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,430 +43,251 @@ use Illuminate\Support\Facades\Route;
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| Structure (top-down):
+|   1. Public auth (register, login, password reset)
+|   2. Public read — departments, unites, reference data, payment callbacks
+|   3. Authenticated routes (auth:sanctum) — one group per domain
+|   4. Admin-guarded routes (auth:admin)
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
-
-// ── Notification Inbox ───────────────────────────────────────────────────────
-// GET    /api/notifications                — paginated list (unread_only=1 filter)
-// GET    /api/notifications/unread-count   — lightweight badge count
-// POST   /api/notifications/{id}/read      — mark single as read
-// POST   /api/notifications/read-all       — mark all as read
-// DELETE /api/notifications/{id}           — delete single
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
-    Route::post('/notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'markAllRead']);
-    Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markRead']);
-    Route::delete('/notifications/{id}', [\App\Http\Controllers\Api\NotificationController::class, 'destroy']);
-
-    // Notification preferences — per-type push + email on/off
-    // GET  /api/notification-preferences          — all types with current setting
-    // PUT  /api/notification-preferences/{type}   — update single type
-    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index']);
-    Route::put('/notification-preferences/{type}', [NotificationPreferenceController::class, 'update']);
-});
-
-// ── Payment Methods ──────────────────────────────────────────────────────────
-// Available payment gateways for checkout screen
-Route::get('/payment-methods', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'paymentMethods']);
-
-// ── Transfer Policy & Transfers (Provider) ────────────────────────────────────
-// GET  /api/transfer-policy         — active fund transfer policy (providers only)
-// GET  /api/my-transfers            — provider's received transfers
-// POST /api/transfer-requests       — provider requests a payout
-// GET  /api/transfer-requests       — provider sees their own requests
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/transfer-policy', [\App\Http\Controllers\Api\TransferApiController::class, 'policy']);
-    Route::get('/refund-policy', [\App\Http\Controllers\Api\TransferApiController::class, 'refundPolicy']);
-    Route::get('/my-transfers', [\App\Http\Controllers\Api\TransferApiController::class, 'myTransfers']);
-    Route::post('/transfer-requests', [\App\Http\Controllers\Api\TransferApiController::class, 'requestTransfer']);
-    Route::get('/transfer-requests', [\App\Http\Controllers\Api\TransferApiController::class, 'myRequests']);
-});
-
-// ── Payment gateway callbacks ─────────────────────────────────────────────────
-Route::post('/tappy/callback', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'tappyCallback']);
-Route::post('/tamara/callback', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'tamaraCallback'])->name('payment.tamara.notification');
-Route::post('/maysar/callback', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'maysarCallback']);
-
-// ── User Profile API ──────────────────────────────────────────────────────────
-// GET    /api/profile           — get own profile
-// PUT    /api/profile           — update profile fields (name, email, phone, password…)
-// POST   /api/profile/photo     — upload/replace profile photo (multipart)
-// DELETE /api/profile           — deactivate account (requires password confirmation)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/profile', [UserProfileController::class, 'show']);
-    Route::put('/profile', [UserProfileController::class, 'update']);
-    Route::post('/profile/photo', [UserProfileController::class, 'updatePhoto']);
-    Route::delete('/profile', [UserProfileController::class, 'deactivate']);
-});
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. PUBLIC AUTH
+// ═══════════════════════════════════════════════════════════════════════════
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-});
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. PUBLIC READ ROUTES
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Public department browsing (guest-accessible, no auth required).
-// Registered before the auth-gated apiResource below specifically so
-// GET /departments/browse isn't shadowed by that resource's wildcard
-// GET /departments/{department} route -- Laravel matches by
-// registration order regardless of middleware grouping, and 'browse'
-// would otherwise be swallowed as a {department} id.
+// ── Departments (public browsing) ────────────────────────────────────────
+// Literal segments must be registered BEFORE the {department} wildcard so
+// Laravel's top-down matcher doesn't swallow them as an ID.
 Route::get('departments/browse', [DepartmentController::class, 'browse']);
 Route::get('departments/{department}/unites', [DepartmentController::class, 'unites']);
+Route::get('departments/{department}/available-unites', [MultiBookingController::class, 'availableUnites'])
+    ->name('multi-booking.available');
 
-// Department Routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('departments', DepartmentController::class);
-});
-
-// Unite Routes
-
+// ── Unites (public read) ─────────────────────────────────────────────────
+// Literal segments and nested routes BEFORE the {unite} wildcard.
 Route::get('unites', [UniteController::class, 'index']);
-// /unites/search must come before /unites/{unite} — 'search' is a literal segment
 Route::get('unites/search', [UniteController::class, 'search']);
-
-// Nearby venues — literal segment, must come before the {unite} wildcard
-// GET /api/unites/nearby?lat=24.7135&lng=46.6753&radius_km=10&type=hall&limit=20
 Route::get('unites/nearby', NearbyUniteController::class);
-
-// Specific routes BEFORE the {unite} wildcard — Laravel matches top-down.
-// Without this order, 'unites/4/availability' is swallowed by 'unites/{unite}'.
+Route::get('unites2', [UniteController::class, 'index2']);
 Route::get('unites/{unite}/availability/date', [AvailabilityController::class, 'date']);
 Route::get('unites/{unite}/availability/range', [AvailabilityController::class, 'range']);
 Route::get('unites/{unite}/availability', [AvailabilityController::class, 'month']);
+Route::get('unites/{unite}/features', [UniteFeatureController::class, 'index']);
+Route::get('unites/{unite}/features/{feature}', [UniteFeatureController::class, 'show']);
+Route::get('unites/{unite}/packages', [UnitePackageController::class, 'index']);
+Route::get('unites/{unite}/packages/{package}', [UnitePackageController::class, 'show']);
+Route::get('unites/{unite}/offers', [UniteOfferController::class, 'index']);
+Route::get('unites/{unite}/offers/{offer}', [UniteOfferController::class, 'show']);
+Route::get('unites/{unite}/prices', [UnitePriceController::class, 'index']);
+Route::get('unites/{unite}/prices/{price}', [UnitePriceController::class, 'show']);
+Route::get('unites/{unite}/slots', [UniteSlotController::class, 'index']);
+Route::get('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'show']);
+Route::get('unites/{unite}', [UniteController::class, 'show']); // wildcard last
 
-// Generic wildcard — must be last among GET /unites/* routes
-Route::get('unites/{unite}', [UniteController::class, 'show']);
-
-// Promo code validation — public, no auth required
-// POST /api/promo-codes/validate  { "code": "SUMMER20", "amount": 500.00 }
+// ── Public misc ──────────────────────────────────────────────────────────
+Route::get('/home', [PackageDiscoveryController::class, 'home'])->name('home');
+Route::get('/payment-methods', [PaymentController::class, 'paymentMethods']);
+Route::get('/saudi-cities', [SaudiCityController::class, 'index']);
+Route::get('/service-fees', [ServiceFeeController::class, 'index']);
 Route::post('promo-codes/validate', [PromoCodeApiController::class, 'check']);
 
+// ── Public reference data ────────────────────────────────────────────────
+Route::get('service-groups', [ServiceGroupController::class, 'index']);
+Route::get('service-groups/{id}', [ServiceGroupController::class, 'show']);
+Route::get('services', [ServiceController::class, 'index']);
+Route::get('services/{id}', [ServiceController::class, 'show']);
+Route::get('stadium-types', [StadiumTypeController::class, 'index']);
+Route::get('stadium-types/{id}', [StadiumTypeController::class, 'show']);
+Route::get('insurance-policies', [InsurancePolicyController::class, 'index']);
+Route::get('insurance-policies/{id}', [InsurancePolicyController::class, 'show']);
+Route::get('suggestions', [SuggestionController::class, 'index']);
+Route::get('suggestions/{id}', [SuggestionController::class, 'show']);
+
+// ── Ad comments (public read) ────────────────────────────────────────────
+Route::get('/ads/{ad}/comments', [AdCommentController::class, 'index']);
+
+// ── Payment gateway callbacks (no auth — called by gateway servers) ───────
+Route::match(['GET', 'POST'], '/geidea/payment/callback', [PaymentController::class, 'callBack'])
+    ->name('payment.callback');
+Route::post('/tappy/callback', [PaymentController::class, 'tappyCallback']);
+Route::post('/tamara/callback', [PaymentController::class, 'tamaraCallback'])
+    ->name('payment.tamara.notification');
+Route::post('/maysar/callback', [PaymentController::class, 'maysarCallback']);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. AUTHENTICATED ROUTES (auth:sanctum)
+// ═══════════════════════════════════════════════════════════════════════════
+
 Route::middleware('auth:sanctum')->group(function () {
+
+    // ── Auth ──────────────────────────────────────────────────────────────
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/fcm/token', [AuthController::class, 'updateFcmToken'])->name('fcm.token');
+
+    // ── Profile ───────────────────────────────────────────────────────────
+    Route::get('/profile', [UserProfileController::class, 'show']);
+    Route::put('/profile', [UserProfileController::class, 'update']);
+    Route::post('/profile/photo', [UserProfileController::class, 'updatePhoto']);
+    Route::delete('/profile', [UserProfileController::class, 'deactivate']);
+
+    // ── Notifications ─────────────────────────────────────────────────────
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index']);
+    Route::put('/notification-preferences/{type}', [NotificationPreferenceController::class, 'update']);
+
+    // ── Departments (write) ───────────────────────────────────────────────
+    Route::apiResource('departments', DepartmentController::class)->except(['index', 'show']);
+
+    // ── Unites (write + social) ───────────────────────────────────────────
     Route::post('unites', [UniteController::class, 'store']);
     Route::put('unites/{unite}', [UniteController::class, 'update']);
     Route::patch('unites/{unite}', [UniteController::class, 'update']);
     Route::delete('unites/{unite}', [UniteController::class, 'destroy']);
-});
-
-Route::get('unites2', [UniteController::class, 'index2']);
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/unites/{id}/favorite', [UniteController::class, 'toggleFavorite']);
-    Route::post('/unites/{id}/rate', [UniteController::class, 'rate']);
+    Route::post('/unites/{unite}/favorite', [UniteController::class, 'toggleFavorite']);
+    Route::post('/unites/{unite}/rate', [UniteController::class, 'rate']);
     Route::post('/vendors/{id}/rate', [UniteController::class, 'rateVendor']);
     Route::get('/user/favorites', [UniteController::class, 'userFavorites']);
 
-});
-
-// // Unite Offer Routes
-// Route::apiResource('unite_offers', UniteOfferController::class);
-// // get offers by unite id
-Route::get('unite_offers/unite/{id}', [UniteOfferController::class, 'findByUniteId'])->name('unite_offers.findByUniteId');
-
-// Property Package Routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('property-packages', PropertyPackageController::class);
-});
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('ad-packages', AdPackageController::class);
-});
-
-//  Package Routes
-Route::get('all-packages', [PropertyPackageController::class, 'getAllPackages'])->name('packages.all');
-
-// Home — top 5 property + ad packages, plus provider statistics when auth user is provider.
-// No auth middleware: guests get packages only; authenticated providers also get their statistics.
-Route::get('home', [\App\Http\Controllers\Api\PackageDiscoveryController::class, 'home'])
-    ->name('home');
-
-// Package activation keys — booleans indicating whether the auth user has an active subscription.
-// Provider: { property_package_activation: bool, ad_package_activation: bool }
-// Customer: { ad_package_activation: bool }
-Route::middleware('auth:sanctum')->get(
-    'package-activation-keys',
-    [\App\Http\Controllers\Api\PackageDiscoveryController::class, 'activationKeys']
-)->name('packages.activation-keys');
-
-// User subscriptions split by domain
-// Provider: { property_subscriptions, ad_subscriptions }
-// Customer: { ad_subscriptions }
-Route::middleware('auth:sanctum')->get(
-    'user-subscriptions',
-    [\App\Http\Controllers\Api\PackageDiscoveryController::class, 'userSubscriptions']
-)->name('packages.user-subscriptions');
-
-// Ads Routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('ads', AdController::class);
-    Route::get('/user/ads', [AdController::class, 'userAds']);
-    Route::post('/ads/{id}/seen', [AdController::class, 'markSeen']);
-    Route::post('/ads/{id}/activate', [AdController::class, 'activate']);
-});
-
-// Ad Comments
-// GET    /api/ads/{ad}/comments           — public: visible comments (owner sees all)
-// POST   /api/ads/{ad}/comments           — auth: post a comment
-// DELETE /api/ads/{ad}/comments/{comment} — auth: delete own comment OR ad owner deletes any
-// PATCH  /api/ads/{ad}/comments/{comment}/toggle — ad owner only: hide/show comment
-// GET    /api/ads/{ad}/comments/my        — auth: current user's own comments on this ad
-Route::get('/ads/{ad}/comments', [AdCommentController::class, 'index']);
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/ads/{ad}/comments', [AdCommentController::class, 'store']);
-    Route::delete('/ads/{ad}/comments/{comment}', [AdCommentController::class, 'destroy']);
-    Route::patch('/ads/{ad}/comments/{comment}/toggle', [AdCommentController::class, 'toggle']);
-    Route::get('/ads/{ad}/comments/my', [AdCommentController::class, 'myComments']);
-});
-
-// Subscription Routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('subscriptions', SubscriptionController::class);
-});
-// My Subscriptions — authenticated user's own subscription history
-// GET /api/my-subscriptions          — current (active) + expired list
-// GET /api/my-subscriptions/{id}     — single subscription detail
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/my-subscriptions', [\App\Http\Controllers\Api\MySubscriptionController::class, 'index'])->name('my-subscriptions.index');
-    Route::get('/my-subscriptions/{id}', [\App\Http\Controllers\Api\MySubscriptionController::class, 'show'])->name('my-subscriptions.show');
-});
-Route::prefix('admin')
-    ->middleware(['auth:admin'])
-    ->group(function () {
-        // CRUD Roles
-        Route::apiResource('roles', RoleController::class);
-        // CRUD Permissions
-        Route::apiResource('permissions', PermissionController::class);
-        // unites management
-    });
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('reservations', UniteReservationController::class);
-    Route::post('/reservations/{id}/cancel', [UniteReservationController::class, 'cancel']);
-    Route::post('/reservations/{id}/approve', [UniteReservationController::class, 'approve']);
-    Route::post('/reservations/{id}/reject', [UniteReservationController::class, 'reject']);
-    // Rate a completed booking — one rating per reservation, independent of
-    // any other booking the same customer has made for the same venue.
-    Route::post('/reservations/{id}/rate', [UniteReservationController::class, 'rate']);
-
-    // Paginated reservation history for authenticated customer
-    // GET /api/my-reservations?status=confirmed&upcoming=1&per_page=15
-    Route::get('/my-reservations', [UniteReservationController::class, 'myReservations'])
-        ->name('reservations.my');
-
-    // Viewing appointments — a customer schedules a visit to inspect the
-    // venue before booking it, picking one of the venue's predefined
-    // weekly time slots. Deposit (if the venue requires one) is handled
-    // inside UniteViewingRepository, matching the reservation flow's
-    // exact gateway-integration pattern.
-    Route::post('/unite-viewings', [\App\Http\Controllers\Viewing\UniteViewingController::class, 'store']);
-    Route::post('/unite-viewings/{id}/cancel', [\App\Http\Controllers\Viewing\UniteViewingController::class, 'cancel']);
-
-    // Store/update FCM device token for push notifications
-    // POST /api/fcm/token  { "fcm_token": "..." }
-    Route::post('/fcm/token', [\App\Http\Controllers\Provider\AuthController::class, 'updateFcmToken'])
-        ->name('fcm.token');
-});
-
-// Admin notification endpoints
-Route::middleware('auth:admin')->group(function () {
-    // POST /api/admin/notifications/test  { email/user_id, title, body, ... }
-    Route::post('/admin/notifications/test', [\App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'test'])
-        ->name('admin.notifications.test')
-        ->middleware('permission:notifications.create');
-
-    // POST /api/admin/notifications/test-token  { device_token, title, body, data: {...} }
-    // Sends directly to an arbitrary device token with an arbitrary data
-    // payload -- does not require a saved User/fcm_token, unlike the
-    // route above.
-    Route::post('/admin/notifications/test-token', [\App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'testToken'])
-        ->name('admin.notifications.test-token')
-        ->middleware('permission:notifications.create');
-
-    // GET /api/admin/users/search?q=ahmed&type=customer  — for specific-user picker
-    Route::get('/admin/users/search', [\App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'searchUsers'])
-        ->name('admin.users.search');
-});
-
-// Unite Detail Routes — DEPRECATED & REMOVED. GET /api/unites/{unite} already
-// embeds the detail object inline (see SingleUniteResource::getDetailModel()),
-// and POST/PUT /api/unites/{unite} already writes detail fields via the
-// nested $data[$data['type']] payload in UniteRepository::update()/create().
-// This standalone endpoint duplicated both the read and write paths with
-// no unique capability beyond a narrow DELETE-detail-only case, and had
-// zero other callers in the repo (confirmed via full reference scan).
-
-// Unite Feature Routes
-Route::get('unites/{unite}/features', [UniteFeatureController::class, 'index']);
-Route::get('unites/{unite}/features/{feature}', [UniteFeatureController::class, 'show']);
-
-Route::middleware('auth:sanctum')->group(function () {
+    // ── Unite sub-resources (write) ────────────────────────────────────────
     Route::post('unites/{unite}/features', [UniteFeatureController::class, 'store']);
     Route::put('unites/{unite}/features/{feature}', [UniteFeatureController::class, 'update']);
     Route::patch('unites/{unite}/features/{feature}', [UniteFeatureController::class, 'update']);
     Route::delete('unites/{unite}/features/{feature}', [UniteFeatureController::class, 'destroy']);
-});
-// Unite Package Routes
-Route::get('unites/{unite}/packages', [UnitePackageController::class, 'index']);
-Route::get('unites/{unite}/packages/{package}', [UnitePackageController::class, 'show']);
 
-Route::middleware('auth:sanctum')->group(function () {
     Route::post('unites/{unite}/packages', [UnitePackageController::class, 'store']);
     Route::put('unites/{unite}/packages/{package}', [UnitePackageController::class, 'update']);
     Route::patch('unites/{unite}/packages/{package}', [UnitePackageController::class, 'update']);
     Route::delete('unites/{unite}/packages/{package}', [UnitePackageController::class, 'destroy']);
-});
 
-// Unite Offer Routes
-
-Route::get('unites/{unite}/offers', [UniteOfferController::class, 'index']);
-Route::get('unites/{unite}/offers/{offer}', [UniteOfferController::class, 'show']);
-
-Route::middleware('auth:sanctum')->group(function () {
     Route::post('unites/{unite}/offers', [UniteOfferController::class, 'store']);
     Route::put('unites/{unite}/offers/{offer}', [UniteOfferController::class, 'update']);
     Route::patch('unites/{unite}/offers/{offer}', [UniteOfferController::class, 'update']);
     Route::delete('unites/{unite}/offers/{offer}', [UniteOfferController::class, 'destroy']);
-});
 
-// unite price routes
-
-Route::get('unites/{unite}/prices', [UnitePriceController::class, 'index']);
-Route::get('unites/{unite}/prices/{price}', [UnitePriceController::class, 'show']);
-
-Route::middleware('auth:sanctum')->group(function () {
     Route::post('unites/{unite}/prices', [UnitePriceController::class, 'store']);
     Route::put('unites/{unite}/prices/{price}', [UnitePriceController::class, 'update']);
     Route::patch('unites/{unite}/prices/{price}', [UnitePriceController::class, 'update']);
     Route::delete('unites/{unite}/prices/{price}', [UnitePriceController::class, 'destroy']);
-});
 
-// Unite Slot Routes
-
-Route::get('unites/{unite}/slots', [UniteSlotController::class, 'index']);
-Route::get('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'show']);
-// ── Multi-unit booking ────────────────────────────────────────────────────
-// GET  /departments/{department}/available-unites  — browse conflict-free
-//      unites for a shift; public endpoint so guests can see the picker
-//      before deciding to sign in.
-// POST /multi-booking                              — create reservations for
-//      multiple unites in one department + one consolidated payment URL.
-Route::get(
-    'departments/{department}/available-unites',
-    [\App\Http\Controllers\Api\MultiBookingController::class, 'availableUnites']
-)->name('multi-booking.available');
-
-Route::middleware('auth:sanctum')->post(
-    'multi-booking',
-    [\App\Http\Controllers\Api\MultiBookingController::class, 'store']
-)->name('multi-booking.store');
-Route::middleware('auth:sanctum')->group(function () {
     Route::post('unites/{unite}/slots', [UniteSlotController::class, 'store']);
     Route::put('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'update']);
     Route::patch('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'update']);
     Route::delete('unites/{unite}/slots/{slot}', [UniteSlotController::class, 'destroy']);
-});
 
-Route::get('service-groups', [ServiceGroupController::class, 'index']);
-Route::get('service-groups/{service_group}', [ServiceGroupController::class, 'show']);
-Route::get('services', [ServiceController::class, 'index']);
-Route::get('services/{service}', [ServiceController::class, 'show']);
+    // ── Booking availability (admin/provider — slot config tool) ───────────
+    Route::get('unites/{unite}/booking-availability', [UniteSlotController::class, 'availabilityAndPrices']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('service-groups', [ServiceGroupController::class, 'store']);
-    Route::put('service-groups/{service_group}', [ServiceGroupController::class, 'update']);
-    Route::delete('service-groups/{service_group}', [ServiceGroupController::class, 'destroy']);
+    // ── Reservations ──────────────────────────────────────────────────────
+    Route::apiResource('reservations', UniteReservationController::class);
+    Route::post('/reservations/{id}/cancel', [UniteReservationController::class, 'cancel']);
+    Route::post('/reservations/{id}/approve', [UniteReservationController::class, 'approve']);
+    Route::post('/reservations/{id}/reject', [UniteReservationController::class, 'reject']);
+    Route::post('/reservations/{id}/rate', [UniteReservationController::class, 'rate']);
+    Route::get('/my-reservations', [UniteReservationController::class, 'myReservations'])
+        ->name('reservations.my');
 
-    Route::post('services', [ServiceController::class, 'store']);
-    Route::put('services/{service}', [ServiceController::class, 'update']);
-    Route::delete('services/{service}', [ServiceController::class, 'destroy']);
-});
+    // ── Multi-unit booking ────────────────────────────────────────────────
+    Route::post('multi-booking', [MultiBookingController::class, 'store'])->name('multi-booking.store');
 
-// Saudi Cities Reference (static list — no auth required, matches the
-// unite city field's validation and the dashboard city dropdown)
-Route::get('/saudi-cities', [\App\Http\Controllers\Api\SaudiCityController::class, 'index']);
+    // ── Viewing appointments ──────────────────────────────────────────────
+    Route::post('/unite-viewings', [UniteViewingController::class, 'store']);
+    Route::post('/unite-viewings/{id}/cancel', [UniteViewingController::class, 'cancel']);
 
-// Service fees — public reference data, so a client can show a price
-// breakdown before checkout instead of only discovering the fee after
-// paying. See App\Models\ServiceFee::feeFor() for where it's actually applied.
-Route::get('/service-fees', [\App\Http\Controllers\Api\ServiceFeeController::class, 'index']);
+    // ── Packages & subscriptions ──────────────────────────────────────────
+    Route::apiResource('property-packages', PropertyPackageController::class);
+    Route::apiResource('ad-packages', AdPackageController::class);
+    Route::apiResource('subscriptions', SubscriptionController::class);
+    Route::get('/my-subscriptions', [MySubscriptionController::class, 'index'])->name('my-subscriptions.index');
+    Route::get('/my-subscriptions/{id}', [MySubscriptionController::class, 'show'])->name('my-subscriptions.show');
+    Route::get('package-activation-keys', [PackageDiscoveryController::class, 'activationKeys'])
+        ->name('packages.activation-keys');
+    Route::get('user-subscriptions', [PackageDiscoveryController::class, 'userSubscriptions'])
+        ->name('packages.user-subscriptions');
 
-// Stadium Type Routes
-Route::prefix('stadium-types')->group(function () {
-    Route::get('/', [StadiumTypeController::class, 'index']);
-    Route::post('/', [StadiumTypeController::class, 'store']);
-    Route::get('/{id}', [StadiumTypeController::class, 'show']);
-    Route::post('/{id}', [StadiumTypeController::class, 'update']);
-    Route::delete('/{id}', [StadiumTypeController::class, 'destroy']);
-});
+    // ── Ads ───────────────────────────────────────────────────────────────
+    Route::apiResource('ads', AdController::class);
+    Route::get('/user/ads', [AdController::class, 'userAds']);
+    Route::post('/ads/{ad}/seen', [AdController::class, 'markSeen']);
+    Route::post('/ads/{ad}/activate', [AdController::class, 'activate']);
+    Route::post('/ads/{ad}/comments', [AdCommentController::class, 'store']);
+    Route::delete('/ads/{ad}/comments/{comment}', [AdCommentController::class, 'destroy']);
+    Route::patch('/ads/{ad}/comments/{comment}/toggle', [AdCommentController::class, 'toggle']);
+    Route::get('/ads/{ad}/comments/my', [AdCommentController::class, 'myComments']);
 
-// Insurance Policy Routes
-Route::prefix('insurance-policies')->group(function () {
-    Route::get('/', [InsurancePolicyController::class, 'index']);
-    Route::post('/', [InsurancePolicyController::class, 'store']);
-    Route::get('/{id}', [InsurancePolicyController::class, 'show']);
-    Route::post('/{id}', [InsurancePolicyController::class, 'update']);
-    Route::delete('/{id}', [InsurancePolicyController::class, 'destroy']);
-});
+    // ── Transfers & payouts ───────────────────────────────────────────────
+    Route::get('/transfer-policy', [TransferApiController::class, 'policy']);
+    Route::get('/refund-policy', [TransferApiController::class, 'refundPolicy']);
+    Route::get('/my-transfers', [TransferApiController::class, 'myTransfers']);
+    Route::post('/transfer-requests', [TransferApiController::class, 'requestTransfer']);
+    Route::get('/transfer-requests', [TransferApiController::class, 'myRequests']);
 
-// Suggestion Routes
-Route::prefix('suggestions')->group(function () {
-    Route::get('/', [SuggestionController::class, 'index']);
-    Route::post('/', [SuggestionController::class, 'store'])->middleware('auth:sanctum');
-    Route::get('/{id}', [SuggestionController::class, 'show']);
-    Route::post('/{id}', [SuggestionController::class, 'update'])->middleware('auth:sanctum');
-    Route::delete('/{id}', [SuggestionController::class, 'destroy'])->middleware('auth:sanctum');
-});
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/my-suggestions', [SuggestionController::class, 'mySuggestions']);
-});
-
-// -------------------------------------------------------------------------
-// Payment routes
-// -------------------------------------------------------------------------
-
-// Webhook callback — must stay unauthenticated (called by Geidea's servers).
-// Signature verification happens inside GeideaPaymentService::callBack().
-
-// ── Provider Statistics (mobile app) ─────────────────────────────────────────
-// GET /api/provider/statistics?year=2026&month=5
-Route::middleware('auth:sanctum')->get('/provider/statistics', ProviderStatisticsController::class)
-    ->name('provider.statistics');
-
-Route::match(['GET', 'POST'], '/geidea/payment/callback', [PaymentController::class, 'callBack'])
-    ->name('payment.callback');
-
-Route::middleware('auth:sanctum')->group(function () {
-    // Initiate a payment session → returns Geidea hosted URL
+    // ── Payments ──────────────────────────────────────────────────────────
     Route::post('/geidea/payment/process', [PaymentController::class, 'paymentProcess'])
         ->name('payment.process');
-
-    // Query a payment intent from Geidea by their paymentIntentId
     Route::get('/geidea/payments/{payment_id}', [PaymentController::class, 'details'])
         ->name('payment.details');
-
-    // Provider: list own payments
     Route::get('/my-payments', [PaymentController::class, 'myPayments'])
         ->name('payment.my');
-
-    // Recovery: manually confirm a payment using the Geidea Order ID
-    // Use when callback was unreachable (localhost / no public URL)
     Route::post('/payments/confirm-by-order', [PaymentController::class, 'confirmByOrder'])
         ->name('payment.confirm-by-order');
-
-    // Admin: list all payments / single payment
     Route::get('/payments', [PaymentController::class, 'index'])
         ->name('payment.index');
     Route::get('/payments/{id}', [PaymentController::class, 'show'])
         ->name('payment.show');
+
+    // ── Misc (write) ──────────────────────────────────────────────────────
+    Route::post('service-groups', [ServiceGroupController::class, 'store']);
+    Route::post('service-groups/{id}', [ServiceGroupController::class, 'update']);
+    Route::delete('service-groups/{id}', [ServiceGroupController::class, 'destroy']);
+    Route::post('services', [ServiceController::class, 'store']);
+    Route::post('services/{id}', [ServiceController::class, 'update']);
+    Route::delete('services/{id}', [ServiceController::class, 'destroy']);
+    Route::post('stadium-types', [StadiumTypeController::class, 'store']);
+    Route::post('stadium-types/{id}', [StadiumTypeController::class, 'update']);
+    Route::delete('stadium-types/{id}', [StadiumTypeController::class, 'destroy']);
+    Route::post('insurance-policies', [InsurancePolicyController::class, 'store']);
+    Route::post('insurance-policies/{id}', [InsurancePolicyController::class, 'update']);
+    Route::delete('insurance-policies/{id}', [InsurancePolicyController::class, 'destroy']);
+    Route::post('suggestions', [SuggestionController::class, 'store']);
+    Route::post('suggestions/{id}', [SuggestionController::class, 'update']);
+    Route::delete('suggestions/{id}', [SuggestionController::class, 'destroy']);
+    Route::get('/my-suggestions', [SuggestionController::class, 'mySuggestions']);
+
+    // ── Provider statistics ───────────────────────────────────────────────
+    Route::get('/provider/statistics', ProviderStatisticsController::class)
+        ->name('provider.statistics');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. ADMIN-GUARDED ROUTES (auth:admin)
+// ═══════════════════════════════════════════════════════════════════════════
+
+Route::middleware('auth:admin')->group(function () {
+    Route::apiResource('admin/roles', RoleController::class);
+    Route::apiResource('admin/permissions', PermissionController::class);
+
+    Route::post('/admin/notifications/test', [
+        \App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'test',
+    ])->name('admin.notifications.test')->middleware('permission:notifications.create');
+
+    Route::post('/admin/notifications/test-token', [
+        \App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'testToken',
+    ])->name('admin.notifications.test-token')->middleware('permission:notifications.create');
+
+    Route::get('/admin/users/search', [
+        \App\Http\Controllers\Admin\Broadcast\BroadcastNotificationController::class, 'searchUsers',
+    ])->name('admin.users.search');
 });
