@@ -42,6 +42,8 @@ class DatabaseSeeder extends Seeder
             AdViewsTableSeeder::class,
             AdCommentSeeder::class,               // NEW — 2–4 comments per ad (1 hidden to demo toggle)
             UniteReservationsTableSeeder::class,  // 25 reservations + payments per venue
+            MultiBookingGroupSeeder::class,        // Multi-unit booking demos (uses unites freed by reservation seeder)
+            AvailableUnitesTestSeeder::class,       // Validates dept/unit IDs and prints confirmed Postman variables
             UniteViewingsTableSeeder::class,      // NEW — customer viewing-appointment bookings, both deposit and no-deposit outcomes
             ProviderStatisticsSeeder::class,       // 12-month historical data for provider stats API
             FavoriteUnitesTableSeeder::class,

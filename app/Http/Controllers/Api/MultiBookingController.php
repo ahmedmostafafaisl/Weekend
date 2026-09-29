@@ -60,15 +60,16 @@ class MultiBookingController extends Controller
                 continue; // slot / time config missing — skip this unite
             }
 
-            // Check for conflicts
+            // Check for conflicts — match the scopeConflicting signature exactly:
+            // ($query, uniteId, startDate, endDate=null, fromTime=null, toTime=null, ignoreId=null, bufferMinutes=0)
             $conflict = UniteReservation::scopeConflicting(
                 UniteReservation::query(),
                 $unite->id,
                 $data['reservation_date'],
+                $endDate ?? null,
                 $fromTime,
                 $toTime,
                 null,
-                $endDate ?? null,
                 $bufferMinutes
             )->whereIn('status', ['pending', 'confirmed', 'pending_approval'])->exists();
 
@@ -193,15 +194,16 @@ class MultiBookingController extends Controller
                 return response()->json(['message' => $e->getMessage()], 422);
             }
 
-            // Conflict check per unite
+            // Conflict check per unite — correct parameter order:
+            // ($query, uniteId, startDate, endDate, fromTime, toTime, ignoreId, bufferMinutes)
             $conflict = UniteReservation::scopeConflicting(
                 UniteReservation::query(),
                 $unite->id,
                 $data['reservation_date'],
+                $endDate ?? null,
                 $fromTime,
                 $toTime,
                 null,
-                $endDate ?? null,
                 $bufferMinutes
             )->whereIn('status', ['pending', 'confirmed', 'pending_approval'])->exists();
 
