@@ -100,16 +100,10 @@ class MultiBookingController extends Controller
 
             // 4. Conflict check — correct parameter order matches scopeConflicting signature:
             //    ($query, uniteId, startDate, endDate, fromTime, toTime, ignoreId, bufferMinutes)
-            $hasConflict = \App\Models\UniteReservation::scopeConflicting(
-                \App\Models\UniteReservation::query(),
-                $unite->id,
-                $date,
-                $endDate,
-                $fromTime,
-                $toTime,
-                null,
-                $bufferMinutes
-            )->whereIn('status', ['pending', 'confirmed', 'pending_approval'])->exists();
+            $hasConflict = \App\Models\UniteReservation::query()
+                ->conflicting($unite->id, $date, $endDate, $fromTime, $toTime, null, $bufferMinutes)
+                ->whereIn('status', ['pending', 'confirmed', 'pending_approval'])
+                ->exists();
 
             if ($hasConflict) {
                 continue;
@@ -240,16 +234,10 @@ class MultiBookingController extends Controller
 
             // Conflict check per unite — correct parameter order:
             // ($query, uniteId, startDate, endDate, fromTime, toTime, ignoreId, bufferMinutes)
-            $conflict = UniteReservation::scopeConflicting(
-                UniteReservation::query(),
-                $unite->id,
-                $data['reservation_date'],
-                $endDate ?? null,
-                $fromTime,
-                $toTime,
-                null,
-                $bufferMinutes
-            )->whereIn('status', ['pending', 'confirmed', 'pending_approval'])->exists();
+            $conflict = UniteReservation::query()
+                ->conflicting($unite->id, $data['reservation_date'], $endDate ?? null, $fromTime, $toTime, null, $bufferMinutes)
+                ->whereIn('status', ['pending', 'confirmed', 'pending_approval'])
+                ->exists();
 
             if ($conflict) {
                 return response()->json([
