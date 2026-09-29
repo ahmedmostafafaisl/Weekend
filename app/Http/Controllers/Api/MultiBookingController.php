@@ -45,50 +45,92 @@ class MultiBookingController extends Controller
             'to_time' => ['nullable', 'required_if:period_type,hourly', 'date_format:H:i'],
         ]);
 
+        $date = $data['reservation_date'];
+        $periodType = $data['period_type'];
+        $dayOfWeek = strtolower(\Carbon\Carbon::parse($date)->englishDayOfWeek);
+
+        // Price day-category (matches UnitePricesTableSeeder and resolvePrice())
+        $dayCategory = match ($dayOfWeek) {
+            'thursday' => 'thursday',
+            'friday' => 'friday',
+            'saturday' => 'saturday',
+            default => 'week_day',
+        };
+
         $unites = $department->unites()
-            ->with(['prices', 'slots', 'offers', 'images'])
+            ->with(['images'])          // only what we actually output
             ->where('status', 'active')
             ->get();
 
         $available = [];
 
         foreach ($unites as $unite) {
-            // Resolve times + buffer the same way the single-booking flow does
-            try {
-                [$fromTime, $toTime, $endDate, $bufferMinutes] = $this->repo->resolveTimes($unite, $data);
-            } catch (\Throwable) {
-                continue; // slot / time config missing — skip this unite
+
+            // 1. Skip venue types that don't support this period
+            if (! in_array($periodType, $unite->allowedPeriodTypes())) {
+                continue;
             }
 
-            // Check for conflicts — match the scopeConflicting signature exactly:
-            // ($query, uniteId, startDate, endDate=null, fromTime=null, toTime=null, ignoreId=null, bufferMinutes=0)
-            $conflict = UniteReservation::scopeConflicting(
-                UniteReservation::query(),
+            // 2. Look up the slot for this day directly (no abort(), no try-catch)
+            $slot = \App\Models\UniteSlot::where('unite_id', $unite->id)
+                ->where('day_of_week', $dayOfWeek)
+                ->where('status', 'available')
+                ->first();
+
+            if (! $slot) {
+                continue;
+            }
+
+            // 3. Resolve the period start/end from the slot
+            [$fromTime, $toTime] = match ($periodType) {
+                'morning' => [$slot->morning_start, $slot->morning_end],
+                'evening' => [$slot->evening_start, $slot->evening_end],
+                'full_day' => [$slot->full_start,    $slot->full_end],
+                'hourly' => [$data['from_time'] ?? null, $data['to_time'] ?? null],
+                default => [null, null],
+            };
+
+            // Skip if this period is not configured on the slot
+            if (! $fromTime || ! $toTime) {
+                continue;
+            }
+
+            $bufferMinutes = (int) ($slot->buffer_minutes ?? 0);
+            $endDate = $data['end_date'] ?? null;
+
+            // 4. Conflict check — correct parameter order matches scopeConflicting signature:
+            //    ($query, uniteId, startDate, endDate, fromTime, toTime, ignoreId, bufferMinutes)
+            $hasConflict = \App\Models\UniteReservation::scopeConflicting(
+                \App\Models\UniteReservation::query(),
                 $unite->id,
-                $data['reservation_date'],
-                $endDate ?? null,
+                $date,
+                $endDate,
                 $fromTime,
                 $toTime,
                 null,
                 $bufferMinutes
             )->whereIn('status', ['pending', 'confirmed', 'pending_approval'])->exists();
 
-            if ($conflict) {
+            if ($hasConflict) {
                 continue;
             }
 
-            // Resolve price using the same logic as the single-booking repo
-            try {
-                if ($data['period_type'] === 'hourly') {
-                    $price = $this->repo->resolveHourlyPrice($unite, $fromTime, $toTime, $data['reservation_date']);
-                } elseif ($data['period_type'] === 'full_day' && ! empty($data['end_date'])) {
-                    $price = $this->repo->resolveFullDayRangePrice($unite, $data['reservation_date'], $data['end_date']);
-                } else {
-                    $price = $this->repo->resolvePrice($unite, $data['period_type'], $data['reservation_date']);
-                }
-            } catch (\Throwable) {
-                continue; // price not configured — skip
+            // 5. Get price directly — no try-catch, no abort()
+            $priceRow = \App\Models\UnitePrice::where('unite_id', $unite->id)
+                ->where('day', $dayCategory)
+                ->first();
+
+            if (! $priceRow) {
+                continue;
             }
+
+            $price = (float) match ($periodType) {
+                'morning' => $priceRow->morning_price ?? 0,
+                'evening' => $priceRow->evening_price ?? 0,
+                'full_day' => $priceRow->full_price ?? 0,
+                'hourly' => $priceRow->price ?? 0,
+                default => 0,
+            };
 
             $available[] = [
                 'id' => $unite->id,
@@ -96,7 +138,9 @@ class MultiBookingController extends Controller
                 'type' => $unite->type,
                 'description' => $unite->description,
                 'capacity' => $unite->capacity ?? null,
-                'price' => round((float) $price, 2),
+                'price' => round($price, 2),
+                'from_time' => substr($fromTime, 0, 5),
+                'to_time' => substr($toTime, 0, 5),
                 'images' => $unite->images->map(fn ($img) => [
                     'id' => $img->id,
                     'url' => asset($img->image),
@@ -109,8 +153,8 @@ class MultiBookingController extends Controller
             'meta' => [
                 'department_id' => $department->id,
                 'department_name' => $department->name,
-                'reservation_date' => $data['reservation_date'],
-                'period_type' => $data['period_type'],
+                'reservation_date' => $date,
+                'period_type' => $periodType,
                 'available_count' => count($available),
             ],
         ]);

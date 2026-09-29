@@ -22,10 +22,12 @@ class UniteReservationsTableSeeder extends Seeder
             return;
         }
 
-        // Group unites by department so we can leave some free per department
-        // for the multi-booking available-unites endpoint to return results.
-        // RULE: only the FIRST unite per department gets future reservations;
-        // subsequent unites in the same department get only PAST reservations.
+        // Group unites by department so we can leave most free for the
+        // multi-booking available-unites endpoint to return results.
+        // RULE: only the FIRST unite per department gets past reservations
+        // (as realistic history). All other unites in the same department
+        // get NO seeded reservations at all — completely free for any
+        // future date so the picker always returns them.
         $deptUniteCounts = [];
 
         $statuses = ['confirmed', 'confirmed', 'confirmed', 'pending', 'cancelled'];
@@ -36,16 +38,11 @@ class UniteReservationsTableSeeder extends Seeder
             $deptUniteCounts[$deptId] = ($deptUniteCounts[$deptId] ?? 0) + 1;
             $positionInDept = $deptUniteCounts[$deptId]; // 1-based
 
-            // Only the first unite per department gets future bookings.
-            // All others get past-only so they remain available going forward.
+            // First unite per dept: past-only (history). All others: nothing seeded.
             if ($positionInDept === 1) {
-                $scenarios = array_merge(
-                    array_map(fn ($i) => ['days' => $i + 1, 'past' => false], range(1, 15)),
-                    array_map(fn ($i) => ['days' => -($i + 1), 'past' => true], range(1, 10))
-                );
-            } else {
-                // Past only — these unites are available for upcoming dates
                 $scenarios = array_map(fn ($i) => ['days' => -($i + 1), 'past' => true], range(1, 10));
+            } else {
+                continue; // no reservations for this unite — leave it fully available
             }
 
             foreach ($scenarios as $sIdx => $s) {
