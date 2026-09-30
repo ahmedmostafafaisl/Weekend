@@ -26,7 +26,7 @@ class UniteViewingController extends Controller
         } catch (\RuntimeException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ], 422);
         }
 

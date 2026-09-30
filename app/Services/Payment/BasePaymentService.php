@@ -77,7 +77,7 @@ abstract class BasePaymentService
             return response()->json([
                 'success' => false,
                 'status' => 500,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ], 500);
         }
     }

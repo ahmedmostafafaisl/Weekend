@@ -121,7 +121,20 @@ class UniteReservationsTableSeeder extends Seeder
             ->with('bookingPackages')
             ->get();
 
+        // Same rule as the main loop above: only the FIRST unite of each
+        // department gets seeded bookings, so units 2+ stay free for the
+        // multi-booking picker. This loop used to ignore that rule, and the
+        // day-of-week nudge below made the clash date-dependent: seeding on
+        // 2026-09-30 put a Saturday package booking on unit 16 exactly at
+        // today+10 — the Postman test date — so the picker lost a unit on
+        // some days and AvailableUnitesTestSeeder failed intermittently.
+        $firstUniteIds = Unite::selectRaw('MIN(id) as id')->groupBy('department_id')->pluck('id')->all();
+
         foreach ($unites as $uIdx => $unite) {
+            if (! in_array($unite->id, $firstUniteIds, true)) {
+                continue;
+            }
+
             $package = $unite->bookingPackages->firstWhere('status', 'active');
 
             if (! $package) {

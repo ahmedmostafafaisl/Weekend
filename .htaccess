@@ -1,4 +1,7 @@
 # ── Upload hardening ───────────────────────────────────────────────────────
+# MUST live in public/.htaccess: Apache reads this file whether the docroot
+# is public/ or the project root rewrites into /public/ (weekend-new/.htaccess).
+# A copy in the project-root .htaccess alone is NOT applied.
 # User uploads live under public/. Only the front controller may execute:
 # any other PHP-family file (e.g. an uploaded "shell.php") is refused, and
 # HTML/SVG are forced to download instead of rendering same-origin.

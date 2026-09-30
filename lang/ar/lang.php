@@ -1669,4 +1669,10 @@ return [
     'customer_home_section_hint' => 'تلميح لقسم الصفحة الرئيسية للعميل.',
     'featured_departments' => 'الأقسام المميزة',
     'featured_departments_hint' => 'إذا لم يتم اختيار أي قسم، ستعرض الصفحة تلقائيًا أحدث الأقسام النشطة.',
+
+    /* ── restored after d27e167 (were EN-only) ── */
+    'reservation_created_complete_payment' => 'تم إنشاء الحجز. أكمل الدفع لتأكيد حجزك.',
+    'password_reset_mail_failed' => 'تعذّر إرسال بريد إعادة التعيين حاليًا. يرجى المحاولة بعد قليل.',
+    'unexpected_error_try_again' => 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
+    'example' => 'مثال',
 ];

@@ -141,7 +141,7 @@ class BroadcastNotificationController extends Controller
                 Log::error('[Broadcast] ✗ failed for user', [
                     'user_id' => $user->id,
                     'email' => $user->email,
-                    'error' => $e->getMessage(),
+                    'error' => \App\Support\ClientError::message($e),
                     'trace' => $e->getTraceAsString(),
                 ]);
             }
