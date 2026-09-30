@@ -4,6 +4,7 @@ namespace App\Repositories\Department;
 
 use App\Models\Department;
 use App\Repositories\Interfaces\DepartmentInterface;
+use App\Support\SafeUpload;
 use Illuminate\Support\Facades\Storage;
 
 class DepartmentRepository implements DepartmentInterface
@@ -97,15 +98,9 @@ class DepartmentRepository implements DepartmentInterface
 
     protected function storeSakImage(Department $department, $file): string
     {
-        $path = public_path("department/{$department->type}/{$department->name}/sak_image");
-        if (! file_exists($path)) {
-            mkdir($path, 0777, true);
-        }
-
-        $imageName = time().'_'.$file->getClientOriginalName();
-        $file->move($path, $imageName);
-
-        return "department/{$department->type}/{$department->name}/sak_image/{$imageName}";
+        // Directory keyed by id, not the user-controlled department name —
+        // a name such as "../../x" previously escaped the upload folder.
+        return SafeUpload::store($file, "department/{$department->type}/{$department->id}/sak_image", SafeUpload::IMAGES, 'sak_image');
     }
 
     protected function storeImages(Department $department, array $images): void
@@ -114,16 +109,8 @@ class DepartmentRepository implements DepartmentInterface
             $type = $department->type;
             $name = $department->name;
 
-            $path = public_path("department/{$type}/{$department->id}");
-            if (! file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-
-            $imageName = time().'_'.$image->getClientOriginalName();
-            $image->move($path, $imageName);
-
             $department->images()->create([
-                'image' => "department/{$type}/{$department->id}/{$imageName}",
+                'image' => SafeUpload::store($image, "department/{$type}/{$department->id}", SafeUpload::IMAGES, 'images'),
             ]);
         }
     }

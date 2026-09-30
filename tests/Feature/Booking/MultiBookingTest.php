@@ -263,17 +263,24 @@ class MultiBookingTest extends TestCase
             'type' => 'lounge', 'status' => 'active',
         ]);
         UniteDetail::create(['unite_id' => $unite->id]);
-        UniteSlot::create([
-            'unite_id' => $unite->id, 'day_of_week' => 'week_day', 'status' => 'available',
-            'morning_start' => '08:00', 'morning_end' => '13:00',
-            'evening_start' => '14:00', 'evening_end' => '20:00',
-            'full_start' => '08:00', 'full_end' => '20:00',
-        ]);
-        UnitePrice::create([
-            'unite_id' => $unite->id,
-            'morning_price' => $price, 'evening_price' => $price,
-            'full_price' => $price * 2,
-        ]);
+        // unite_slots.day_of_week is an enum of full day names — one row per
+        // weekday (a 'week_day' value is truncated by MySQL and rejected).
+        foreach (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as $day) {
+            UniteSlot::create([
+                'unite_id' => $unite->id, 'day_of_week' => $day, 'status' => 'available',
+                'morning_start' => '08:00', 'morning_end' => '13:00',
+                'evening_start' => '14:00', 'evening_end' => '20:00',
+                'full_start' => '08:00', 'full_end' => '20:00',
+            ]);
+        }
+        // Prices are looked up per day category (week_day/thursday/friday/saturday).
+        foreach (['week_day', 'thursday', 'friday', 'saturday'] as $dayCategory) {
+            UnitePrice::create([
+                'unite_id' => $unite->id, 'day' => $dayCategory,
+                'morning_price' => $price, 'evening_price' => $price,
+                'full_price' => $price * 2,
+            ]);
+        }
 
         return $unite;
     }

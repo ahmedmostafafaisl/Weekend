@@ -13,6 +13,7 @@ use App\Models\UniteReservation;
 use App\Models\UniteSlot;
 use App\Repositories\Interfaces\UniteRepositoryInterface;
 use App\Services\Availability\AvailabilityService;
+use App\Support\SafeUpload;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -716,18 +717,8 @@ class UniteRepository implements UniteRepositoryInterface
                 continue;
             }
 
-            $path = public_path("unites/images/{$unite->id}");
-
-            if (! file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-
-            $imageName = time().'_'.$image->getClientOriginalName();
-
-            $image->move($path, $imageName);
-
             $unite->images()->create([
-                'image' => "unites/images/{$unite->id}/{$imageName}",
+                'image' => SafeUpload::store($image, "unites/images/{$unite->id}", SafeUpload::IMAGES, 'images'),
             ]);
         }
     }

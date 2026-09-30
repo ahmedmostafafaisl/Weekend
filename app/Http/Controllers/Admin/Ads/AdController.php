@@ -29,7 +29,7 @@ class AdController extends Controller
 
     public function create()
     {
-        $users = User::all();
+        $users = $this->userOptions();
 
         return view('dashboard.web.ads.create', compact('users'));
     }
@@ -79,7 +79,7 @@ class AdController extends Controller
     public function edit($id)
     {
         $ad = $this->adRepo->find($id);
-        $users = User::all();
+        $users = $this->userOptions();
 
         return view('dashboard.web.ads.edit', compact('ad', 'users'));
     }
@@ -154,5 +154,18 @@ class AdController extends Controller
         return $request->expectsJson()
             ? new AdResource($ad)
             : redirect()->route('ads.index')->with('success', __('lang.ad_activated_24h'));
+    }
+
+    /**
+     * Owner dropdown options. Was User::all(): every column of every user
+     * (password hashes, identity-document paths, FCM tokens…) hydrated into
+     * full models on each page load. The select only needs these four.
+     */
+    private function userOptions()
+    {
+        return User::query()
+            ->select(['id', 'name', 'email', 'type'])
+            ->orderBy('name')
+            ->get();
     }
 }

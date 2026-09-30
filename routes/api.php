@@ -55,10 +55,10 @@ use Illuminate\Support\Facades\Route;
 // 1. PUBLIC AUTH
 // ═══════════════════════════════════════════════════════════════════════════
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. PUBLIC READ ROUTES
@@ -98,7 +98,7 @@ Route::get('/home', [PackageDiscoveryController::class, 'home'])->name('home');
 Route::get('/payment-methods', [PaymentController::class, 'paymentMethods']);
 Route::get('/saudi-cities', [SaudiCityController::class, 'index']);
 Route::get('/service-fees', [ServiceFeeController::class, 'index']);
-Route::post('promo-codes/validate', [PromoCodeApiController::class, 'check']);
+Route::post('promo-codes/validate', [PromoCodeApiController::class, 'check'])->middleware('throttle:promo');
 
 // ── Public reference data ────────────────────────────────────────────────
 Route::get('service-groups', [ServiceGroupController::class, 'index']);

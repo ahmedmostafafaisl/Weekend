@@ -37,7 +37,22 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        $auth = $this->userRepo->login($request->validated());
+        // Enforce rate limiting BEFORE credential check so an attacker
+        // cannot enumerate valid emails by observing whether the rate
+        // limit fires before or after the credential error.
+        $request->ensureIsNotRateLimited();
+
+        try {
+            $auth = $this->userRepo->login($request->validated());
+        } catch (\Throwable $e) {
+            // Record the failed attempt against this email + IP pair.
+            $request->hitRateLimit();
+            throw $e;
+        }
+
+        // Successful login — clear the counter so legitimate users are
+        // not locked out after a previous failed attempt.
+        $request->authenticate(); // clears the rate-limit counter
 
         return response()->json([
             'user' => new UserResource($auth['user']),
@@ -52,9 +67,12 @@ class AuthController extends Controller
         return response()->json(['message' => __('lang.logged_out_successfully')]);
     }
 
-    // update fcm token
     public function updateFcmToken(Request $request)
     {
+        $request->validate([
+            'fcm_token' => ['required', 'string', 'max:255'],
+        ]);
+
         $user = auth()->user();
         $user->fcm_token = $request->fcm_token;
         $user->save();
@@ -64,9 +82,6 @@ class AuthController extends Controller
 
     /**
      * POST /api/forgot-password
-     * Send a password-reset link to the given email address.
-     * The link points to FRONTEND_URL/reset-password so the mobile app
-     * or web frontend receives it and shows a "set new password" form.
      */
     public function forgotPassword(Request $request)
     {
@@ -75,56 +90,45 @@ class AuthController extends Controller
         ]);
 
         try {
-            $status = Password::sendResetLink(
-                $request->only('email')
-            );
+            $status = Password::sendResetLink($request->only('email'));
         } catch (\Throwable $e) {
-            // Mail exception (wrong SMTP credentials, connection refused,
-            // TLS error, etc.) -- log the full detail and surface it in
-            // the response so production issues are immediately visible.
             Log::error('ResetPasswordNotification mail failed', [
                 'email' => $request->email,
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            // The raw mail exception (SMTP host, port, username, TLS details)
+            // was returned to any unauthenticated caller as 'mail_error', with
+            // a contradictory "link sent" message on an HTTP 500. It is logged
+            // above; the client gets an honest, generic message.
             return response()->json([
-                'message' => __('lang.password_reset_link_sent'), // token was created
-                'mail_error' => $e->getMessage(),                  // but sending failed
-            ], 500);
+                'message' => __('lang.password_reset_mail_failed'),
+            ], 503);
         }
 
         if ($status === Password::RESET_LINK_SENT) {
-            return response()->json([
-                'message' => __('lang.password_reset_link_sent'),
-            ]);
+            return response()->json(['message' => __('lang.password_reset_link_sent')]);
         }
 
         if ($status === Password::RESET_THROTTLED) {
-            return response()->json([
-                'message' => __('lang.password_reset_throttled'),
-            ], 429);
+            return response()->json(['message' => __('lang.password_reset_throttled')], 429);
         }
 
-        // Password::INVALID_USER -- no account found for this email
-        return response()->json([
-            'message' => __('lang.email_not_found'),
-            'status' => $status, // raw Laravel status for debugging
-        ], 422);
+        // INVALID_USER — no account for this email.
+        // Do NOT leak the raw $status constant; the message is enough.
+        return response()->json(['message' => __('lang.email_not_found')], 422);
     }
 
     /**
      * POST /api/reset-password
-     * Validate the token and set the new password.
-     * Invalidates all existing Sanctum tokens after a successful reset
-     * so every previously-logged-in device is logged out.
      */
     public function resetPassword(Request $request)
     {
         $request->validate([
             'token' => ['required', 'string'],
             'email' => ['required', 'email'],
-            'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
             'password_confirmation' => ['required'],
         ]);
 

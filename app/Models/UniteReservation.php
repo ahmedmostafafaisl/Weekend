@@ -31,6 +31,7 @@ class UniteReservation extends Model
         'reservation_date' => 'date',
         'end_date' => 'date',
         'price' => 'float',
+        'multi_booking_group_id' => 'integer',
     ];
 
     public function multiBookingGroup()
@@ -117,7 +118,7 @@ class UniteReservation extends Model
         $candidateEnd = $isTimeCheck ? date('Y-m-d', strtotime($endDate.' +1 day')) : $endDate;
 
         $query->where('unite_id', $uniteId)
-            ->whereIn('status', ['pending', 'confirmed'])
+            ->whereIn('status', ['pending', 'confirmed', 'pending_approval'])
             ->where(function ($q) use ($candidateStart, $candidateEnd) {
                 $q->where('reservation_date', '<=', $candidateEnd)
                     ->where(function ($q2) use ($candidateStart) {
@@ -128,6 +129,15 @@ class UniteReservation extends Model
         if ($isTimeCheck) {
             $query->where(function ($q) use ($startDate, $fromTime, $toTime, $bufferMinutes) {
                 $q->whereNotNull('end_date')
+                    // A same-day reservation stored without from_time/to_time has
+                    // an unknown window. TIMESTAMP(date, NULL) is NULL, so the time
+                    // comparison below silently excluded such rows and the slot
+                    // looked free — a double-booking hole. Fail closed instead.
+                    ->orWhere(function ($q2) use ($startDate) {
+                        $q2->whereNull('end_date')
+                            ->whereDate('reservation_date', $startDate)
+                            ->where(fn ($q3) => $q3->whereNull('from_time')->orWhereNull('to_time'));
+                    })
                     ->orWhere(function ($q2) use ($startDate, $fromTime, $toTime, $bufferMinutes) {
                         // Existing reservation's real start/end datetimes --
                         // end bumped a day forward whenever to_time isn't

@@ -6,24 +6,33 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push to the same branch/PR cancels the older, now-irrelevant run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: PHP ${{ matrix.php }} — Laravel Tests
+    name: PHP ${{ matrix.php }} — Laravel Tests (MariaDB)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
-      mysql:
-        image: mysql:8.0
+      # Production runs MariaDB. Several bugs found in review depended on the
+      # engine's strict-mode behaviour (e.g. enum truncation), so CI must use
+      # the same engine rather than MySQL 8.
+      mariadb:
+        image: mariadb:10.11
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: weekend_test
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: weekend_test
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=10
 
     strategy:
       matrix:
@@ -37,51 +46,69 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo, pdo_mysql, mbstring, openssl, tokenizer, xml, ctype, json, bcmath, gd
+          extensions: pdo, pdo_mysql, mbstring, openssl, tokenizer, xml, ctype, json, bcmath, gd, intl, zip
           coverage: none
 
+      # ── Fast gates: fail in seconds, before installing anything ─────────────
+      - name: ─── No merge-conflict markers ───────────────────────────────────
+        # Merge d60ca8b committed <<<<<<< markers into a controller, turning two
+        # endpoints into a fatal parse error. Caught here with a clear message.
+        run: |
+          if git grep -nE '^(<<<<<<< |=======$|>>>>>>> )' -- app routes config database resources lang tests; then
+            echo "::error::Unresolved merge-conflict markers found (see above)."
+            exit 1
+          fi
+
+      - name: ─── PHP syntax (lint) ────────────────────────────────────────────
+        run: |
+          find app routes config database lang tests -name '*.php' -print0 \
+            | xargs -0 -n1 -P4 php -l > /tmp/lint.log 2>&1 || { grep -v '^No syntax errors' /tmp/lint.log; exit 1; }
+
+      # ── Install ────────────────────────────────────────────────────────────
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache
           key: composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-
 
       - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Copy environment file
-        run: cp .env.example .env
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
 
       - name: Configure test environment
+        # No payment-gateway keys on purpose: the app must boot and every
+        # payment route must work without them (gateway constructors used to
+        # crash with a TypeError when unconfigured).
         run: |
-          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
-          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
-          sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
-          sed -i 's/DB_DATABASE=.*/DB_DATABASE=weekend_test/' .env
-          sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
-          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=root/' .env
-          sed -i 's/MAIL_MAILER=.*/MAIL_MAILER=log/' .env
+          cp .env.example .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=weekend_test/' .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=root/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=root/' .env
+          sed -i 's/^MAIL_MAILER=.*/MAIL_MAILER=log/' .env
           echo "QUEUE_CONNECTION=sync" >> .env
-          echo "GEIDEA_API_KEY=test-dummy" >> .env
-          echo "GEIDEA_API_PASSWORD=test-dummy" >> .env
+          php artisan key:generate --force
 
-      - name: Generate application key
-        run: php artisan key:generate --force
-
-      - name: ─── Migrate fresh + seed ─────────────────────────────────────
-        # This is the primary gating check: every push/PR must produce a
-        # clean database from scratch. If any migration fails (e.g. due to
-        # editing an already-run migration without creating a new one), the
-        # pipeline fails here and is visible before merge.
+      # ── Gates ──────────────────────────────────────────────────────────────
+      - name: ─── Migrate fresh + seed ─────────────────────────────────────────
+        # Every push must build a clean database from scratch. Catches edited
+        # already-run migrations and duplicate CREATE TABLEs (the 142244
+        # multi_booking_groups crash) before they reach a server.
         run: php artisan migrate:fresh --seed --force
 
-      - name: ─── Test suite ─────────────────────────────────────────────────
-        # All automated regression tests must pass.
-        run: php artisan test --stop-on-failure
+      - name: ─── Route table compiles ─────────────────────────────────────────
+        run: php artisan route:list > /dev/null
 
-      - name: Upload test output on failure
+      - name: ─── Test suite ────────────────────────────────────────────────────
+        # No --stop-on-failure: report every failing test in one run.
+        run: php artisan test
+
+      - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-output
+          name: laravel-log
           path: storage/logs/laravel.log
+          if-no-files-found: ignore

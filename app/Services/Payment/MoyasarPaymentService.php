@@ -65,20 +65,39 @@ class MoyasarPaymentService extends BasePaymentService implements PaymentGateway
         } catch (\Throwable $e) {
             Log::error('Maysar sendPayment error', ['error' => $e->getMessage()]);
 
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
     public function callBack(Request $request): bool
     {
-        $sessionId = $request->session_id ?? $request->input('session_id');
-        $status = $request->status ?? $request->input('status');
-        if (! $sessionId || $status !== 'paid') {
+        $sessionId = $request->input('session_id');
+        if (! $sessionId) {
             return false;
         }
 
         $payment = Payment::where('payment_id', $sessionId)->first();
         if (! $payment) {
+            return false;
+        }
+
+        if ($payment->status === 'paid') {
+            return true; // idempotent — gateway retries are harmless
+        }
+
+        // Never trust the callback body. Previously POST
+        // {"session_id":"…","status":"paid"} marked any payment paid with no
+        // signature and no verification. Re-read the session from Maysar.
+        $verified = $this->confirmByOrderId($sessionId);
+        $verifiedStatus = $verified['data']['status'] ?? null;
+
+        if (! ($verified['success'] ?? false) || $verifiedStatus !== 'paid') {
+            Log::warning('Maysar callback: session not verified as paid — ignored', [
+                'payment_id' => $payment->id,
+                'session_id' => $sessionId,
+                'verified_status' => $verifiedStatus,
+            ]);
+
             return false;
         }
 
@@ -96,7 +115,7 @@ class MoyasarPaymentService extends BasePaymentService implements PaymentGateway
 
             return ['success' => $r->successful(), 'data' => $r->json()];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -108,7 +127,7 @@ class MoyasarPaymentService extends BasePaymentService implements PaymentGateway
 
             return $r->json();
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -120,7 +139,7 @@ class MoyasarPaymentService extends BasePaymentService implements PaymentGateway
 
             return ['success' => $r->successful(), 'data' => $r->json()];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 }

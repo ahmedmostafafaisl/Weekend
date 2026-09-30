@@ -3,26 +3,22 @@
 namespace App\Services\Payment;
 
 use App\Models\Payment;
-use App\Models\Subscription;
-use App\Models\UniteReservation;
-use App\Notifications\NewReservationReceived;
 use App\Notifications\PaymentFailed;
-use App\Notifications\ReservationConfirmed;
-use App\Notifications\SubscriptionActivated;
 use App\Repositories\Interfaces\PaymentGatewayInterface;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class GeideaPaymentService extends BasePaymentService implements PaymentGatewayInterface
 {
     public function __construct()
     {
-        $this->base_url = config('services.geidea.base_url');
-        $this->api_key = config('services.geidea.api_key');
-        $this->api_password = config('services.geidea.api_password');
+        // Cast to string: an unconfigured gateway (CI, local, staging) must not
+        // crash on construction — PaymentController injects this service, so a
+        // TypeError here took down every payment endpoint, not just Geidea.
+        $this->base_url = (string) config('services.geidea.base_url', '');
+        $this->api_key = (string) config('services.geidea.api_key', '');
+        $this->api_password = (string) config('services.geidea.api_password', '');
 
         $this->header = [
             'accept' => 'application/json',
@@ -46,7 +42,7 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
 
         // --- Amount: must be a clean float, never a string or long decimal ---
         $amount = round((float) ($data['amount'] ?? 0), 2);
-        $currency = (string) ($data['currency'] ?? config('services.geidea.currency', env('GEIDEA_CURRENCY')));
+        $currency = (string) ($data['currency'] ?? config('services.geidea.currency', 'SAR'));
 
         // --- merchantReferenceId ---
         $merchantReferenceId = (string) ($data['merchantReferenceId'] ?? '');
@@ -203,13 +199,26 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
     {
         $payload = $request->all();
 
-        Storage::put('geidea_response.json', json_encode($payload, JSON_PRETTY_PRINT));
         Log::info('Geidea callback raw payload', ['payload' => $payload]);
 
         if (! $this->verifyWebhookSignature($request)) {
             Log::warning('Geidea callback: invalid signature', ['ip' => $request->ip()]);
 
             return false;
+        }
+
+        // No webhook secret configured → the payload cannot be trusted as-is
+        // (anyone could POST {"order":{"status":"Success","detailedStatus":"Paid"}}).
+        // Re-verify the order status directly with Geidea's API instead.
+        if (! config('services.geidea.webhook_secret')) {
+            $orderId = $payload['order']['orderId'] ?? null;
+            if (! $orderId) {
+                Log::warning('Geidea callback: unsigned payload without orderId — ignored', ['ip' => $request->ip()]);
+
+                return false;
+            }
+
+            return (bool) ($this->confirmByOrderId($orderId)['success'] ?? false);
         }
 
         $referenceId = $payload['merchantReferenceId'] ?? null;
@@ -314,7 +323,7 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
             }
 
             $order = $details['data'] ?? [];
-            $currency = $order['currency'] ?? config('services.geidea.currency', env('GEIDEA_CURRENCY'));
+            $currency = $order['currency'] ?? config('services.geidea.currency', 'SAR');
             $merchantReferenceId = $order['merchantReferenceId'] ?? $geideaOrderId;
 
             // If no partial amount specified, refund the full order amount
@@ -366,7 +375,7 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
         } catch (\Throwable $e) {
             Log::error('Geidea refund exception', ['order_id' => $geideaOrderId, 'message' => $e->getMessage()]);
 
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -388,7 +397,7 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
         } catch (\Throwable $e) {
             Log::error('Geidea getPaymentDetails error', ['message' => $e->getMessage()]);
 
-            return ['success' => false, 'status' => 500, 'message' => $e->getMessage()];
+            return ['success' => false, 'status' => 500, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -398,56 +407,15 @@ class GeideaPaymentService extends BasePaymentService implements PaymentGatewayI
 
     private function handleSuccessfulPayment(Payment $payment, ?string $gatewayOrderId): bool
     {
-        DB::transaction(function () use ($payment, $gatewayOrderId) {
-            $payment->update(['status' => 'paid', 'payment_id' => $gatewayOrderId]);
+        $payment->update(['status' => 'paid', 'payment_id' => $gatewayOrderId ?? $payment->payment_id]);
 
-            if ($payment->reservation_id) {
-                $reservation = UniteReservation::with(['user', 'unite.department.user'])
-                    ->findOrFail($payment->reservation_id);
-                $reservation->update(['status' => 'confirmed']);
-                $reservation->user?->notify(new ReservationConfirmed($reservation));
-                $reservation->unite?->department?->user?->notify(new NewReservationReceived($reservation));
-            }
-
-            if ($payment->subscription_id) {
-                $subscription = Subscription::with(['adPackage', 'propertyPackage', 'user'])
-                    ->findOrFail($payment->subscription_id);
-                $this->activateSubscription($subscription);
-                $subscription->user?->notify(new SubscriptionActivated($subscription));
-            }
-        });
+        // Single source of truth for fulfillment — shared with Tabby/Tamara/Maysar.
+        // Confirms the reservation, multi-booking group, viewing deposit or
+        // subscription, and sends notifications outside any transaction so a
+        // notification failure can never roll back a real payment confirmation.
+        app(\App\Repositories\Payment\PaymentRepository::class)->handlePostPayment($payment->fresh());
 
         return true;
-    }
-
-    private function activateSubscription(Subscription $subscription): void
-    {
-        $updates = ['status' => 'active'];
-
-        if ($subscription->type === 'property') {
-            $package = $subscription->propertyPackage;
-            if ($package?->type === 'time') {
-                $updates['start_date'] = now()->toDateString();
-                $updates['end_date'] = now()->addDays($package->duration)->toDateString();
-            }
-            if ($package?->type === 'percentage') {
-                $updates['percentage'] = $package->percentage;
-            }
-            if ($package?->type === 'count') {
-                $updates['count'] = $package->count;
-            }
-        } elseif ($subscription->type === 'ad') {
-            $package = $subscription->adPackage;
-            if ($package?->type === 'duration') {
-                $updates['start_date'] = now()->toDateString();
-                $updates['end_date'] = now()->addDays($package->duration)->toDateString();
-            }
-            if ($package?->type === 'count') {
-                $updates['count'] = $package->count;
-            }
-        }
-
-        $subscription->update($updates);
     }
 
     private function handleFailedPayment(Payment $payment): bool

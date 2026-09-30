@@ -80,7 +80,7 @@
                             <span class="text-muted small ms-2">({{ $items->count() }})</span>
                         </div>
                         <div class="me-3 text-muted small">
-                            مثال: <span class="badge bg-light text-dark border">{{ $module }}.view</span>
+                            {{ __('lang.example') }}: <span class="badge bg-light text-dark border">{{ $module }}.view</span>
                         </div>
                     </div>
                 </button>

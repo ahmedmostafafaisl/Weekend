@@ -168,7 +168,10 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Unset previously meant "not secure": the admin session cookie could be
+    // sent over plain HTTP. Now defaults to secure whenever APP_URL is https
+    // (local http:// dev keeps working); SESSION_SECURE_COOKIE still overrides.
+    'secure' => env('SESSION_SECURE_COOKIE', str_starts_with((string) env('APP_URL', ''), 'https://')),
 
     /*
     |--------------------------------------------------------------------------

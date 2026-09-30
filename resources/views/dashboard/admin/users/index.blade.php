@@ -242,8 +242,8 @@
                         <label class="form-label">{{ __('lang.ownership') }}</label>
                         <select class="form-select" name="ownership" id="createOwnership">
                             <option value="0">0</option>
-                            <option value="1">1 (مالك)</option>
-                            <option value="2">2 (موكل)</option>
+                            <option value="1">1 ({{ __('lang.ownership_owner') }})</option>
+                            <option value="2">2 ({{ __('lang.ownership_agent') }})</option>
                         </select>
                     </div>
 
@@ -409,8 +409,8 @@
                         <label class="form-label">{{ __('lang.ownership') }}</label>
                         <select class="form-select" name="ownership" id="editOwnership">
                             <option value="0">0</option>
-                            <option value="1">1 (مالك)</option>
-                            <option value="2">2 (موكل)</option>
+                            <option value="1">1 ({{ __('lang.ownership_owner') }})</option>
+                            <option value="2">2 ({{ __('lang.ownership_agent') }})</option>
                         </select>
                     </div>
 

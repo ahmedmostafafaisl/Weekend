@@ -4,6 +4,7 @@ namespace App\Repositories\User;
 
 use App\Models\User;
 use App\Repositories\Interfaces\UserInterface;
+use App\Support\SafeUpload;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -34,17 +35,7 @@ class UserRepository implements UserInterface
         foreach ($imageFields as $field) {
             if (request()->hasFile($field)) {
                 $image = request()->file($field);
-                $path = public_path("users/{$user->id}/{$field}");
-
-                if (! file_exists($path)) {
-                    mkdir($path, 0777, true);
-                }
-
-                $imageName = time().'_'.$image->getClientOriginalName();
-                $image->move($path, $imageName);
-
-                // Save the relative path to DB
-                $user->{$field} = "users/{$user->id}/{$field}/{$imageName}";
+                $user->{$field} = SafeUpload::store($image, "users/{$user->id}/{$field}", SafeUpload::IMAGES, $field);
             }
         }
 

@@ -30,12 +30,23 @@ class PackageDiscoveryTest extends TestCase
     }
 
     /** @test */
-    public function top_packages_returns_property_and_ad_keys(): void
+    public function home_for_guest_returns_departments_and_price_filter(): void
     {
         $response = $this->getJson('/api/home');
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['property_packages', 'ad_packages']);
+            ->assertJsonStructure(['departments', 'price_filter' => ['min', 'max']]);
+        $this->assertArrayNotHasKey('property_packages', $response->json(),
+            'Guests get departments + price_filter; packages are provider-only');
+    }
+
+    /** @test */
+    public function top_packages_returns_property_and_ad_keys(): void
+    {
+        $response = $this->homeAsProvider();
+
+        $response->assertStatus(200)
+            ->assertJsonStructure(['property_packages', 'ad_packages']);
     }
 
     /** @test */
@@ -46,7 +57,7 @@ class PackageDiscoveryTest extends TestCase
             AdPackage::create(['name' => "AP{$i}", 'type' => 'count', 'count' => 5, 'price' => $i * 10, 'status' => 'active']);
         }
 
-        $response = $this->getJson('/api/home');
+        $response = $this->homeAsProvider();
 
         $this->assertCount(5, $response->json('property_packages'));
         $this->assertCount(5, $response->json('ad_packages'));
@@ -59,7 +70,7 @@ class PackageDiscoveryTest extends TestCase
         PropertyPackage::create(['name' => 'Cheap',     'type' => 'count', 'count' => 5, 'price' => 50,  'status' => 'active']);
         PropertyPackage::create(['name' => 'Mid',       'type' => 'count', 'count' => 5, 'price' => 200, 'status' => 'active']);
 
-        $response = $this->getJson('/api/home');
+        $response = $this->homeAsProvider();
 
         $prices = collect($response->json('property_packages'))->pluck('price')->map(fn ($p) => (float) $p);
         $this->assertEquals($prices->sort()->values()->toArray(), $prices->values()->toArray(),
@@ -72,17 +83,17 @@ class PackageDiscoveryTest extends TestCase
         PropertyPackage::create(['name' => 'Active',   'type' => 'count', 'count' => 5, 'price' => 100, 'status' => 'active']);
         PropertyPackage::create(['name' => 'Inactive', 'type' => 'count', 'count' => 5, 'price' => 50,  'status' => 'inactive']);
 
-        $response = $this->getJson('/api/home');
+        $response = $this->homeAsProvider();
 
         $names = collect($response->json('property_packages'))->pluck('name');
-        $this->assertContains('Active',   $names);
+        $this->assertContains('Active', $names);
         $this->assertNotContains('Inactive', $names);
     }
 
     /** @test */
     public function top_packages_returns_empty_arrays_when_no_packages_exist(): void
     {
-        $response = $this->getJson('/api/home');
+        $response = $this->homeAsProvider();
 
         $response->assertStatus(200);
         $this->assertSame([], $response->json('property_packages'));
@@ -93,12 +104,12 @@ class PackageDiscoveryTest extends TestCase
     public function home_includes_statistics_for_authenticated_provider(): void
     {
         $provider = $this->makeUser('provider');
-        $token    = $provider->createToken('test')->plainTextToken;
+        $token = $provider->createToken('test')->plainTextToken;
 
         $response = $this->withToken($token)->getJson('/api/home');
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['property_packages', 'ad_packages', 'statistics']);
+            ->assertJsonStructure(['property_packages', 'ad_packages', 'statistics']);
 
         $this->assertNotNull($response->json('statistics'));
     }
@@ -107,7 +118,7 @@ class PackageDiscoveryTest extends TestCase
     public function home_does_not_include_statistics_for_customer(): void
     {
         $customer = $this->makeUser('customer');
-        $token    = $customer->createToken('test')->plainTextToken;
+        $token = $customer->createToken('test')->plainTextToken;
 
         $response = $this->withToken($token)->getJson('/api/home');
 
@@ -140,10 +151,10 @@ class PackageDiscoveryTest extends TestCase
         $provider = $this->makeUser('provider');
 
         $response = $this->actingAs($provider, 'sanctum')
-                         ->getJson('/api/package-activation-keys');
+            ->getJson('/api/package-activation-keys');
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['property_package_activation', 'ad_package_activation']);
+            ->assertJsonStructure(['property_package_activation', 'ad_package_activation']);
 
         $this->assertIsBool($response->json('property_package_activation'));
         $this->assertIsBool($response->json('ad_package_activation'));
@@ -155,11 +166,11 @@ class PackageDiscoveryTest extends TestCase
         $customer = $this->makeUser('customer');
 
         $response = $this->actingAs($customer, 'sanctum')
-                         ->getJson('/api/package-activation-keys');
+            ->getJson('/api/package-activation-keys');
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['ad_package_activation'])
-                 ->assertJsonMissing(['property_package_activation']);
+            ->assertJsonStructure(['ad_package_activation'])
+            ->assertJsonMissing(['property_package_activation']);
 
         $this->assertIsBool($response->json('ad_package_activation'));
     }
@@ -170,7 +181,7 @@ class PackageDiscoveryTest extends TestCase
         $provider = $this->makeUser('provider'); // no subscriptions
 
         $response = $this->actingAs($provider, 'sanctum')
-                         ->getJson('/api/package-activation-keys');
+            ->getJson('/api/package-activation-keys');
 
         $this->assertFalse($response->json('property_package_activation'));
         $this->assertFalse($response->json('ad_package_activation'));
@@ -184,7 +195,7 @@ class PackageDiscoveryTest extends TestCase
         Subscription::create(['user_id' => $provider->id, 'type' => 'property', 'package_id' => $pp->id, 'status' => 'active', 'count' => 5]);
 
         $response = $this->actingAs($provider, 'sanctum')
-                         ->getJson('/api/package-activation-keys');
+            ->getJson('/api/package-activation-keys');
 
         $this->assertTrue($response->json('property_package_activation'));
         $this->assertFalse($response->json('ad_package_activation'));
@@ -199,7 +210,7 @@ class PackageDiscoveryTest extends TestCase
         Subscription::create(['user_id' => $provider->id, 'type' => 'property', 'package_id' => $pp->id, 'status' => 'active', 'count' => 0]);
 
         $response = $this->actingAs($provider, 'sanctum')
-                         ->getJson('/api/package-activation-keys');
+            ->getJson('/api/package-activation-keys');
 
         $this->assertFalse($response->json('property_package_activation'),
             'Exhausted subscription must not be counted as active');
@@ -226,10 +237,10 @@ class PackageDiscoveryTest extends TestCase
         Subscription::create(['user_id' => $provider->id, 'type' => 'ad',       'package_id' => $ap->id, 'status' => 'active', 'count' => 5]);
 
         $response = $this->actingAs($provider, 'sanctum')
-                         ->getJson('/api/user-subscriptions');
+            ->getJson('/api/user-subscriptions');
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['property_subscriptions', 'ad_subscriptions']);
+            ->assertJsonStructure(['property_subscriptions', 'ad_subscriptions']);
 
         $this->assertCount(1, $response->json('property_subscriptions'));
         $this->assertCount(1, $response->json('ad_subscriptions'));
@@ -243,11 +254,11 @@ class PackageDiscoveryTest extends TestCase
         Subscription::create(['user_id' => $customer->id, 'type' => 'ad', 'package_id' => $ap->id, 'status' => 'active', 'count' => 5]);
 
         $response = $this->actingAs($customer, 'sanctum')
-                         ->getJson('/api/user-subscriptions');
+            ->getJson('/api/user-subscriptions');
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['ad_subscriptions'])
-                 ->assertJsonMissing(['property_subscriptions']);
+            ->assertJsonStructure(['ad_subscriptions'])
+            ->assertJsonMissing(['property_subscriptions']);
 
         $this->assertCount(1, $response->json('ad_subscriptions'));
     }
@@ -263,7 +274,7 @@ class PackageDiscoveryTest extends TestCase
         Subscription::create(['user_id' => $provider2->id, 'type' => 'property', 'package_id' => $pp->id, 'status' => 'active', 'count' => 5]);
 
         $response = $this->actingAs($provider1, 'sanctum')
-                         ->getJson('/api/user-subscriptions');
+            ->getJson('/api/user-subscriptions');
 
         $this->assertCount(1, $response->json('property_subscriptions'),
             'Must only return the authenticated user\'s own subscriptions');
@@ -276,15 +287,15 @@ class PackageDiscoveryTest extends TestCase
         $pp = PropertyPackage::create(['name' => 'PP', 'type' => 'count', 'count' => 5, 'price' => 100, 'status' => 'active']);
 
         $sub = Subscription::create([
-            'user_id'    => $provider->id,
-            'type'       => 'property',
+            'user_id' => $provider->id,
+            'type' => 'property',
             'package_id' => $pp->id,
-            'status'     => 'active',
-            'count'      => 0, // exhausted — isExpiredByRules() will return true
+            'status' => 'active',
+            'count' => 0, // exhausted — isExpiredByRules() will return true
         ]);
 
         $response = $this->actingAs($provider, 'sanctum')
-                         ->getJson('/api/user-subscriptions');
+            ->getJson('/api/user-subscriptions');
 
         $this->assertEquals('inactive', $response->json('property_subscriptions.0.status'),
             'Exhausted subscription must be returned with status=inactive');
@@ -300,12 +311,20 @@ class PackageDiscoveryTest extends TestCase
     private function makeUser(string $type): User
     {
         return User::create([
-            'name'     => ucfirst($type),
-            'email'    => $type.uniqid().'@e.com',
-            'phone'    => '05'.rand(10000000, 99999999),
+            'name' => ucfirst($type),
+            'email' => $type.uniqid().'@e.com',
+            'phone' => '05'.rand(10000000, 99999999),
             'password' => bcrypt('x'),
-            'status'   => 'active',
-            'type'     => $type,
+            'status' => 'active',
+            'type' => $type,
         ]);
+    }
+
+    /** GET /api/home as an authenticated provider — the audience that receives packages. */
+    private function homeAsProvider()
+    {
+        $token = $this->makeUser('provider')->createToken('test')->plainTextToken;
+
+        return $this->withToken($token)->getJson('/api/home');
     }
 }

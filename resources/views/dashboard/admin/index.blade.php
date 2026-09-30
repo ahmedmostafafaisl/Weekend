@@ -197,7 +197,7 @@
         // Most profitable places
         const container = document.getElementById('statPlaces');
         if (!s.most_profitable_places.places.length) {
-            container.innerHTML = '<div class="text-muted small text-center py-3">لا توجد بيانات لهذا الشهر</div>';
+            container.innerHTML = '<div class="text-muted small text-center py-3">' + @json(__('lang.no_data_this_month')) + '</div>';
             return;
         }
         container.innerHTML = s.most_profitable_places.places.map(p => `

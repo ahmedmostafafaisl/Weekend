@@ -32,6 +32,11 @@ class Department extends Model
         'ownership',
     ];
 
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');

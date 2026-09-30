@@ -2,10 +2,9 @@
 
 namespace App\Repositories\Packages;
 
-
-
 use App\Models\AdPackage;
 use App\Repositories\Interfaces\AdPackageInterface;
+use App\Support\SafeUpload;
 
 class AdPackageRepository implements AdPackageInterface
 {
@@ -23,18 +22,9 @@ class AdPackageRepository implements AdPackageInterface
     {
         if (isset($data['image']) && is_file($data['image'])) {
             $image = request()->file('image');
-            $path = public_path("Packages/Ad_packages");
-
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->move($path, $imageName);
-
-            // Save the relative path to DB
-            $data['image'] = "Packages/Ad_packages/{$imageName}";
+            $data['image'] = SafeUpload::store($image, 'Packages/Ad_packages', SafeUpload::IMAGES, 'image');
         }
+
         return AdPackage::create($data);
     }
 
@@ -43,25 +33,17 @@ class AdPackageRepository implements AdPackageInterface
         $ad = $this->find($id);
         if (isset($data['image']) && is_file($data['image'])) {
             $image = request()->file('image');
-            $path = public_path("Packages/Ad_packages");
-
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->move($path, $imageName);
-
-            // Save the relative path to DB
-            $data['image'] = "Packages/Ad_packages/{$imageName}";
+            $data['image'] = SafeUpload::store($image, 'Packages/Ad_packages', SafeUpload::IMAGES, 'image');
         }
         $ad->update($data);
+
         return $ad;
     }
 
     public function delete($id)
     {
         $ad = $this->find($id);
+
         return $ad->delete();
     }
 }

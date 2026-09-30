@@ -42,32 +42,6 @@ class Unite extends Model
         return $this->hasOne(UniteDetail::class, 'unite_id');
     }
 
-    /**
-     * @deprecated Use detail() — kept temporarily so any code still calling
-     * stadiumDetail()/hallDetail()/loungeDetail()/campDetail() (e.g. cached
-     * views, third-party integrations) keeps working during the transition.
-     * All four now point at the same single unite_details row.
-     */
-    public function stadiumDetail()
-    {
-        return $this->detail();
-    }
-
-    public function hallDetail()
-    {
-        return $this->detail();
-    }
-
-    public function loungeDetail()
-    {
-        return $this->detail();
-    }
-
-    public function campDetail()
-    {
-        return $this->detail();
-    }
-
     public function department()
     {
         return $this->belongsTo(Department::class, 'department_id');

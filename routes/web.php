@@ -88,18 +88,20 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
 require __DIR__.'/auth.php';
 
 // Homepage settings — isolated from the rest of the dashboard functionality.
+// Previously any authenticated admin (including read-only reviewer/viewer
+// roles) could rewrite the public landing page.
 Route::prefix('admin/homepage')->name('admin.homepage.')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::get('/', [HomePageSettingController::class, 'edit'])->name('edit');
-    Route::put('/', [HomePageSettingController::class, 'update'])->name('update');
-    Route::post('/slides', [HomePageSettingController::class, 'storeSlide'])->name('slides.store');
-    Route::put('/slides/{slide}', [HomePageSettingController::class, 'updateSlide'])->name('slides.update');
-    Route::delete('/slides/{slide}', [HomePageSettingController::class, 'destroySlide'])->name('slides.destroy');
+    Route::get('/', [HomePageSettingController::class, 'edit'])->name('edit')->middleware('permission:homepage.view');
+    Route::put('/', [HomePageSettingController::class, 'update'])->name('update')->middleware('permission:homepage.update');
+    Route::post('/slides', [HomePageSettingController::class, 'storeSlide'])->name('slides.store')->middleware('permission:homepage.create');
+    Route::put('/slides/{slide}', [HomePageSettingController::class, 'updateSlide'])->name('slides.update')->middleware('permission:homepage.update');
+    Route::delete('/slides/{slide}', [HomePageSettingController::class, 'destroySlide'])->name('slides.destroy')->middleware('permission:homepage.delete');
 });
 
 Route::prefix('admin')->name('admin.')->group(function () {
 
     // Provider statistics proxy — admin views any provider's stats
-    Route::middleware(['admin'])->get('/api/provider-statistics/{provider}', function (\Illuminate\Http\Request $request, $provider) {
+    Route::middleware(['admin', 'permission:reports.view'])->get('/api/provider-statistics/{provider}', function (\Illuminate\Http\Request $request, $provider) {
         $user = \App\Models\User::where('type', 'provider')->findOrFail($provider);
         $request->merge(['_provider_user' => $user]);
 
@@ -141,16 +143,20 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin.guard'])->group(functio
         ->middleware('permission:unites.update');
 });
 
+// Venue CRUD — the unites.* permissions already existed but were never
+// applied here, so a reviewer (intended: reservations.view only) could
+// create, edit and delete venues. 'create' is registered before the
+// {unite} wildcard so it is not captured as an id.
 Route::prefix('admin')->middleware(['auth:admin', 'admin.guard'])->group(function () {
-    Route::resource('unites', UniteController::class)->names([
-        'index' => 'unites.index',
-        'create' => 'unites.create',
-        'store' => 'unites.store',
-        'show' => 'unites.show',
-        'edit' => 'unites.edit',
-        'update' => 'unites.update',
+    $names = [
+        'index' => 'unites.index', 'create' => 'unites.create', 'store' => 'unites.store',
+        'show' => 'unites.show', 'edit' => 'unites.edit', 'update' => 'unites.update',
         'destroy' => 'unites.destroy',
-    ]);
+    ];
+    Route::resource('unites', UniteController::class)->only(['create', 'store'])->names($names)->middleware('permission:unites.create');
+    Route::resource('unites', UniteController::class)->only(['index', 'show'])->names($names)->middleware('permission:unites.view');
+    Route::resource('unites', UniteController::class)->only(['edit', 'update'])->names($names)->middleware('permission:unites.update');
+    Route::resource('unites', UniteController::class)->only(['destroy'])->names($names)->middleware('permission:unites.delete');
 });
 // Route::resource('unite_offers', UniteOfferController::class);
 
@@ -205,19 +211,22 @@ Route::prefix('admin/service-fees')->middleware(['auth:admin', 'admin.guard'])->
 });
 
 // Application settings — boolean flags (free-trial toggles, subscription gates).
-// Restricted to super-admin: these flags affect ALL providers immediately.
-Route::resource('admin/app-settings', \App\Http\Controllers\Admin\Settings\AppSettingController::class)
-    ->middleware(['auth:admin', 'admin.guard'])
-    ->names([
-        'index' => 'admin.app-settings.index',
-        'create' => 'admin.app-settings.create',
-        'store' => 'admin.app-settings.store',
-        'show' => 'admin.app-settings.show',
-        'edit' => 'admin.app-settings.edit',
-        'update' => 'admin.app-settings.update',
+// These flags affect ALL providers immediately. The comment here used to say
+// "restricted to super-admin", but no check existed: any admin could flip them.
+Route::middleware(['auth:admin', 'admin.guard'])->group(function () {
+    $ctrl = \App\Http\Controllers\Admin\Settings\AppSettingController::class;
+    $names = [
+        'index' => 'admin.app-settings.index', 'create' => 'admin.app-settings.create',
+        'store' => 'admin.app-settings.store', 'show' => 'admin.app-settings.show',
+        'edit' => 'admin.app-settings.edit', 'update' => 'admin.app-settings.update',
         'destroy' => 'admin.app-settings.destroy',
-    ])
-    ->parameters(['app-settings' => 'appSetting']);
+    ];
+    $params = ['app-settings' => 'appSetting'];
+    Route::resource('admin/app-settings', $ctrl)->only(['create', 'store'])->names($names)->parameters($params)->middleware('permission:app_settings.create');
+    Route::resource('admin/app-settings', $ctrl)->only(['index', 'show'])->names($names)->parameters($params)->middleware('permission:app_settings.view');
+    Route::resource('admin/app-settings', $ctrl)->only(['edit', 'update'])->names($names)->parameters($params)->middleware('permission:app_settings.update');
+    Route::resource('admin/app-settings', $ctrl)->only(['destroy'])->names($names)->parameters($params)->middleware('permission:app_settings.delete');
+});
 Route::get('/payment-failed', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'failed'])->name('payment.failed');
 Route::get('/payment-cancelled', [\App\Http\Controllers\Admin\Payment\PaymentController::class, 'cancelled'])->name('payment.cancelled');
 

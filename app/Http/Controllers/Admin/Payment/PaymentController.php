@@ -32,7 +32,7 @@ class PaymentController extends Controller
         try {
             $gateway = PaymentMethodFactory::make($method);
         } catch (\InvalidArgumentException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return response()->json(['success' => false, 'message' => \App\Support\ClientError::message($e)], 422);
         }
 
         $result = $gateway->sendPayment($request);
@@ -111,6 +111,19 @@ class PaymentController extends Controller
 
     public function index(Request $request): JsonResponse|View
     {
+        // API customers/providers only ever see their own payments. The same
+        // action backs the admin dashboard (auth:admin + permission:payments.view),
+        // where the authenticated model is Admin, not User — admins keep the
+        // platform-wide list. Previously any logged-in app user could list
+        // every payment on the platform.
+        if ($this->isAppUser($request)) {
+            $payments = $this->paymentRepository->providerPayments($request->only([
+                'status', 'reference_id', 'phone',
+            ]));
+
+            return response()->json(['data' => PaymentResource::collection($payments)]);
+        }
+
         $payments = $this->paymentRepository->paginate($request->only([
             'status', 'payment_type', 'reference_id', 'phone',
         ]));
@@ -123,6 +136,11 @@ class PaymentController extends Controller
     public function show(int $id, Request $request): JsonResponse|View
     {
         $payment = $this->paymentRepository->findOrFail($id);
+
+        // App users may only view their own payment (was: any payment by id).
+        if ($this->isAppUser($request) && $payment->user_id !== $request->user()->id) {
+            abort(404);
+        }
 
         return $request->expectsJson()
             ? response()->json(['data' => new PaymentResource($payment)])
@@ -180,13 +198,39 @@ class PaymentController extends Controller
 
     public function success(Request $request)
     {
-        // dd('Payment successful callback hit', $request->all());
-        if ($request->input('payment_type') == 'tabby') {
+        if ($request->input('payment_type') === 'tabby') {
             return $this->tabbyPaymentService->handleSuccessRedirect($request);
-        } elseif ($request->input('payment_type') == 'tamara') {
+        }
+
+        if ($request->input('payment_type') === 'tamara') {
             return $this->tamaraPaymentService->handleSuccessRedirect($request);
         }
 
+        // Geidea / Maysar return here after checkout. Fulfillment itself is
+        // done by the server-to-server callback — this page only reflects the
+        // current state. Previously it returned an empty response.
+        $referenceId = $request->input('reference_id') ?? $request->input('merchantReferenceId');
+        $payment = $referenceId
+            ? Payment::where('reference_id', $referenceId)->latest('id')->first()
+            : null;
+
+        $totalAmount = (float) ($payment?->amount ?? 0);
+        $priceWithoutTax = $totalAmount > 0 ? round($totalAmount / 1.15, 2) : 0;
+
+        return view('Payment.result', [
+            'status' => $payment?->status === 'paid' ? 'paid' : ($payment?->status ?? 'pending'),
+            'payment_type' => $payment?->payment_type ?? $request->input('payment_type', 'geidea'),
+            'payment' => $payment,
+            'phone' => $payment?->phone,
+            'priceWithoutTax' => $priceWithoutTax,
+            'taxAmount' => round($totalAmount - $priceWithoutTax, 2),
+        ]);
+    }
+
+    /** True for sanctum app users (customers/providers), false for dashboard admins. */
+    private function isAppUser(Request $request): bool
+    {
+        return $request->user() instanceof \App\Models\User;
     }
 
     public function failed(Request $request)
@@ -234,7 +278,7 @@ class PaymentController extends Controller
 
         if ($payment && $payment->status === 'pending') {
             // ── Mark payment as failed/cancelled ─────────────────────────────
-            $payment->update(['status' => $outcome === 'cancelled' ? 'failed' : 'failed']);
+            $payment->update(['status' => 'failed']);
 
             // ── Revert reservation to pending so the customer can retry ───────
             $reservation = $payment->reservation

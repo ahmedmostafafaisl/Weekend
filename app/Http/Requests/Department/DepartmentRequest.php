@@ -57,8 +57,8 @@ class DepartmentRequest extends FormRequest
             'tiktok' => 'nullable|string',
             'user_id' => $this->isApi() ? 'nullable|exists:users,id' : 'required|exists:users,id',
             'images' => ['nullable', 'array'],
-            'images.*' => ['image', 'mimes:jpeg,png,jpg,gif,svg,webp', 'max:2048'],
-            'sak_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg,webp', 'max:2048'],
+            'images.*' => ['image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            'sak_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
             'ownership' => ['nullable', 'in:0,1,2'],
         ];
     }

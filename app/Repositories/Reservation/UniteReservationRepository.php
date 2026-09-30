@@ -201,7 +201,7 @@ class UniteReservationRepository implements UniteReservationInterface
                 'price' => $chargeAmount,
                 'quantity' => 1,
                 'description' => $unite->name.' — '.$data['reservation_date'],
-                'currency' => env('GEIDEA_CURRENCY'),
+                'currency' => config('services.geidea.currency', 'SAR'),
 
                 // merchantReferenceId ties the callback back to our Payment row
                 'merchantReferenceId' => $payment->reference_id,
@@ -241,7 +241,6 @@ class UniteReservationRepository implements UniteReservationInterface
                     $userId
                 );
             }
-            // dd($gatewayResult['payment_url']);
 
             return [
                 'reservation' => $reservation->load(['user', 'unite', 'payment']),
@@ -556,7 +555,7 @@ class UniteReservationRepository implements UniteReservationInterface
             'price' => $payment->amount,
             'quantity' => 1,
             'description' => $reservation->unite->name.' — '.$reservation->reservation_date->format('Y-m-d'),
-            'currency' => env('GEIDEA_CURRENCY'),
+            'currency' => config('services.geidea.currency', 'SAR'),
             'payment_id' => $payment->id,
             'reference' => $payment->reference_id,
             'email' => $user?->email,
@@ -652,7 +651,7 @@ class UniteReservationRepository implements UniteReservationInterface
     // Private: slot resolution
     // -------------------------------------------------------------------------
 
-    protected function resolveTimes(Unite $unite, array $data): array
+    public function resolveTimes(Unite $unite, array $data): array
     {
         // Centralized reservation-level enforcement — replaces the old
         // stadium-only check with the general matrix from
@@ -797,7 +796,7 @@ class UniteReservationRepository implements UniteReservationInterface
      * is correctly applied only to those specific days, not the whole
      * stay at one rate.
      */
-    protected function resolveFullDayRangePrice(Unite $unite, string $startDate, string $endDate): float
+    public function resolveFullDayRangePrice(Unite $unite, string $startDate, string $endDate): float
     {
         $total = 0.0;
 
@@ -891,7 +890,7 @@ class UniteReservationRepository implements UniteReservationInterface
         return (float) $package->price;
     }
 
-    protected function resolvePrice(Unite $unite, string $periodType, string $date): float
+    public function resolvePrice(Unite $unite, string $periodType, string $date): float
     {
         $reservationDate = Carbon::parse($date);
 
@@ -1046,7 +1045,7 @@ class UniteReservationRepository implements UniteReservationInterface
      * UnitePrice::calculateHourlyPrice() to split the time range
      * at the day/night boundary.
      */
-    protected function resolveHourlyPrice(
+    public function resolveHourlyPrice(
         Unite $unite,
         string $fromTime,
         string $toTime,

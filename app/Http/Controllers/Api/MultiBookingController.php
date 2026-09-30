@@ -229,7 +229,7 @@ class MultiBookingController extends Controller
             try {
                 [$fromTime, $toTime, $endDate, $bufferMinutes] = $this->repo->resolveTimes($unite, $data);
             } catch (\RuntimeException $e) {
-                return response()->json(['message' => $e->getMessage()], 422);
+                return response()->json(['message' => \App\Support\ClientError::message($e)], 422);
             }
 
             // Conflict check per unite — correct parameter order:
@@ -255,7 +255,7 @@ class MultiBookingController extends Controller
                     $price = $this->repo->resolvePrice($unite, $data['period_type'], $data['reservation_date']);
                 }
             } catch (\RuntimeException $e) {
-                return response()->json(['message' => $e->getMessage()], 422);
+                return response()->json(['message' => \App\Support\ClientError::message($e)], 422);
             }
 
             $resolvedUnites[] = compact('unite', 'fromTime', 'toTime', 'endDate', 'bufferMinutes', 'price');
@@ -397,7 +397,7 @@ class MultiBookingController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ], 422);
         }
 

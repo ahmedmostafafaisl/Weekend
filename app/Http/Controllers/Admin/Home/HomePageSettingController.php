@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\HomeSetting;
 use App\Models\HomeSlide;
 use App\Models\Unite;
+use App\Support\SafeUpload;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 
 class HomePageSettingController extends Controller
 {
@@ -145,13 +145,7 @@ class HomePageSettingController extends Controller
 
     private function storeImage($file, string $directory): string
     {
-        $dir = public_path($directory);
-        File::ensureDirectoryExists($dir);
-        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-        $name = now()->format('YmdHis').'_'.bin2hex(random_bytes(5)).'.'.$extension;
-        $file->move($dir, $name);
-
-        return trim($directory, '/').'/'.$name;
+        return SafeUpload::store($file, $directory, SafeUpload::IMAGES, 'image');
     }
 
     private function deletePublicFile(?string $relativePath): void

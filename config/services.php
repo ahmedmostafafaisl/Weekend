@@ -34,7 +34,7 @@ return [
     'geidea' => [
         // KSA: https://api.ksamerchant.geidea.net  |  EGY: https://api.merchant.geidea.net
         'base_url' => env('GEIDEA_BASE_URL', 'https://api.merchant.geidea.net'),
-        'currency' => env('GEIDEA_CURRENCY', env('GEIDEA_CURRENCY')),  // SAR for KSA, EGP for Egypt
+        'currency' => env('GEIDEA_CURRENCY', 'SAR'),  // SAR for KSA, EGP for Egypt
         'api_key' => env('GEIDEA_API_KEY'),
         'api_password' => env('GEIDEA_API_PASSWORD'),
         'webhook_secret' => env('GEIDEA_WEBHOOK_SECRET'),
@@ -53,6 +53,22 @@ return [
     'maysar' => [
         'api_key' => env('MOYASAR_API_KEY', ''),
         'base_url' => env('MOYASAR_BASE_URL', 'https://api.maysar.sa/v1'),
+    ],
+
+    // Tabby / Tap. Read through config() rather than env() in the service
+    // constructors: under `php artisan config:cache` Laravel stops loading
+    // .env, so env() silently fell back to '' and every BNPL request was sent
+    // with an empty secret key. Env names are unchanged (TAPPY_* still honoured).
+    'tabby' => [
+        'public_key' => env('TABBY_PUBLIC_KEY', env('TAPPY_PUBLIC_KEY', '')),
+        'secret_key' => env('TABBY_SECRET_KEY', env('TAPPY_SECRET_KEY', '')),
+        'base_url' => env('TABBY_BASE_URL', env('TAPPY_BASE_URL', 'https://api.tabby.sa/api/v2/')),
+        'merchant_code' => env('TABBY_MERCHANT_CODE', 'Naqiappsau'),
+    ],
+
+    'tamara' => [
+        'api_token' => env('TAMARA_API_TOKEN', ''),
+        'base_url' => env('TAMARA_BASE_URL', 'https://api.tamara.co'),
     ],
 
     'fcm' => [

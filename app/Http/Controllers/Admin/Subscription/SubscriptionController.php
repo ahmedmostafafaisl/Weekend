@@ -66,7 +66,7 @@ class SubscriptionController extends Controller
             return SubscriptionResource::collection($subscriptions);
         }
 
-        $users = User::all();
+        $users = $this->userOptions();
         $adPackages = AdPackage::where('status', 'active')->get();
         $propertyPackages = PropertyPackage::where('status', 'active')->get();
 
@@ -180,7 +180,7 @@ class SubscriptionController extends Controller
                 ];
             });
         } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return response()->json(['success' => false, 'message' => \App\Support\ClientError::message($e)], 422);
         }
 
         $this->bumpCacheVersion('my_subscriptions');
@@ -221,7 +221,7 @@ class SubscriptionController extends Controller
 
     public function create()
     {
-        $users = User::all();
+        $users = $this->userOptions();
         $adPackages = AdPackage::where('status', 'active')->get();
         $propertyPackages = PropertyPackage::where('status', 'active')->get();
 
@@ -231,7 +231,7 @@ class SubscriptionController extends Controller
     public function edit($id)
     {
         $subscription = Subscription::findOrFail($id);
-        $users = User::all();
+        $users = $this->userOptions();
         $adPackages = AdPackage::where('status', 'active')->get();
         $propertyPackages = PropertyPackage::where('status', 'active')->get();
 
@@ -315,5 +315,18 @@ class SubscriptionController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Owner dropdown options. Was User::all(): every column of every user
+     * (password hashes, identity-document paths, FCM tokens…) hydrated into
+     * full models on each page load. The select only needs these four.
+     */
+    private function userOptions()
+    {
+        return User::query()
+            ->select(['id', 'name', 'email', 'type'])
+            ->orderBy('name')
+            ->get();
     }
 }

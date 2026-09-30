@@ -46,7 +46,11 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Minutes. Default null (tokens never expire) is unchanged, so existing
+    // mobile sessions are not logged out on deploy. A stolen token otherwise
+    // stays valid forever; set e.g. SANCTUM_EXPIRATION=43200 (30 days) and
+    // schedule `php artisan sanctum:prune-expired --hours=24`.
+    'expiration' => env('SANCTUM_EXPIRATION') !== null ? (int) env('SANCTUM_EXPIRATION') : null,
 
     /*
     |--------------------------------------------------------------------------

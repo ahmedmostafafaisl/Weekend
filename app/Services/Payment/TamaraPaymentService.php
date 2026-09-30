@@ -27,8 +27,8 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
     public function __construct()
     {
-        $this->token = env('TAMARA_API_TOKEN', '');
-        $this->baseUrl = env('TAMARA_BASE_URL', 'https://api.tamara.co');
+        $this->token = (string) config('services.tamara.api_token', '');
+        $this->baseUrl = (string) config('services.tamara.base_url', 'https://api.tamara.co');
         $this->notifyUrl = url('/api/tamara/callback');
 
         $this->client = new Client([
@@ -175,7 +175,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
             return ['success' => false, 'message' => $body['message'] ?? 'Tamara checkout failed.'];
         } catch (\Throwable $e) {
 
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -233,19 +233,42 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
                 $payment->update(['payment_id' => $orderId]);
             }
 
-            // ── Authorize → Capture flow ──────────────────────────────────────
-            if ($orderId) {
-                $statusResponse = $this->getOrderStatus($orderId);
-                $tamaraStatus = $statusResponse['status'] ?? null;
+            // ── Verify with Tamara's API — never trust the webhook body ───────
+            // Previously a body carrying only order_reference_id skipped this
+            // block entirely and fell through to "mark paid", so anyone could
+            // POST {"order_reference_id":"PAY-..."} and confirm a booking.
+            $orderId = $orderId ?: $payment->payment_id;
 
-                if ($tamaraStatus === 'approved') {
-                    $authResponse = $this->authorizeOrder($orderId);
-                    $tamaraStatus = $authResponse['status'] ?? $tamaraStatus;
-                }
+            if (! $orderId) {
+                Log::warning('Tamara callback: no Tamara order id to verify — ignored', [
+                    'payment_id' => $payment->id,
+                ]);
 
-                if (in_array($tamaraStatus, ['authorised', 'authorized'])) {
-                    $this->captureOrder($payment->reference_id, $orderId);
-                }
+                return false;
+            }
+
+            $statusResponse = $this->getOrderStatus($orderId);
+            $tamaraStatus = $statusResponse['status'] ?? null;
+
+            if ($tamaraStatus === 'approved') {
+                $authResponse = $this->authorizeOrder($orderId);
+                $tamaraStatus = $authResponse['status'] ?? $tamaraStatus;
+            }
+
+            if (in_array($tamaraStatus, ['authorised', 'authorized'], true)) {
+                $this->captureOrder($payment->reference_id, $orderId);
+                // captureOrder() reports success even on a non-2xx response,
+                // so re-read the real order status rather than assuming.
+                $tamaraStatus = $this->getOrderStatus($orderId)['status'] ?? $tamaraStatus;
+            }
+
+            if (! in_array($tamaraStatus, ['fully_captured', 'captured', 'partially_captured'], true)) {
+                Log::info('Tamara callback: order not captured — payment left unchanged', [
+                    'payment_id' => $payment->id,
+                    'tamara_status' => $tamaraStatus,
+                ]);
+
+                return false;
             }
 
             // ── Mark paid + activate reservation or subscription ──────────────
@@ -262,7 +285,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
         } catch (\Throwable $e) {
             Log::error('Tamara callback error', [
-                'error' => $e->getMessage(),
+                'error' => \App\Support\ClientError::message($e),
                 'order_id' => $orderId,
                 'reference_id' => $referenceId,
             ]);
@@ -278,7 +301,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
             return ['success' => $r->successful(), 'data' => $r->json()];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -289,7 +312,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
             return $r->json();
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -303,7 +326,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
             return ['success' => $r->successful(), 'data' => $r->json()];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -441,7 +464,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
         } catch (\Exception $e) {
             return [
                 'error' => true,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ];
         }
 
@@ -531,7 +554,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
 
             return [
                 'error' => true,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ];
         }
     }
@@ -545,7 +568,7 @@ class TamaraPaymentService extends BasePaymentService implements PaymentGatewayI
         } catch (\Exception $e) {
             return [
                 'error' => true,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ];
         }
     }

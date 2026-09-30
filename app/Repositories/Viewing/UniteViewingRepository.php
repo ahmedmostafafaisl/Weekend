@@ -153,7 +153,7 @@ class UniteViewingRepository
                 'price' => $depositAmount,
                 'quantity' => 1,
                 'description' => $unite->name.' — '.__('lang.viewing_deposit').' — '.$data['viewing_date'],
-                'currency' => env('GEIDEA_CURRENCY'),
+                'currency' => config('services.geidea.currency', 'SAR'),
                 'merchantReferenceId' => $payment->reference_id,
                 'customer' => [
                     'name' => $user?->name ?? 'Customer',

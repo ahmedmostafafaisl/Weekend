@@ -1,22 +1,40 @@
+# ── Upload hardening ───────────────────────────────────────────────────────
+# User uploads live under public/. Only the front controller may execute:
+# any other PHP-family file (e.g. an uploaded "shell.php") is refused, and
+# HTML/SVG are forced to download instead of rendering same-origin.
+# NOTE: .htaccess is Apache-only — on Nginx add the equivalent, e.g.
+#   location ~* ^/(?!index\.php$).*\.(php\d?|phtml|phar|phps)$ { deny all; }
+<FilesMatch "\.(php[0-9]?|phtml|phar|phps|pht)$">
+    Require all denied
+</FilesMatch>
+<Files "index.php">
+    Require all granted
+</Files>
+<IfModule mod_headers.c>
+    <FilesMatch "\.(svg|html?|xhtml|shtml)$">
+        Header set Content-Disposition "attachment"
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
-Options +FollowSymLinks
-RewriteEngine On
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
 
-RewriteCond %{REQUEST_URI} !^/public/ 
+    RewriteEngine On
 
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME} !-f
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
 
-
-RewriteRule ^(.*)$ /public/$1 
-#RewriteRule ^ index.php [L]
-RewriteRule ^(/)?$ public/index.php [L] 
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
 </IfModule>
-
-# php -- BEGIN cPanel-generated handler, do not edit
-# Set the “ea-php82” package as the default “PHP” programming language.
-<IfModule mime_module>
-  AddHandler application/x-httpd-ea-php82 .php .php8 .phtml
-</IfModule>
-# php -- END cPanel-generated handler, do not edit

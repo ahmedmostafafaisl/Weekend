@@ -69,6 +69,10 @@ class AdminRolesPermissionsSeeder extends Seeder
             'services',
             'suggestions',
             'notifications',
+
+            // ── Site configuration ────────────────────────────────────────────
+            'app_settings',
+            'homepage',
         ];
 
         $actions = ['view', 'create', 'update', 'delete'];

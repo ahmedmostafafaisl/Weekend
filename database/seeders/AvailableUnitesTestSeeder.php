@@ -72,8 +72,10 @@ class AvailableUnitesTestSeeder extends Seeder
         $this->command->info('');
         $this->command->info('  Collection variables:');
         $this->command->info('    dept_id      = '.self::DEPT_ID.'  ('.$dept->name.')');
-        $this->command->info('    unite_id_2   = '.self::UNITE_ID_2.'  (صالة الواحة — 300 SAR '.self::PERIOD.')');
-        $this->command->info('    unite_id_3   = '.self::UNITE_ID_3.'  (صالة فيلا الغروب — 300 SAR '.self::PERIOD.')');
+        foreach (['unite_id_2' => self::UNITE_ID_2, 'unite_id_3' => self::UNITE_ID_3] as $var => $uid) {
+            $unite = Unite::find($uid);
+            $this->command->info(sprintf('    %-12s = %d  (%s — %s SAR %s)', $var, $uid, $unite->name, $this->priceFor($uid, $testDate), self::PERIOD));
+        }
         $this->command->info('    booking_date = '.$testDate.'  (today+'.self::DATE_OFFSET.')');
         $this->command->info('    period_type  = '.self::PERIOD);
         $this->command->info('');
@@ -84,6 +86,20 @@ class AvailableUnitesTestSeeder extends Seeder
         $this->command->info('  Expected: 2 units returned (IDs '.self::UNITE_ID_2.' and '.self::UNITE_ID_3.')');
         $this->command->info('  Multi-booking POST /api/multi-booking with these IDs should succeed.');
         $this->command->info('');
+    }
+
+    /** Actual seeded price for the test date (day category depends on the weekday). */
+    private function priceFor(int $uniteId, string $date): string
+    {
+        $dayCategory = match (strtolower(Carbon::parse($date)->englishDayOfWeek)) {
+            'thursday' => 'thursday',
+            'friday' => 'friday',
+            'saturday' => 'saturday',
+            default => 'week_day',
+        };
+        $price = UnitePrice::where('unite_id', $uniteId)->where('day', $dayCategory)->value('morning_price');
+
+        return $price !== null ? number_format((float) $price, 0) : '?';
     }
 
     private function validate(string $testDate): array

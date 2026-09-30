@@ -15,7 +15,7 @@
     $showPropertyPackages = $me && $me->can('property_packages.view');
     $showAdPackages       = $me && $me->can('ad_packages.view');
     $showSubscriptions    = $me && $me->can('subscriptions.view');
-    $showUnits            = $me && $me->can('units.view');
+    $showUnits            = $me && $me->can('unites.view'); // matches the permission the unites routes enforce
     $showPayments         = $me && $me->can('payments.view');
     $showTransfers        = $me && $me->can('transfers.view');
     // BUG FIX: these three used a hardcoded role-name check (or, for
@@ -32,8 +32,8 @@
     $showReviewers        = $me && $me->can('reviewers.view');
     $showPromoCodes       = $me && $me->can('promo_codes.view');
     $showServiceFees      = $me && $me->can('service_fees.view');
-    $showAppSettings      = (bool) $me; // route already gated by auth:admin + admin.guard
-    $showHomepageSettings = (bool) $me; // homepage settings use the same authenticated admin guard
+    $showAppSettings      = $me && $me->can('app_settings.view');
+    $showHomepageSettings = $me && $me->can('homepage.view');
     $showServiceGroups    = $me && $me->can('service_groups.view');
     $showServices         = $me && $me->can('services.view');
     $showStadiumTypes     = $me && $me->can('stadium_types.view');

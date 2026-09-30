@@ -166,12 +166,56 @@ class PaymentRepository implements PaymentRepositoryInterface
     {
         // Ensure relations are freshly loaded — the $payment object may come
         // from a gateway callback that didn't eager-load anything.
-        $payment->loadMissing(['reservation.unite.department.user', 'subscription']);
+        $payment->loadMissing(['reservation.unite.department.user', 'subscription', 'uniteViewing']);
+
+        // ── Multi-unit booking group ──────────────────────────────────────────
+        // A multi-booking payment has no reservation_id — it is linked from
+        // multi_booking_groups.payment_id and covers N reservations at once.
+        $group = \App\Models\MultiBookingGroup::with(['reservations.user', 'reservations.unite.department.user'])
+            ->where('payment_id', $payment->id)
+            ->first();
+
+        if ($group && $group->status !== 'confirmed') {
+            $group->update(['status' => 'confirmed']);
+
+            foreach ($group->reservations as $groupReservation) {
+                // Never resurrect a reservation that was cancelled meanwhile.
+                if ($groupReservation->status === 'cancelled') {
+                    continue;
+                }
+                $groupReservation->update(['status' => 'confirmed']);
+
+                try {
+                    $groupReservation->user?->notify(
+                        new \App\Notifications\ReservationConfirmed($groupReservation->load('unite', 'payment'))
+                    );
+                    $groupReservation->unite?->department?->user?->notify(
+                        new \App\Notifications\NewReservationReceived($groupReservation->load('user', 'unite', 'payment'))
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('handlePostPayment: multi-booking notification failed', [
+                        'payment_id' => $payment->id,
+                        'group_id' => $group->id,
+                        'reservation_id' => $groupReservation->id,
+                        'error' => \App\Support\ClientError::message($e),
+                    ]);
+                }
+            }
+
+            $this->bumpCacheVersion("unite_reservations_index:{$group->user_id}");
+        }
+
+        // ── Viewing appointment deposit ───────────────────────────────────────
+        $viewing = $payment->uniteViewing;
+
+        if ($viewing && $viewing->status === 'pending') {
+            $viewing->update(['status' => 'confirmed']);
+        }
 
         // ── Reservation ───────────────────────────────────────────────────────
         $reservation = $payment->reservation;
 
-        if ($reservation) {
+        if ($reservation && $reservation->status !== 'cancelled') {
             $reservation->update(['status' => 'confirmed']);
 
             try {
@@ -189,7 +233,7 @@ class PaymentRepository implements PaymentRepositoryInterface
                 \Illuminate\Support\Facades\Log::warning('handlePostPayment: reservation notification failed', [
                     'payment_id' => $payment->id,
                     'reservation_id' => $reservation->id,
-                    'error' => $e->getMessage(),
+                    'error' => \App\Support\ClientError::message($e),
                 ]);
             }
         }
@@ -211,6 +255,17 @@ class PaymentRepository implements PaymentRepositoryInterface
             }
 
             $subscriptionData = ['status' => 'active'];
+
+            // Quota for count-type packages and rate for percentage-type
+            // property packages. Previously only the Geidea path set these,
+            // so count-type subscriptions paid via Tabby/Tamara/Maysar were
+            // left with count = NULL, i.e. unlimited quota that never expired.
+            if ($package?->type === 'count' && $subscription->count === null) {
+                $subscriptionData['count'] = $package->count;
+            }
+            if ($subscription->type === 'property' && $package?->type === 'percentage') {
+                $subscriptionData['percentage'] = $package->percentage;
+            }
 
             // Only set date range for duration-type packages; count-type packages
             // have no expiry by date — they expire when the ad count hits zero.
@@ -236,7 +291,7 @@ class PaymentRepository implements PaymentRepositoryInterface
                 \Illuminate\Support\Facades\Log::warning('handlePostPayment: subscription notification failed', [
                     'payment_id' => $payment->id,
                     'subscription_id' => $subscription->id,
-                    'error' => $e->getMessage(),
+                    'error' => \App\Support\ClientError::message($e),
                 ]);
             }
         }

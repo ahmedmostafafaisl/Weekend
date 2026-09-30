@@ -48,7 +48,7 @@ class UniteReservationController extends Controller
         } catch (\RuntimeException $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => \App\Support\ClientError::message($e),
             ], 422);
         }
 
@@ -59,8 +59,8 @@ class UniteReservationController extends Controller
         return response()->json([
             'success' => true,
             'message' => $result['message'] ?? ($isPendingApproval
-                ? 'Booking request sent to provider. Payment will be taken after approval.'
-                : 'Reservation created. Complete payment to confirm your booking.'),
+                ? __('lang.booking_request_sent_awaiting_payment')
+                : __('lang.reservation_created_complete_payment')),
             'status' => $result['status'] ?? 'pending',
             'data' => [
                 'reservation' => new ReservationResource($result['reservation']),
@@ -141,7 +141,7 @@ class UniteReservationController extends Controller
         $request->validate([
             'status' => ['nullable', 'in:confirmed,pending,cancelled'],
             'payment_status' => ['nullable', 'in:paid,pending,failed,refunded,refund_failed'],
-            'period_type' => ['nullable', 'in:morning,evening,full_day,custom'],
+            'period_type' => ['nullable', 'in:morning,evening,full_day,custom,hourly,package'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'upcoming' => ['nullable', 'boolean'],
@@ -260,7 +260,7 @@ class UniteReservationController extends Controller
         try {
             $result = $this->repo->approve($id, $provider->id);
         } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return response()->json(['success' => false, 'message' => \App\Support\ClientError::message($e)], 422);
         }
 
         $this->bumpCacheVersion("unite_reservations_index:{$result['reservation']->user_id}");
@@ -286,7 +286,7 @@ class UniteReservationController extends Controller
         try {
             $reservation = $this->repo->reject($id, $provider->id, $request->reason);
         } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return response()->json(['success' => false, 'message' => \App\Support\ClientError::message($e)], 422);
         }
 
         $this->bumpCacheVersion("unite_reservations_index:{$reservation->user_id}");

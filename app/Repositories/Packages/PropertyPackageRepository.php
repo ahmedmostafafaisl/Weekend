@@ -2,11 +2,10 @@
 
 namespace App\Repositories\Packages;
 
-
-
 use App\Models\AdPackage;
 use App\Models\PropertyPackage;
 use App\Repositories\Interfaces\PropertyPackageInterface;
+use App\Support\SafeUpload;
 
 class PropertyPackageRepository implements PropertyPackageInterface
 {
@@ -24,18 +23,9 @@ class PropertyPackageRepository implements PropertyPackageInterface
     {
         if (isset($data['image']) && is_file($data['image'])) {
             $image = request()->file('image');
-            $path = public_path("Packages/Property_packages");
-
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->move($path, $imageName);
-
-            // Save the relative path to DB
-            $data['image'] = "Packages/Property_packages/{$imageName}";
+            $data['image'] = SafeUpload::store($image, 'Packages/Property_packages', SafeUpload::IMAGES, 'image');
         }
+
         return PropertyPackage::create($data);
     }
 
@@ -44,19 +34,10 @@ class PropertyPackageRepository implements PropertyPackageInterface
         $package = $this->find($id);
         if (isset($data['image']) && is_file($data['image'])) {
             $image = request()->file('image');
-            $path = public_path("Packages/Property_packages");
-
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->move($path, $imageName);
-
-            // Save the relative path to DB
-            $data['image'] = "Packages/Property_packages/{$imageName}";
+            $data['image'] = SafeUpload::store($image, 'Packages/Property_packages', SafeUpload::IMAGES, 'image');
         }
         $package->update($data);
+
         return $package;
     }
 

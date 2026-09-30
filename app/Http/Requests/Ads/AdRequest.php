@@ -20,7 +20,9 @@ class AdRequest extends FormRequest
             'type' => ['nullable', 'in:property,ad'],
             'thumbnail' => ['nullable', 'file', 'image', 'max:10240'],
             'media' => ['nullable', 'array'],
-            'media.*' => ['file', 'max:51200'],  // each file up to 50MB (images/video)
+            // mimes checks the file CONTENT, not its name. Was ['file', 'max:51200']:
+            // any type accepted, including .php into the web root.
+            'media.*' => ['file', 'mimes:jpg,jpeg,png,gif,webp,mp4,mov,webm,mkv,avi', 'max:51200'],
             'is_active' => ['nullable', 'boolean'],
             'user_id' => $this->isApiRequest() ? 'nullable' : 'required|exists:users,id',
             'city' => ['nullable', 'string', 'max:100'],

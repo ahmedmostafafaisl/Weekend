@@ -29,7 +29,7 @@ class SuggestionController extends Controller
 
             ]);
         }
-        $users = User::all(); // Fetch users for the dropdown
+        $users = User::query()->select(['id', 'name', 'email'])->orderBy('name')->get();
 
         return view('dashboard.admin.suggestions.index', ['suggestions' => $data, 'users' => $users]);
 

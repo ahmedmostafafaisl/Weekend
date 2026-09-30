@@ -6,6 +6,7 @@ use App\Http\Resources\Ads\AdResource;
 use App\Models\Ad;
 use App\Models\AdView;
 use App\Repositories\Interfaces\AdInterface;
+use App\Support\SafeUpload;
 
 class AdRepository implements AdInterface
 {
@@ -187,27 +188,19 @@ class AdRepository implements AdInterface
 
     protected function handleFiles(array $data): array
     {
-        $path = public_path('Ads');
-
-        if (! file_exists($path)) {
-            mkdir($path, 0777, true);
-        }
-
         if (request()->hasFile('media')) {
             $files = request()->file('media');
             $file = is_array($files) ? ($files[0] ?? null) : $files;
             if ($file) {
-                $mediaName = time().'_media_'.$file->getClientOriginalName();
-                $file->move($path, $mediaName);
-                $data['media'] = "Ads/{$mediaName}";
+                // Ad media was validated only as ['file', 'max:51200'] — any
+                // type, stored in the web root under its client filename (RCE).
+                $data['media'] = SafeUpload::store($file, 'Ads', [...SafeUpload::IMAGES, ...SafeUpload::VIDEOS], 'media');
             }
         }
 
         if (request()->hasFile('thumbnail')) {
             $thumbnail = request()->file('thumbnail');
-            $thumbnailName = time().'_thumb_'.$thumbnail->getClientOriginalName();
-            $thumbnail->move($path, $thumbnailName);
-            $data['thumbnail'] = "Ads/{$thumbnailName}";
+            $data['thumbnail'] = SafeUpload::store($thumbnail, 'Ads', SafeUpload::IMAGES, 'thumbnail');
         }
 
         return $data;

@@ -19,7 +19,12 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    // Default '*' is unchanged. The API authenticates with Bearer tokens
+    // (never sent automatically by browsers) and supports_credentials is
+    // false, so a wildcard does not expose authenticated data. Native mobile
+    // apps are unaffected by CORS entirely. To restrict browser callers, set
+    // e.g. CORS_ALLOWED_ORIGINS=https://weekend.sa,https://admin.weekend.sa
+    'allowed_origins' => array_filter(array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS', '*')))),
 
     'allowed_origins_patterns' => [],
 

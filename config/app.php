@@ -56,6 +56,9 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+    // See App\Http\Middleware\TrustProxies::proxies().
+    'trusted_proxies' => env('TRUSTED_PROXIES', ''),
+
     'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
 
     'asset_url' => env('ASSET_URL'),

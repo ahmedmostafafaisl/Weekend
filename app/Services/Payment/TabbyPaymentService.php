@@ -25,10 +25,10 @@ class TabbyPaymentService extends BasePaymentService implements PaymentGatewayIn
 
     public function __construct()
     {
-        $this->publicKey = env('TABBY_PUBLIC_KEY', env('TAPPY_PUBLIC_KEY', ''));
-        $this->secretKey = env('TABBY_SECRET_KEY', env('TAPPY_SECRET_KEY', ''));
-        $this->baseUrl = env('TABBY_BASE_URL', env('TAPPY_BASE_URL', 'https://api.tabby.sa/api/v2/'));
-        $this->merchantCode = env('TABBY_MERCHANT_CODE', 'Naqiappsau');
+        $this->publicKey = (string) config('services.tabby.public_key', '');
+        $this->secretKey = (string) config('services.tabby.secret_key', '');
+        $this->baseUrl = (string) config('services.tabby.base_url', 'https://api.tabby.sa/api/v2/');
+        $this->merchantCode = (string) config('services.tabby.merchant_code', 'Naqiappsau');
     }
 
     public function sendPayment(Request|array $input): array
@@ -208,7 +208,7 @@ class TabbyPaymentService extends BasePaymentService implements PaymentGatewayIn
         } catch (\Throwable $e) {
             Log::error('Tabby sendPayment error', ['error' => $e->getMessage()]);
 
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -251,7 +251,7 @@ class TabbyPaymentService extends BasePaymentService implements PaymentGatewayIn
 
             return ['success' => $r->successful(), 'data' => $r->json()];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -262,7 +262,7 @@ class TabbyPaymentService extends BasePaymentService implements PaymentGatewayIn
 
             return $r->json();
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -278,7 +278,7 @@ class TabbyPaymentService extends BasePaymentService implements PaymentGatewayIn
 
             return ['success' => $r->successful(), 'data' => $r->json()];
         } catch (\Throwable $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => \App\Support\ClientError::message($e)];
         }
     }
 
@@ -325,7 +325,7 @@ class TabbyPaymentService extends BasePaymentService implements PaymentGatewayIn
             Log::error('Tabby capturePaymentRequest error', [
                 'payment_id' => $payment_id,
                 'reference_id' => $reference_id,
-                'error' => $e->getMessage(),
+                'error' => \App\Support\ClientError::message($e),
             ]);
 
             return null;
